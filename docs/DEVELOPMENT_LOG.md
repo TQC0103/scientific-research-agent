@@ -222,3 +222,17 @@ available; the laptop remains appropriate for unit tests and small smoke runs.
 The suite now contains 22 passing tests, including JSON extraction, query
 rewrite routing, fail-closed behavior, verified-passage filtering, contradictory
 output repair, hybrid lexical scoring, and all earlier metadata/PDF tests.
+
+## 2026-08-18 — Living architecture documentation
+
+Architecture documentation was promoted to a maintained project artifact.
+`docs/SYSTEM_VISUALIZATION.md` contains one module-only system diagram and one
+detailed internal diagram for each implemented module. `docs/PROJECT_STATE.md`
+is the concise current-state handoff, while this development log remains the
+chronological record of decisions, failures, and evaluations.
+
+A root `AGENTS.md` now requires future implementation sessions to update the
+visualization when interactions change, refresh project state after work, and
+record meaningful decisions or evaluations here. `.remember/remember.md` stays
+Git-ignored as a short cross-session handoff, not as the architecture source of
+truth.

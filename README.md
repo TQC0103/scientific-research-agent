@@ -70,3 +70,9 @@ a multi-agent swarm, or process figures/tables yet. See `docs/ROADMAP.md`.
 
 Implementation decisions, failures, fixes, and baseline evaluation results are
 recorded in `docs/DEVELOPMENT_LOG.md`.
+
+Architecture is documented as one module-only overview plus a detailed diagram
+for every module in `docs/SYSTEM_VISUALIZATION.md`. The current implementation,
+known issues, verification status, and next priorities are maintained in
+`docs/PROJECT_STATE.md`. Future coding sessions follow the update contract in
+`AGENTS.md` so these documents stay synchronized with the code.
