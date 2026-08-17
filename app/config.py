@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen3:4b-instruct"
     ollama_embed_model: str = "qwen3-embedding:0.6b"
     max_tool_loops: int = 6
+    max_retrieval_rewrites: int = 2
     arxiv_max_results: int = 10
     request_timeout_seconds: int = 120
     data_dir: Path = PROJECT_ROOT / "data"

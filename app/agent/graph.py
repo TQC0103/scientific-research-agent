@@ -5,6 +5,7 @@ from app.config import settings
 from app.db.database import search_local
 from app.ingestion.indexing import index_paper
 from app.models.llm import answer_from_evidence
+from app.models.verifier import verify_evidence
 from app.retrieval.vector_store import index_is_current, retrieve
 from app.tools.arxiv_search import get_arxiv_metadata, search_arxiv
 from app.tools.paper_download import PaperDownloadError
@@ -41,6 +42,9 @@ def discover(state: AgentState) -> dict:
         "failed_papers": [],
         "tool_errors": [],
         "iteration_count": 0,
+        "retrieval_query": state["user_query"],
+        "retrieval_attempt_count": 0,
+        "evidence_sufficient": False,
         "discovery_source": source,
     }
 
@@ -79,10 +83,11 @@ def retrieve_evidence(state: AgentState) -> dict:
     papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
     failed = set(state.get("failed_papers", []))
     evidence = []
+    retrieval_query = state.get("retrieval_query") or state["user_query"]
     for paper_id in state.get("selected_papers", []):
         paper = papers[paper_id]
         if paper_id not in failed and index_is_current(paper):
-            evidence.extend(retrieve(paper_id, state["user_query"], top_k=4))
+            evidence.extend(retrieve(paper_id, retrieval_query, top_k=6))
         elif paper.get("abstract"):
             evidence.append(
                 {
@@ -93,31 +98,97 @@ def retrieve_evidence(state: AgentState) -> dict:
                     "chunk_index": 0,
                     "text": paper["abstract"],
                     "score": 0.15,
+                    "retrieval_score": 0.0,
                 }
             )
-    evidence.sort(key=lambda item: item["score"], reverse=True)
-    return {"retrieved_chunks": evidence[:8]}
+    evidence.sort(key=lambda item: item.get("retrieval_score", item["score"]), reverse=True)
+    # Keep the newest retrieval first, then retain distinct passages from earlier
+    # attempts so the verifier can combine complementary evidence.
+    combined = evidence[:8] + state.get("retrieved_chunks", [])
+    unique = []
+    seen = set()
+    for item in combined:
+        key = (item["arxiv_id"], item.get("chunk_index"), item.get("page"), item["text"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return {"retrieved_chunks": unique[:12]}
 
 
 def check_evidence(state: AgentState) -> dict:
     evidence = state.get("retrieved_chunks", [])
-    full_text = [item for item in evidence if item.get("page") is not None]
-    enough = len(full_text) >= 3 and max((item["score"] for item in full_text), default=0) >= 0.30
-    if len(state.get("selected_papers", [])) >= AUTO_INDEX_LIMIT:
-        enough = True
-    if state.get("iteration_count", 0) >= settings.max_tool_loops:
-        enough = True
-    return {"evidence_sufficient": enough}
+    attempts = state.get("retrieval_attempt_count", 0) + 1
+    errors = list(state.get("tool_errors", []))
+    verifier_failed = False
+    try:
+        result = verify_evidence(
+            state["user_query"], evidence, state.get("retrieval_query") or state["user_query"]
+        )
+        verification = result.model_dump()
+    except (ValueError, OSError) as exc:
+        verifier_failed = True
+        verification = {
+            "sufficient": False,
+            "reason": "The local evidence verifier failed, so the system failed closed.",
+            "missing_information": ["A successful evidence verification."],
+            "suggested_query": state["user_query"],
+            "supported_evidence": [],
+        }
+        errors.append(f"verifier: {exc}")
+
+    proposed = (verification.get("suggested_query") or "").strip()
+    current = (state.get("retrieval_query") or state["user_query"]).strip()
+    if not verification["sufficient"] and (not proposed or proposed.casefold() == current.casefold()):
+        missing = " ".join(verification.get("missing_information") or []).strip()
+        proposed = (
+            f"{missing} specific mechanism terminology section table".strip()
+            if missing
+            else f"{current} specific evidence section table"
+        )
+    can_rewrite = (
+        not verification["sufficient"]
+        and not verifier_failed
+        and attempts <= settings.max_retrieval_rewrites
+        and bool(proposed)
+        and proposed.casefold() != current.casefold()
+    )
+    return {
+        "evidence_sufficient": verification["sufficient"],
+        "evidence_verification": verification,
+        "retrieval_query": proposed if can_rewrite else current,
+        "retrieval_attempt_count": attempts,
+        "should_retry_retrieval": can_rewrite,
+        "tool_errors": errors,
+    }
 
 
 def route_after_check(state: AgentState) -> str:
+    if state.get("evidence_sufficient"):
+        return "synthesize"
+    if state.get("should_retry_retrieval"):
+        return "retrieve"
     remaining = len(state.get("candidate_papers", [])) - len(state.get("selected_papers", []))
-    return "synthesize" if state.get("evidence_sufficient") or remaining <= 0 else "index_next"
+    can_index = (
+        remaining > 0
+        and len(state.get("selected_papers", [])) < AUTO_INDEX_LIMIT
+        and state.get("iteration_count", 0) < settings.max_tool_loops
+    )
+    return "index_next" if can_index else "synthesize"
 
 
 def synthesize(state: AgentState) -> dict:
     papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
-    answer = answer_from_evidence(state["user_query"], state.get("retrieved_chunks", []), papers)
+    verification = state.get("evidence_verification", {})
+    if not state.get("evidence_sufficient"):
+        missing = verification.get("missing_information") or ["Direct supporting evidence."]
+        answer = "Insufficient evidence to answer without guessing."
+        answer += f"\n\nReason: {verification.get('reason', 'The retrieved passages were insufficient.')}"
+        answer += "\n\nMissing:\n- " + "\n- ".join(missing)
+    else:
+        evidence = state.get("retrieved_chunks", [])
+        supported = verification.get("supported_evidence", [])
+        verified_evidence = [evidence[number - 1] for number in supported]
+        answer = answer_from_evidence(state["user_query"], verified_evidence, papers)
     if state.get("tool_errors"):
         answer += "\n\nRetrieval notes:\n- " + "\n- ".join(state["tool_errors"])
     return {"answer": answer}
@@ -135,7 +206,9 @@ def build_graph():
     graph.add_edge("index_next", "retrieve")
     graph.add_edge("retrieve", "check")
     graph.add_conditional_edges(
-        "check", route_after_check, {"index_next": "index_next", "synthesize": "synthesize"}
+        "check",
+        route_after_check,
+        {"retrieve": "retrieve", "index_next": "index_next", "synthesize": "synthesize"},
     )
     graph.add_edge("synthesize", END)
     return graph.compile()

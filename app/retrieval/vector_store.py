@@ -1,4 +1,7 @@
 import json
+import math
+import re
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -8,6 +11,28 @@ from langchain_ollama import OllamaEmbeddings
 
 from app.config import settings
 from app.tools.paper_download import safe_paper_id
+
+TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+LEXICAL_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "does",
+    "how",
+    "in",
+    "is",
+    "of",
+    "or",
+    "the",
+    "to",
+    "what",
+    "which",
+    "why",
+    "with",
+    "without",
+}
+RRF_K = 60
 
 
 def _embeddings() -> OllamaEmbeddings:
@@ -68,6 +93,33 @@ def index_is_current(paper: dict) -> bool:
     )
 
 
+def _lexical_scores(query: str, chunks: list[dict]) -> list[float]:
+    """Small BM25-like scorer used alongside dense retrieval."""
+    terms = {
+        token
+        for token in TOKEN_PATTERN.findall(query.casefold())
+        if len(token) > 2 and token not in LEXICAL_STOPWORDS
+    }
+    if not terms:
+        return [0.0] * len(chunks)
+    documents = [TOKEN_PATTERN.findall(chunk["text"].casefold()) for chunk in chunks]
+    document_frequency = {
+        term: sum(term in set(document) for document in documents) for term in terms
+    }
+    count = len(documents)
+    scores = []
+    for document in documents:
+        frequencies = Counter(document)
+        score = sum(
+            (1 + math.log(frequencies[term]))
+            * math.log((count + 1) / (document_frequency[term] + 1))
+            for term in terms
+            if frequencies[term]
+        )
+        scores.append(score)
+    return scores
+
+
 def retrieve(arxiv_id: str, query: str, *, top_k: int = 5) -> list[dict]:
     source = index_directory(arxiv_id)
     index_path, chunks_path = source / "index.faiss", source / "chunks.json"
@@ -81,17 +133,42 @@ def retrieve(arxiv_id: str, query: str, *, top_k: int = 5) -> list[dict]:
     )
     query_vector = np.asarray([_embeddings().embed_query(query)], dtype="float32")
     faiss.normalize_L2(query_vector)
-    scores, positions = index.search(query_vector, min(top_k, len(chunks)))
+    candidate_count = min(max(top_k * 3, 20), len(chunks))
+    scores, positions = index.search(query_vector, candidate_count)
+    dense_by_position = {
+        int(position): (rank, float(score))
+        for rank, (score, position) in enumerate(zip(scores[0], positions[0], strict=True), 1)
+        if position >= 0
+    }
+    lexical_scores = _lexical_scores(query, chunks)
+    lexical_order = sorted(range(len(chunks)), key=lambda pos: lexical_scores[pos], reverse=True)
+    lexical_rank = {
+        position: rank
+        for rank, position in enumerate(lexical_order, 1)
+        if lexical_scores[position] > 0
+    }
+    candidates = set(dense_by_position) | set(lexical_order[:top_k])
+    fused = []
+    for position in candidates:
+        dense_rank, dense_score = dense_by_position.get(position, (None, 0.0))
+        word_rank = lexical_rank.get(position)
+        retrieval_score = (1 / (RRF_K + dense_rank) if dense_rank else 0.0) + (
+            1 / (RRF_K + word_rank) if word_rank else 0.0
+        )
+        fused.append((retrieval_score, dense_score, dense_rank, word_rank, position))
+    fused.sort(reverse=True)
     results = []
-    for score, position in zip(scores[0], positions[0], strict=True):
-        if position >= 0:
-            item = dict(chunks[int(position)])
-            item.update(
-                {
-                    "arxiv_id": arxiv_id,
-                    "versioned_id": metadata.get("versioned_id", arxiv_id),
-                    "score": float(score),
-                }
-            )
-            results.append(item)
+    for retrieval_score, dense_score, dense_rank, word_rank, position in fused[:top_k]:
+        item = dict(chunks[position])
+        item.update(
+            {
+                "arxiv_id": arxiv_id,
+                "versioned_id": metadata.get("versioned_id", arxiv_id),
+                "score": dense_score,
+                "retrieval_score": retrieval_score,
+                "dense_rank": dense_rank,
+                "lexical_rank": word_rank,
+            }
+        )
+        results.append(item)
     return results

@@ -5,12 +5,14 @@ from langchain_ollama import ChatOllama
 from app.config import settings
 
 
-def get_llm(*, temperature: float = 0.1) -> ChatOllama:
+def get_llm(*, temperature: float = 0.1, num_predict: int = 1000, seed: int = 42) -> ChatOllama:
     return ChatOllama(
         model=settings.ollama_model,
         base_url=settings.ollama_base_url,
         temperature=temperature,
         num_ctx=16384,
+        num_predict=num_predict,
+        seed=seed,
     )
 
 

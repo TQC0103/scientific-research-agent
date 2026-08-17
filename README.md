@@ -9,6 +9,8 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - explicit first-submission vs last-revision dates and version-aware citations
 - lazy PDF download, PyMuPDF parsing, section-aware chunking
 - per-paper Ollama embeddings and FAISS indexes
+- hybrid dense + lexical retrieval with reciprocal-rank fusion
+- local Qwen evidence verification, query rewrite, and fail-closed abstention
 - evidence retrieval with page/section citations
 - a bounded LangGraph search/index/retrieve/answer loop
 - CLI, Gradio UI, smoke tests, and local data isolation
@@ -29,8 +31,14 @@ research-agent ui
 ```
 
 Replace the sample arXiv ID with one returned by `search`. `chat` may search and
-index up to two promising papers automatically; `ask` is the faster, controlled
-single-paper path.
+index up to two promising papers automatically. Both `ask` and `chat` use the
+same evidence-verification workflow; `ask` limits discovery to the supplied papers.
+
+The workflow does not treat vector similarity as proof. Qwen checks whether the
+retrieved passages actually cover the question, identifies supported passages,
+and proposes a focused retrieval query when information is missing. Only verified
+passages reach answer synthesis. After two rewrites, unresolved questions return
+an explicit insufficient-evidence response instead of a guessed answer.
 
 ## Data layout
 

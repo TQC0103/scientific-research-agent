@@ -9,11 +9,10 @@ from rich.table import Table
 
 from app.agent.graph import research_graph
 from app.config import settings
-from app.db.database import get_paper, search_local
+from app.db.database import search_local
 from app.ingestion.indexing import index_paper
-from app.models.llm import answer_from_evidence
-from app.retrieval.vector_store import index_is_current, retrieve
-from app.tools.arxiv_search import get_arxiv_metadata, search_arxiv
+from app.retrieval.vector_store import retrieve
+from app.tools.arxiv_search import search_arxiv
 
 app = typer.Typer(no_args_is_help=True, help="Local-first scientific research assistant")
 console = Console()
@@ -105,17 +104,8 @@ def ask_command(
     query: str, paper_id: Annotated[list[str], typer.Option("--paper-id", "-p")]
 ) -> None:
     """Answer from one or more already-indexed papers."""
-    evidence = []
-    papers = {}
-    for pid in paper_id:
-        paper = get_arxiv_metadata(pid)
-        if not index_is_current(paper):
-            index_paper(pid, paper=paper)
-            paper = get_paper(paper["arxiv_id"]) or paper
-        papers[paper["arxiv_id"]] = paper
-        evidence.extend(retrieve(paper["arxiv_id"], query, top_k=4))
-    evidence.sort(key=lambda item: item["score"], reverse=True)
-    console.print(answer_from_evidence(query, evidence[:8], papers))
+    result = research_graph.invoke({"user_query": query, "paper_ids": paper_id})
+    console.print(result["answer"])
 
 
 @app.command("chat")
@@ -130,7 +120,9 @@ def chat_command(
         console.print(
             f"[dim]discovery={result.get('discovery_source')} "
             f"selected={result.get('selected_papers', [])} "
-            f"failed={result.get('failed_papers', [])}[/dim]"
+            f"failed={result.get('failed_papers', [])} "
+            f"retrieval_attempts={result.get('retrieval_attempt_count', 0)} "
+            f"verified={result.get('evidence_sufficient', False)}[/dim]"
         )
     console.print(result["answer"])
 

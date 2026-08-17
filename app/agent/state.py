@@ -8,6 +8,10 @@ class AgentState(TypedDict, total=False):
     selected_papers: list[str]
     retrieved_chunks: list[dict]
     evidence_sufficient: bool
+    evidence_verification: dict
+    retrieval_query: str
+    retrieval_attempt_count: int
+    should_retry_retrieval: bool
     answer: str
     iteration_count: int
     discovery_source: str

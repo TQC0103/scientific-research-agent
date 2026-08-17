@@ -152,4 +152,73 @@ Key commits:
 ```text
 5007275 Initial V1 scientific research agent
 6cc9869 Harden arXiv metadata and PDF lifecycle
+c4af443 Document development history and baseline evaluation
 ```
+
+## 2026-08-18 — LLM evidence verifier and hybrid retrieval
+
+The numeric evidence gate was replaced with a structured local verifier using
+`qwen3:4b-instruct`. It receives the question and retrieved passages and returns:
+
+- whether the evidence is sufficient;
+- a reason and specific missing information;
+- a focused replacement retrieval query;
+- the passage numbers that directly support synthesis.
+
+Only passages selected by the verifier reach answer synthesis. If evidence is
+still insufficient after at most two query rewrites, the graph returns an
+insufficient-evidence response and does not call the synthesis model. Verifier
+errors also fail closed. The controlled `ask` command was moved onto the same
+graph as `chat`, removing the former bypass around evidence verification.
+
+### Failures found while calibrating
+
+The first prompt was too strict: it rejected all six baseline cases, including
+passages that explicitly stated the answer, because it demanded experimental
+comparisons or enumerated formatting that the questions did not request. A
+semantic sufficiency rubric and general positive/negative calibration examples
+fixed that behavior without embedding Transformer-specific answers in code.
+
+A second failure was more dangerous: the 4B verifier incorrectly treated
+self-attention and decoder masking as the mechanism that represents token
+order. Inspection showed that the actual positional-encoding chunk was dense
+rank 11, outside the six passages shown to the verifier. Retrieval was therefore
+changed from FAISS-only to hybrid dense + lexical ranking using reciprocal-rank
+fusion. The correct chunk became fused rank 5 and the verifier selected page 6.
+The BLEU result table likewise appears near the top for exact metric terms.
+
+The model also once returned a contradictory structure: `sufficient=false`, an
+empty missing-information list, a supporting passage, and a reason concluding
+that the evidence was fully sufficient. Schema post-processing now repairs this
+specific logical contradiction. A fixed Ollama seed makes repeated verifier
+runs reproducible, and a generic missing-information fallback forces a changed
+query when the model merely repeats the current query.
+
+### Post-change six-case result
+
+The unchanged six questions were run end to end against `1706.03762v7`:
+
+| Case | Expected action | Result | Verifier calls |
+|---|---|---:|---:|
+| Multi-head rationale | Answer | Answered from pages 5/2/4 | 1 |
+| Token order | Answer | Answered from positional encoding on page 6 | 2 |
+| Base/big EN-DE BLEU | Answer | Answered from Table 2 on page 8 | 1 |
+| Three attention uses | Answer | Answered from pages 5/3 | 1 |
+| ImageNet negative claim | Abstain | Insufficient evidence | 3 |
+| Explicit limitations | Abstain | Insufficient evidence | 3 |
+
+The verifier made the expected answer/abstain decision in 6/6 cases. All four
+answered cases used the correct supporting page; the two negative/exhaustive
+questions stopped without synthesis. This is a small calibration set, not a
+general accuracy claim. The known section-parser errors remain: page 6 and the
+page-8 table can still inherit `Attention` instead of their true headings.
+
+Local execution was slow because the 4 GB laptop GPU must hold/swap both the
+embedding and 4B reasoning models, and insufficient cases invoke the verifier
+three times. Future batch and model-comparison benchmarks should use the user's
+Kaggle Control Plane/GPU and parallel execution when that connection is
+available; the laptop remains appropriate for unit tests and small smoke runs.
+
+The suite now contains 22 passing tests, including JSON extraction, query
+rewrite routing, fail-closed behavior, verified-passage filtering, contradictory
+output repair, hybrid lexical scoring, and all earlier metadata/PDF tests.

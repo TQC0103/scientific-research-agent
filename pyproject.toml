@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scientific-research-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "A local-first, citation-grounded scientific research assistant for arXiv papers."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
