@@ -3,10 +3,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.remember/
 .env
 data/papers/*.pdf
 data/indexes/*
 data/research.db*
 !data/papers/.gitkeep
 !data/indexes/.gitkeep
-

@@ -59,3 +59,6 @@ inventing a page citation. See `docs/METADATA_AND_PDF_POLICY.md`.
 
 This is intentionally V1. It does not ingest all of arXiv, fine-tune models, run
 a multi-agent swarm, or process figures/tables yet. See `docs/ROADMAP.md`.
+
+Implementation decisions, failures, fixes, and baseline evaluation results are
+recorded in `docs/DEVELOPMENT_LOG.md`.
