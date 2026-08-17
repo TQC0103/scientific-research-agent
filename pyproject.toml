@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scientific-research-agent"
+version = "0.1.0"
+description = "A local-first, citation-grounded scientific research assistant for arXiv papers."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "arxiv>=2.2,<3",
+  "faiss-cpu>=1.10,<2",
+  "gradio>=5,<7",
+  "langchain>=1,<2",
+  "langchain-community>=0.4,<1",
+  "langchain-ollama>=1,<2",
+  "langgraph>=1,<2",
+  "pydantic-settings>=2.7,<3",
+  "pymupdf>=1.25,<2",
+  "rich>=13.9,<15",
+  "typer>=0.15,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<10",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+research-agent = "app.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
