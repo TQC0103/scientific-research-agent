@@ -11,7 +11,9 @@ def research(question: str) -> str:
 
 
 with gr.Blocks(title="Scientific Research Assistant") as demo:
-    gr.Markdown("# Scientific Research Assistant\nLocal arXiv search, lazy ingestion, and cited answers.")
+    gr.Markdown(
+        "# Scientific Research Assistant\nLocal arXiv search, lazy ingestion, and cited answers."
+    )
     question = gr.Textbox(label="Research question", lines=3)
     run = gr.Button("Research", variant="primary")
     answer = gr.Markdown()
@@ -20,4 +22,3 @@ with gr.Blocks(title="Scientific Research Assistant") as demo:
 
 if __name__ == "__main__":
     demo.launch()
-

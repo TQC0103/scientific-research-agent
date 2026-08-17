@@ -10,4 +10,6 @@ class AgentState(TypedDict, total=False):
     evidence_sufficient: bool
     answer: str
     iteration_count: int
-
+    discovery_source: str
+    failed_papers: list[str]
+    tool_errors: list[str]

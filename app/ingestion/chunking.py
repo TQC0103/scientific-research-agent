@@ -43,4 +43,3 @@ def chunk_pages(pages: list[dict], *, chunk_size: int = 1800, overlap: int = 250
                     break
                 start = max(end - overlap, start + 1)
     return chunks
-

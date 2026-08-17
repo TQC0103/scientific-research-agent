@@ -20,7 +20,9 @@ def answer_from_evidence(question: str, evidence: list[dict], papers: dict[str, 
     excerpts = []
     for number, item in enumerate(evidence, start=1):
         paper = papers.get(item["arxiv_id"], {})
-        label = f"[{number}] arXiv:{item['arxiv_id']}, p.{item['page']}, {item['section']}"
+        source_id = item.get("versioned_id") or paper.get("versioned_id") or item["arxiv_id"]
+        location = f"p.{item['page']}, {item['section']}" if item.get("page") else "Abstract"
+        label = f"[{number}] arXiv:{source_id}, {location}"
         excerpts.append(f"{label}\nTitle: {paper.get('title', 'Unknown')}\n{item['text']}")
     prompt = f"""You are a careful scientific research assistant.
 Answer the question using ONLY the evidence below. Every substantive scientific claim
@@ -55,8 +57,7 @@ def format_verified_sources(answer: str, evidence: list[dict], papers: dict[str,
     for number in cited:
         item = evidence[number - 1]
         paper = papers.get(item["arxiv_id"], {})
-        lines.append(
-            f"[{number}] arXiv:{item['arxiv_id']} — {paper.get('title', 'Unknown')} — "
-            f"p.{item['page']}, {item['section']}"
-        )
+        source_id = item.get("versioned_id") or paper.get("versioned_id") or item["arxiv_id"]
+        location = f"p.{item['page']}, {item['section']}" if item.get("page") else "Abstract"
+        lines.append(f"[{number}] arXiv:{source_id} — {paper.get('title', 'Unknown')} — {location}")
     return f"{answer}\n\nSources:\n" + "\n".join(lines)

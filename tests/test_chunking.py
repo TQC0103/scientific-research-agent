@@ -14,4 +14,3 @@ def test_chunk_metadata_is_preserved() -> None:
     assert all(chunk["page"] == 4 for chunk in chunks)
     assert all(chunk["section"] == "Method" for chunk in chunks)
     assert [chunk["chunk_index"] for chunk in chunks] == list(range(len(chunks)))
-

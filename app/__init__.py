@@ -1,2 +1,1 @@
 """Scientific research agent package."""
-

@@ -3,6 +3,7 @@
 ## V1 (current)
 
 - Search and persist arXiv metadata
+- Preserve arXiv revisions and distinguish first submission from last revision
 - Lazy download and text extraction
 - Section-aware chunks and FAISS retrieval
 - Single/multi-paper grounded answers
@@ -22,4 +23,4 @@
 - QLoRA/distillation
 - PostgreSQL/Qdrant and deployment
 - Scheduled arXiv discovery
-
+- DOI/Crossref enrichment for journal publication dates and venues

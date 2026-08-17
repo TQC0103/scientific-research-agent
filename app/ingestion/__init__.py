@@ -1,2 +1,1 @@
 """Paper ingestion pipeline."""
-

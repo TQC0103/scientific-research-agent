@@ -9,11 +9,11 @@ from rich.table import Table
 
 from app.agent.graph import research_graph
 from app.config import settings
-from app.db.database import get_paper
+from app.db.database import get_paper, search_local
 from app.ingestion.indexing import index_paper
 from app.models.llm import answer_from_evidence
-from app.retrieval.vector_store import retrieve
-from app.tools.arxiv_search import search_arxiv
+from app.retrieval.vector_store import index_is_current, retrieve
+from app.tools.arxiv_search import get_arxiv_metadata, search_arxiv
 
 app = typer.Typer(no_args_is_help=True, help="Local-first scientific research assistant")
 console = Console()
@@ -30,7 +30,9 @@ def doctor() -> None:
         names = {model["name"] for model in payload.get("models", [])}
         for model in (settings.ollama_model, settings.ollama_embed_model):
             present = model in names or any(name.startswith(f"{model}:") for name in names)
-            console.print(f"{'[green]OK[/green]' if present else '[red]MISSING[/red]'} model: {model}")
+            console.print(
+                f"{'[green]OK[/green]' if present else '[red]MISSING[/red]'} model: {model}"
+            )
     except (OSError, urllib.error.URLError) as exc:
         console.print(f"[red]Ollama unavailable:[/red] {exc}")
         raise typer.Exit(1) from exc
@@ -42,12 +44,30 @@ def search_command(
     year: Annotated[int | None, typer.Option()] = None,
     category: Annotated[str | None, typer.Option()] = None,
     limit: Annotated[int, typer.Option(min=1, max=50)] = 10,
+    date_mode: Annotated[
+        str,
+        typer.Option(help="first_submitted, last_revised, or active_in_period"),
+    ] = "first_submitted",
 ) -> None:
     """Search arXiv and save metadata to SQLite."""
-    papers = search_arxiv(query, year=year, category=category, max_results=limit)
-    table = Table("arXiv ID", "Published", "Title")
+    valid_modes = {"first_submitted", "last_revised", "active_in_period"}
+    if date_mode not in valid_modes:
+        raise typer.BadParameter(f"date-mode must be one of: {', '.join(sorted(valid_modes))}")
+    papers = search_arxiv(
+        query,
+        year=year,
+        category=category,
+        max_results=limit,
+        date_mode=date_mode,  # type: ignore[arg-type]
+    )
+    table = Table("arXiv version", "First submitted", "Last revised", "Title")
     for paper in papers:
-        table.add_row(paper["arxiv_id"], (paper["published"] or "")[:10], paper["title"])
+        table.add_row(
+            paper.get("versioned_id") or paper["arxiv_id"],
+            (paper.get("first_submitted_at") or "")[:10],
+            (paper.get("last_revised_at") or "")[:10],
+            paper["title"],
+        )
     console.print(table)
 
 
@@ -66,25 +86,52 @@ def retrieve_command(arxiv_id: str, query: str, top_k: int = 5) -> None:
         console.print(item["text"])
 
 
+@app.command("local-search")
+def local_search_command(query: str, limit: int = 10) -> None:
+    """Search cached title/abstract metadata with SQLite FTS5."""
+    table = Table("arXiv version", "First submitted", "Last revised", "Title")
+    for paper in search_local(query, limit=limit):
+        table.add_row(
+            paper.get("versioned_id") or paper["arxiv_id"],
+            (paper.get("first_submitted_at") or "")[:10],
+            (paper.get("last_revised_at") or "")[:10],
+            paper["title"],
+        )
+    console.print(table)
+
+
 @app.command("ask")
-def ask_command(query: str, paper_id: Annotated[list[str], typer.Option("--paper-id", "-p")]) -> None:
+def ask_command(
+    query: str, paper_id: Annotated[list[str], typer.Option("--paper-id", "-p")]
+) -> None:
     """Answer from one or more already-indexed papers."""
     evidence = []
     papers = {}
     for pid in paper_id:
-        paper = get_paper(pid)
-        if not paper:
-            raise typer.BadParameter(f"Unknown paper {pid}; run search/index first.")
-        papers[pid] = paper
-        evidence.extend(retrieve(pid, query, top_k=4))
+        paper = get_arxiv_metadata(pid)
+        if not index_is_current(paper):
+            index_paper(pid, paper=paper)
+            paper = get_paper(paper["arxiv_id"]) or paper
+        papers[paper["arxiv_id"]] = paper
+        evidence.extend(retrieve(paper["arxiv_id"], query, top_k=4))
     evidence.sort(key=lambda item: item["score"], reverse=True)
     console.print(answer_from_evidence(query, evidence[:8], papers))
 
 
 @app.command("chat")
-def chat_command(query: str, paper_id: Annotated[list[str] | None, typer.Option("--paper-id", "-p")] = None) -> None:
+def chat_command(
+    query: str,
+    paper_id: Annotated[list[str] | None, typer.Option("--paper-id", "-p")] = None,
+    trace: Annotated[bool, typer.Option(help="Show discovery and retrieval decisions")] = False,
+) -> None:
     """Run the bounded LangGraph workflow, including lazy search/index."""
     result = research_graph.invoke({"user_query": query, "paper_ids": paper_id or []})
+    if trace:
+        console.print(
+            f"[dim]discovery={result.get('discovery_source')} "
+            f"selected={result.get('selected_papers', [])} "
+            f"failed={result.get('failed_papers', [])}[/dim]"
+        )
     console.print(result["answer"])
 
 
@@ -102,4 +149,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
