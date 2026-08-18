@@ -23,5 +23,6 @@ class AgentState(TypedDict, total=False):
     answer: str
     iteration_count: int
     discovery_source: str
+    query_plan: dict
     failed_papers: list[str]
     tool_errors: list[str]

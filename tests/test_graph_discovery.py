@@ -1,5 +1,16 @@
 from app.agent import graph
+from app.models.planner import QueryPlan
 from app.tools.paper_download import PdfUnavailableError
+
+
+def _plan(mode: str = "single_paper") -> QueryPlan:
+    return QueryPlan(
+        mode=mode,
+        search_query="planned scientific query",
+        required_paper_count=2 if mode == "multi_paper" else 1,
+        comparison_dimensions=["architecture"] if mode == "multi_paper" else [],
+        rationale="Test plan.",
+    )
 
 
 def test_discover_uses_local_fts_without_remote_when_catalog_is_sufficient(monkeypatch) -> None:
@@ -8,6 +19,7 @@ def test_discover_uses_local_fts_without_remote_when_catalog_is_sufficient(monke
         for number in range(1, 4)
     ]
     monkeypatch.setattr(graph, "search_local", lambda query, limit: local)
+    monkeypatch.setattr(graph, "plan_query", lambda *args, **kwargs: _plan())
 
     def fail_remote(*args, **kwargs):
         raise AssertionError("Remote arXiv search should not run")
@@ -20,6 +32,17 @@ def test_discover_uses_local_fts_without_remote_when_catalog_is_sufficient(monke
 
 
 def test_explicit_multi_paper_discovery_requires_every_paper(monkeypatch) -> None:
+    monkeypatch.setattr(
+        graph,
+        "plan_query",
+        lambda *args, **kwargs: QueryPlan(
+            mode="multi_paper",
+            search_query="planned query",
+            required_paper_count=2,
+            comparison_dimensions=["method"],
+            rationale="Test plan.",
+        ),
+    )
     monkeypatch.setattr(
         graph,
         "get_arxiv_metadata",
@@ -42,10 +65,32 @@ def test_automatic_comparison_requires_two_candidates(monkeypatch) -> None:
         for number in range(1, 4)
     ]
     monkeypatch.setattr(graph, "search_local", lambda query, limit: local)
+    monkeypatch.setattr(
+        graph, "plan_query", lambda *args, **kwargs: _plan("multi_paper")
+    )
     result = graph.discover({"user_query": "Compare these approaches", "paper_ids": []})
     assert result["coverage_mode"] == "all"
     assert result["required_paper_ids"] == ["2401.00001", "2401.00002"]
     assert result["required_paper_count"] == 2
+
+
+def test_discovery_uses_planned_query_for_local_and_remote_search(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(graph, "plan_query", lambda *args, **kwargs: _plan())
+    monkeypatch.setattr(
+        graph, "search_local", lambda query, limit: calls.append(("local", query)) or []
+    )
+    monkeypatch.setattr(
+        graph, "search_arxiv", lambda query, max_results: calls.append(("arxiv", query)) or []
+    )
+
+    result = graph.discover({"user_query": "verbose original request", "paper_ids": []})
+
+    assert calls == [
+        ("local", "planned scientific query"),
+        ("arxiv", "planned scientific query"),
+    ]
+    assert result["query_plan"]["search_query"] == "planned scientific query"
 
 
 def test_pdf_failure_falls_back_to_abstract(monkeypatch) -> None:

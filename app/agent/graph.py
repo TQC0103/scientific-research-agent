@@ -1,5 +1,3 @@
-import re
-
 from langgraph.graph import END, START, StateGraph
 
 from app.agent.state import AgentState
@@ -7,6 +5,7 @@ from app.config import settings
 from app.db.database import search_local
 from app.ingestion.indexing import index_paper
 from app.models.llm import answer_from_evidence
+from app.models.planner import plan_query
 from app.models.verifier import verify_evidence
 from app.retrieval.vector_store import index_is_current, retrieve
 from app.tools.arxiv_search import get_arxiv_metadata, search_arxiv
@@ -14,11 +13,6 @@ from app.tools.paper_download import PaperDownloadError
 
 AUTO_INDEX_LIMIT = 2
 MIN_LOCAL_CANDIDATES = 3
-MULTI_PAPER_PATTERN = re.compile(
-    r"\b(compare|comparison|versus|vs\.?|differences?|similarities?|two papers?)\b"
-    r"|so sánh|khác nhau|giống nhau|hai (bài|paper)",
-    re.IGNORECASE,
-)
 
 
 def _merge_candidates(*groups: list[dict]) -> list[dict]:
@@ -27,10 +21,6 @@ def _merge_candidates(*groups: list[dict]) -> list[dict]:
         for paper in group:
             merged[paper["arxiv_id"]] = paper
     return list(merged.values())
-
-
-def _requires_multi_paper(query: str) -> bool:
-    return bool(MULTI_PAPER_PATTERN.search(query))
 
 
 def _group_evidence(evidence: list[dict]) -> dict[str, list[dict]]:
@@ -67,6 +57,10 @@ def _coverage_sufficient(state: AgentState, verifications: dict[str, dict]) -> b
 
 def discover(state: AgentState) -> dict:
     explicit = state.get("paper_ids", [])
+    plan = plan_query(
+        state["user_query"],
+        forced_paper_count=len(explicit) if explicit else None,
+    )
     if explicit:
         candidates = _merge_candidates([get_arxiv_metadata(pid) for pid in explicit])
         source = "explicit_arxiv_ids"
@@ -74,15 +68,15 @@ def discover(state: AgentState) -> dict:
         required_paper_ids = [paper["arxiv_id"] for paper in candidates]
         required_paper_count = len(required_paper_ids)
     else:
-        local = search_local(state["user_query"], limit=5)
+        local = search_local(plan.search_query, limit=5)
         if len(local) >= MIN_LOCAL_CANDIDATES:
             candidates = local
             source = "sqlite_fts5"
         else:
-            remote = search_arxiv(state["user_query"], max_results=5)
+            remote = search_arxiv(plan.search_query, max_results=5)
             candidates = _merge_candidates(local, remote)
             source = "sqlite_fts5+arxiv" if local else "arxiv"
-        if _requires_multi_paper(state["user_query"]):
+        if plan.mode == "multi_paper":
             coverage_mode = "all"
             required_paper_ids = [
                 paper["arxiv_id"] for paper in candidates[:AUTO_INDEX_LIMIT]
@@ -111,6 +105,7 @@ def discover(state: AgentState) -> dict:
         "evidence_verifications": {},
         "papers_to_retrieve": [],
         "discovery_source": source,
+        "query_plan": plan.model_dump(),
     }
 
 
