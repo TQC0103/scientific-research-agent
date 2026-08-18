@@ -275,3 +275,38 @@ cross-paper synthesis and paper-specific fail-closed behavior. The suite grew
 from 22 to 28 passing tests, including required-paper discovery, isolated retry,
 per-paper supported-passage filtering, full two-paper graph execution, and
 routing to the next required paper.
+
+## 2026-08-18 — Structured query planner and deterministic policy enforcement
+
+The bilingual comparison regex in `app/agent/graph.py` was removed from coverage routing.
+Automatic discovery now sends the user question plus discovered candidate metadata to a
+structured `qwen3:4b-instruct` planner. The planner returns semantic intent, `any`/`all`
+coverage, proposed required paper IDs/count, explicit comparison dimensions, and a short
+reason. Explicit `--paper-id` values do not call the planner; they remain deterministic user
+constraints and require every supplied paper.
+
+The model is intentionally not trusted as the final controller. Python rejects planner paper
+IDs that are outside the discovered candidate set, deduplicates requirements, forces
+multi-source intents to `coverage=all`, and requires at least two sides for comparison/synthesis
+intents. `AUTO_INDEX_LIMIT` caps only the automatic execution set: if a planner says five papers
+are logically required but the budget admits two, `required_paper_count` remains five so aggregate
+coverage fails closed after the two allowed papers rather than treating them as complete. If a
+hallucinated ID is removed, trusted ranked candidates fill the remaining executable slots.
+Planner dimensions are kept in state and CLI traces, but the verifier continues to judge the original question so a
+bad dimension extraction cannot silently strengthen the evidence requirement.
+
+Planner invocation, JSON parsing, or schema validation failures do not crash the graph and do
+not fall back to the old keyword heuristic. The harness instead uses a conservative
+`coverage=all` plan over trusted candidates within the automatic indexing budget. This choice
+prefers extra work or abstention over the more dangerous failure mode of answering a true
+multi-paper question from only one paper. `chat --trace` now surfaces planner status, intent,
+dimensions, normalization warnings, and planner errors.
+
+Regression tests were added for explicit-ID planner bypass, structured planner parsing,
+ordinary `coverage=any`, automatic comparison coverage, hallucinated-ID rejection, malformed
+planner fallback, hard automatic-index budget enforcement, cross-field normalization, and
+preservation of comparison dimensions. Python compilation and `git diff --check` passed, and
+the 10 focused planner/discovery tests passed in an isolated stub harness. After application,
+`ruff check .` passed and the full pytest suite completed with 36/36 tests passing in the
+repository development environment. This records both isolated planner validation and the
+full integration-level regression result before handoff.

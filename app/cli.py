@@ -119,8 +119,11 @@ def chat_command(
     if trace:
         attempts = result.get("retrieval_attempt_counts", {})
         coverage = result.get("evidence_verification", {}).get("coverage_mode", "any")
+        plan = result.get("query_plan", {})
         console.print(
             f"[dim]discovery={result.get('discovery_source')} "
+            f"plan={plan.get('mode')} "
+            f"planner_fallback={plan.get('used_fallback', False)} "
             f"selected={result.get('selected_papers', [])} "
             f"failed={result.get('failed_papers', [])} "
             f"coverage={coverage} "

@@ -11,6 +11,7 @@ be drawn as current behavior.
 flowchart LR
     UI["Interface module"] --> AGENT["Agent orchestration module"]
     AGENT <--> DISCOVERY["Discovery and catalog module"]
+    AGENT <--> PLANNER["Query planning module"]
     AGENT <--> INGESTION["PDF ingestion module"]
     AGENT <--> RETRIEVAL["Hybrid retrieval module"]
     AGENT <--> VERIFIER["Evidence verification module"]
@@ -21,7 +22,8 @@ flowchart LR
     INGESTION <--> STORAGE
     RETRIEVAL <--> STORAGE
 
-    RETRIEVAL <--> MODELS["Local model runtime module"]
+    PLANNER <--> MODELS["Local model runtime module"]
+    RETRIEVAL <--> MODELS
     VERIFIER <--> MODELS
     ANSWER <--> MODELS
 ```
@@ -53,9 +55,15 @@ Implementation: `app/agent/graph.py`, `app/agent/state.py`.
 
 ```mermaid
 flowchart TD
-    START(["START"]) --> DISCOVER["discover"]
-    DISCOVER --> COVERAGE["Choose any/all coverage and required paper IDs"]
-    COVERAGE --> INDEX["index_next required paper"]
+    START(["START"]) --> DISCOVER["discover candidates"]
+    DISCOVER --> EXPLICIT{"Explicit paper IDs?"}
+    EXPLICIT -->|"yes"| HARD["Hard coverage=all; bypass planner"]
+    EXPLICIT -->|"no"| PLAN["Structured semantic query planner"]
+    PLAN --> VALIDATE["Allow-list candidate IDs; enforce policy consistency + budget"]
+    PLAN -->|"model / JSON / schema failure"| FALLBACK["Conservative coverage=all fallback"]
+    HARD --> INDEX["index_next required paper"]
+    VALIDATE --> INDEX
+    FALLBACK --> INDEX
     INDEX --> RETRIEVE["retrieve_evidence"]
     RETRIEVE --> CHECK["check_evidence"]
 
@@ -67,13 +75,15 @@ flowchart TD
     SYNTH --> END(["END"])
     ABSTAIN --> END
 
-    LIMITS["Limits: 2 query rewrites; 2 auto-indexed papers; 6 tool loops"] -.-> CHECK
+    LIMITS["Hard limits: 2 query rewrites; 2 auto-indexed papers; 6 tool loops"] -.-> VALIDATE
+    LIMITS -.-> CHECK
 ```
 
-The state carries the original question, coverage mode, required paper IDs,
-selected/failed papers, and per-paper maps for retrieval queries, accumulated
-chunks, verifier results, and attempt counters. Aggregate fields remain for CLI
-trace and final routing.
+The state carries the original question, structured query plan, planner status/error/warnings,
+coverage mode, required paper IDs, selected/failed papers, and per-paper maps for retrieval
+queries, accumulated chunks, verifier results, and attempt counters. Semantic intent is
+probabilistic; candidate allow-lists, budgets, coverage invariants, retries, and routing remain
+deterministic harness responsibilities.
 
 ## 3. Discovery and catalog module
 
@@ -93,16 +103,42 @@ flowchart TD
     META --> UPSERT
     LOCAL --> OUTPUT["Ranked candidate papers"]
     MERGE --> OUTPUT
-    OUTPUT --> INTENT{"Explicit multi-ID or comparison intent?"}
-    INTENT -->|"yes"| ALL["coverage=all; require each paper"]
-    INTENT -->|"no"| ANY["coverage=any; try up to two papers"]
 ```
 
 The catalog preserves base ID, versioned ID, version number, first-submitted
 time, last-revised time, DOI, journal reference, categories, abstract, and PDF
 URL. Journal publication date is not inferred from arXiv dates.
 
-## 4. PDF ingestion module
+## 4. Query planning module
+
+Implementation: `app/models/planner.py`, `app/agent/graph.py`.
+
+```mermaid
+flowchart TD
+    INPUT["Question + discovered candidate metadata"] --> PROMPT["Planner prompt; metadata treated as untrusted data"]
+    PROMPT --> QWEN["Qwen3 4B planner; temperature 0"]
+    QWEN --> JSON["Structured intent, coverage, IDs, count, dimensions, reason"]
+    QWEN -->|"invocation failure"| ERROR["Planner failure"]
+    JSON --> PYDANTIC["Pydantic schema validation"]
+    JSON -->|"invalid JSON / schema"| ERROR
+    PYDANTIC --> ALLOW["Reject IDs outside trusted candidate set"]
+    ALLOW --> CONSISTENCY["Multi-source intent => coverage=all and >=2 sides"]
+    CONSISTENCY --> BUDGET["Cap execution set; preserve logical coverage requirement"]
+    BUDGET --> PLAN["Validated query_plan in AgentState"]
+
+    ERROR --> FALLBACK["coverage=all over trusted candidates within budget"]
+    FALLBACK --> PLAN
+```
+
+Explicit user-supplied paper IDs bypass this model completely and remain hard constraints.
+Planner outputs are proposals, not authority: Python owns the candidate allow-list, automatic
+indexing budget, cross-field consistency rules, and conservative failure policy. If the logical
+requirement exceeds the automatic execution budget, the harness preserves that larger requirement
+so aggregate coverage fails closed instead of pretending the truncated execution set is complete.
+The planner's extracted dimensions are retained for tracing and future evaluation; the evidence verifier still
+checks the original user question so an incorrect planner dimension cannot silently strengthen it.
+
+## 5. PDF ingestion module
 
 Implementation: `app/tools/paper_download.py`, `app/ingestion/pdf_parser.py`,
 `app/ingestion/chunking.py`, `app/ingestion/indexing.py`.
@@ -128,7 +164,7 @@ flowchart TD
 An index is reusable only when arXiv revision, exact PDF SHA-256, and embedding
 model all match. A revision change invalidates stale PDF/index metadata.
 
-## 5. Hybrid retrieval module
+## 6. Hybrid retrieval module
 
 Implementation: `app/retrieval/vector_store.py`.
 
@@ -150,7 +186,7 @@ flowchart TD
 `retrieval_score` controls fused ordering and is accompanied by dense and
 lexical ranks.
 
-## 6. Evidence verification module
+## 7. Evidence verification module
 
 Implementation: `app/models/verifier.py`, `app/agent/graph.py`.
 
@@ -187,7 +223,7 @@ multi-paper question, each paper must cover every requested comparison
 dimension on its own side. Missing evidence about another paper is ignored
 during that paper's check, but missing dimensions within the paper are not.
 
-## 7. Answer and citation module
+## 8. Answer and citation module
 
 Implementation: `app/models/llm.py`.
 
@@ -207,7 +243,7 @@ flowchart TD
 The model never authors bibliographic metadata. Abstract fallback citations are
 labeled `Abstract`; full-text citations use stored page and section metadata.
 
-## 8. Persistence module
+## 9. Persistence module
 
 Implementation: `app/db/database.py`, runtime files under `data/`.
 
@@ -231,9 +267,9 @@ flowchart LR
 All runtime databases, PDFs, indexes, evaluation outputs, credentials, and
 handoff memory are ignored by Git.
 
-## 9. Local model runtime module
+## 10. Local model runtime module
 
-Implementation: `app/config.py`, `app/models/llm.py`,
+Implementation: `app/config.py`, `app/models/llm.py`, `app/models/planner.py`,
 `app/retrieval/vector_store.py`.
 
 ```mermaid
@@ -244,6 +280,7 @@ flowchart TD
 
     EMBEDDING --> INDEX_BUILD["Document vector generation"]
     EMBEDDING --> QUERY_EMBED["Query vector generation"]
+    REASONING --> PLAN["Semantic query planning"]
     REASONING --> VERIFY["Evidence verification"]
     REASONING --> ANSWER["Evidence-grounded synthesis"]
 

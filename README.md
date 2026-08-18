@@ -11,7 +11,8 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - per-paper Ollama embeddings and FAISS indexes
 - hybrid dense + lexical retrieval with reciprocal-rank fusion
 - local Qwen evidence verification, query rewrite, and fail-closed abstention
-- per-paper evidence coverage for explicit and automatically detected comparisons
+- structured Qwen query planner with deterministic coverage-policy enforcement
+- per-paper evidence coverage for explicit and semantically planned comparisons
 - evidence retrieval with page/section citations
 - a bounded LangGraph search/index/retrieve/answer loop
 - CLI, Gradio UI, smoke tests, and local data isolation
@@ -41,12 +42,15 @@ and proposes a focused retrieval query when information is missing. Only verifie
 passages reach answer synthesis. After two rewrites, unresolved questions return
 an explicit insufficient-evidence response instead of a guessed answer.
 
-Repeated `--paper-id` options activate required coverage for every supplied
-paper. Comparison-style questions without explicit IDs require the first two
-discovered papers. Retrieval queries, retry counts, verifier decisions, and
-approved passages are isolated per paper, so evidence from one source cannot
-fill a missing side of another source. Use `chat --trace` to inspect per-paper
-attempt counts and the aggregate coverage decision.
+Repeated `--paper-id` options remain deterministic hard constraints and bypass
+semantic planning. Without explicit IDs, Qwen classifies whether one source is
+enough or multiple paper sides are required, and extracts requested comparison
+dimensions. Python validates every planned paper ID against the discovered
+candidate set, enforces the two-paper automatic budget, and repairs inconsistent
+multi-source plans to `coverage=all`. If the planner fails, the harness falls
+back conservatively to required coverage across trusted candidates rather than
+silently under-covering the question. Use `chat --trace` to inspect planner
+status, dimensions, warnings, per-paper attempts, and aggregate coverage.
 
 ## Data layout
 
