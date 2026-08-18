@@ -117,11 +117,14 @@ def chat_command(
     """Run the bounded LangGraph workflow, including lazy search/index."""
     result = research_graph.invoke({"user_query": query, "paper_ids": paper_id or []})
     if trace:
+        attempts = result.get("retrieval_attempt_counts", {})
+        coverage = result.get("evidence_verification", {}).get("coverage_mode", "any")
         console.print(
             f"[dim]discovery={result.get('discovery_source')} "
             f"selected={result.get('selected_papers', [])} "
             f"failed={result.get('failed_papers', [])} "
-            f"retrieval_attempts={result.get('retrieval_attempt_count', 0)} "
+            f"coverage={coverage} "
+            f"retrieval_attempts={attempts} "
             f"verified={result.get('evidence_sufficient', False)}[/dim]"
         )
     console.print(result["answer"])

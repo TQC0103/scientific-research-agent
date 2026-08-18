@@ -236,3 +236,42 @@ visualization when interactions change, refresh project state after work, and
 record meaningful decisions or evaluations here. `.remember/remember.md` stays
 Git-ignored as a short cross-session handoff, not as the architecture source of
 truth.
+
+## 2026-08-18 — Per-paper evidence coverage
+
+Multi-paper questions previously pooled all retrieved chunks into one verifier
+decision. That allowed evidence from paper A to hide missing coverage in paper
+B. Version 0.4 stores retrieval queries, accumulated chunks, retry counts, and
+verifier decisions in maps keyed by base arXiv ID. Repeated explicit
+`--paper-id` values require every supplied paper. Automatically discovered
+comparison questions use a bilingual intent heuristic and require the first two
+candidates; ordinary discovery retains `coverage=any` and may try a second paper
+only if the first is insufficient.
+
+Each required paper is retrieved and verified independently. A failed check
+rewrites and reruns only that paper's query. Synthesis receives the union of
+approved passages only after all required paper sides are sufficient. Otherwise
+the answer lists coverage gaps by arXiv ID and skips synthesis.
+
+### Real smoke failures and correction
+
+The first real comparison between `1706.03762v7` and `1810.04805v2` exposed a
+prompt failure: although evidence was isolated correctly, the 4B verifier still
+demanded that each paper contain information about the other paper. A
+paper-scoped verification question and calibration example corrected this.
+
+The next run passed both papers, but the generated answer claimed that the
+Transformer paper used a "standard language modeling objective" from only
+abstract/conclusion evidence. Per-paper coverage was therefore tightened to
+require direct evidence for every requested comparison dimension. After the
+change, the architecture-and-training-objective case marked BERT sufficient in
+one call but stopped after three Transformer calls because direct loss/objective
+evidence remained missing. It did not synthesize the unsupported comparison.
+
+A positive self-attention comparison then passed in one verifier call per paper
+and produced citations from both arXiv revisions. These are two smoke cases, not
+a general multi-paper accuracy benchmark. They demonstrate both successful
+cross-paper synthesis and paper-specific fail-closed behavior. The suite grew
+from 22 to 28 passing tests, including required-paper discovery, isolated retry,
+per-paper supported-passage filtering, full two-paper graph execution, and
+routing to the next required paper.

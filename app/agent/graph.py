@@ -1,3 +1,5 @@
+import re
+
 from langgraph.graph import END, START, StateGraph
 
 from app.agent.state import AgentState
@@ -12,6 +14,11 @@ from app.tools.paper_download import PaperDownloadError
 
 AUTO_INDEX_LIMIT = 2
 MIN_LOCAL_CANDIDATES = 3
+MULTI_PAPER_PATTERN = re.compile(
+    r"\b(compare|comparison|versus|vs\.?|differences?|similarities?|two papers?)\b"
+    r"|so sánh|khác nhau|giống nhau|hai (bài|paper)",
+    re.IGNORECASE,
+)
 
 
 def _merge_candidates(*groups: list[dict]) -> list[dict]:
@@ -22,11 +29,50 @@ def _merge_candidates(*groups: list[dict]) -> list[dict]:
     return list(merged.values())
 
 
+def _requires_multi_paper(query: str) -> bool:
+    return bool(MULTI_PAPER_PATTERN.search(query))
+
+
+def _group_evidence(evidence: list[dict]) -> dict[str, list[dict]]:
+    grouped: dict[str, list[dict]] = {}
+    for item in evidence:
+        grouped.setdefault(item["arxiv_id"], []).append(item)
+    return grouped
+
+
+def _merge_passages(new: list[dict], previous: list[dict], *, limit: int = 12) -> list[dict]:
+    unique = []
+    seen = set()
+    for item in new[:8] + previous:
+        key = (item["arxiv_id"], item.get("chunk_index"), item.get("page"), item["text"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique[:limit]
+
+
+def _coverage_sufficient(state: AgentState, verifications: dict[str, dict]) -> bool:
+    if state.get("coverage_mode") == "all":
+        required = state.get("required_paper_ids", [])
+        required_count = state.get("required_paper_count", len(required))
+        return bool(
+            len(required) >= required_count
+            and all(verifications.get(paper_id, {}).get("sufficient") for paper_id in required)
+        )
+    return any(
+        verifications.get(paper_id, {}).get("sufficient")
+        for paper_id in state.get("selected_papers", [])
+    )
+
+
 def discover(state: AgentState) -> dict:
     explicit = state.get("paper_ids", [])
     if explicit:
-        candidates = [get_arxiv_metadata(pid) for pid in explicit]
+        candidates = _merge_candidates([get_arxiv_metadata(pid) for pid in explicit])
         source = "explicit_arxiv_ids"
+        coverage_mode = "all"
+        required_paper_ids = [paper["arxiv_id"] for paper in candidates]
+        required_paper_count = len(required_paper_ids)
     else:
         local = search_local(state["user_query"], limit=5)
         if len(local) >= MIN_LOCAL_CANDIDATES:
@@ -36,15 +82,34 @@ def discover(state: AgentState) -> dict:
             remote = search_arxiv(state["user_query"], max_results=5)
             candidates = _merge_candidates(local, remote)
             source = "sqlite_fts5+arxiv" if local else "arxiv"
+        if _requires_multi_paper(state["user_query"]):
+            coverage_mode = "all"
+            required_paper_ids = [
+                paper["arxiv_id"] for paper in candidates[:AUTO_INDEX_LIMIT]
+            ]
+            required_paper_count = AUTO_INDEX_LIMIT
+        else:
+            coverage_mode = "any"
+            required_paper_ids = []
+            required_paper_count = 1
     return {
         "candidate_papers": candidates,
         "selected_papers": [],
+        "required_paper_ids": required_paper_ids,
+        "required_paper_count": required_paper_count,
+        "coverage_mode": coverage_mode,
         "failed_papers": [],
         "tool_errors": [],
         "iteration_count": 0,
         "retrieval_query": state["user_query"],
+        "retrieval_queries": {},
         "retrieval_attempt_count": 0,
+        "retrieval_attempt_counts": {},
+        "retrieved_chunks": [],
+        "retrieved_chunks_by_paper": {},
         "evidence_sufficient": False,
+        "evidence_verifications": {},
+        "papers_to_retrieve": [],
         "discovery_source": source,
     }
 
@@ -53,16 +118,26 @@ def index_next(state: AgentState) -> dict:
     selected = list(state.get("selected_papers", []))
     failed = list(state.get("failed_papers", []))
     errors = list(state.get("tool_errors", []))
-    remaining = [p["arxiv_id"] for p in state["candidate_papers"] if p["arxiv_id"] not in selected]
-    if not remaining:
-        return {}
+    required_remaining = [
+        paper_id
+        for paper_id in state.get("required_paper_ids", [])
+        if paper_id not in selected
+    ]
+    all_remaining = [
+        paper["arxiv_id"]
+        for paper in state.get("candidate_papers", [])
+        if paper["arxiv_id"] not in selected
+    ]
+    if not required_remaining and not all_remaining:
+        return {"papers_to_retrieve": []}
 
-    paper_id = remaining[0]
+    paper_id = (required_remaining or all_remaining)[0]
     selected.append(paper_id)
     try:
         paper = get_arxiv_metadata(paper_id)
         candidates = [
-            paper if item["arxiv_id"] == paper_id else item for item in state["candidate_papers"]
+            paper if item["arxiv_id"] == paper_id else item
+            for item in state["candidate_papers"]
         ]
         if not index_is_current(paper):
             index_paper(paper_id, paper=paper)
@@ -75,6 +150,7 @@ def index_next(state: AgentState) -> dict:
         "selected_papers": selected,
         "failed_papers": failed,
         "tool_errors": errors,
+        "papers_to_retrieve": [paper_id],
         "iteration_count": state.get("iteration_count", 0) + 1,
     }
 
@@ -82,14 +158,23 @@ def index_next(state: AgentState) -> dict:
 def retrieve_evidence(state: AgentState) -> dict:
     papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
     failed = set(state.get("failed_papers", []))
-    evidence = []
-    retrieval_query = state.get("retrieval_query") or state["user_query"]
-    for paper_id in state.get("selected_papers", []):
+    queries = dict(state.get("retrieval_queries", {}))
+    by_paper = {
+        paper_id: list(items)
+        for paper_id, items in state.get("retrieved_chunks_by_paper", {}).items()
+    }
+    if not by_paper and state.get("retrieved_chunks"):
+        by_paper = _group_evidence(state["retrieved_chunks"])
+    targets = state.get("papers_to_retrieve") or state.get("selected_papers", [])[-1:]
+
+    for paper_id in targets:
         paper = papers[paper_id]
+        query = queries.get(paper_id, state["user_query"])
+        evidence = []
         if paper_id not in failed and index_is_current(paper):
-            evidence.extend(retrieve(paper_id, retrieval_query, top_k=6))
+            evidence = retrieve(paper_id, query, top_k=6)
         elif paper.get("abstract"):
-            evidence.append(
+            evidence = [
                 {
                     "arxiv_id": paper_id,
                     "versioned_id": paper.get("versioned_id") or paper_id,
@@ -100,64 +185,121 @@ def retrieve_evidence(state: AgentState) -> dict:
                     "score": 0.15,
                     "retrieval_score": 0.0,
                 }
-            )
-    evidence.sort(key=lambda item: item.get("retrieval_score", item["score"]), reverse=True)
-    # Keep the newest retrieval first, then retain distinct passages from earlier
-    # attempts so the verifier can combine complementary evidence.
-    combined = evidence[:8] + state.get("retrieved_chunks", [])
-    unique = []
-    seen = set()
-    for item in combined:
-        key = (item["arxiv_id"], item.get("chunk_index"), item.get("page"), item["text"])
-        if key not in seen:
-            seen.add(key)
-            unique.append(item)
-    return {"retrieved_chunks": unique[:12]}
+            ]
+        evidence.sort(key=lambda item: item.get("retrieval_score", item["score"]), reverse=True)
+        by_paper[paper_id] = _merge_passages(evidence, by_paper.get(paper_id, []))
+        queries.setdefault(paper_id, query)
+
+    flattened = [
+        item
+        for paper_id in state.get("selected_papers", [])
+        for item in by_paper.get(paper_id, [])
+    ]
+    last_query = queries.get(targets[-1], state["user_query"]) if targets else state["user_query"]
+    return {
+        "retrieved_chunks": flattened,
+        "retrieved_chunks_by_paper": by_paper,
+        "retrieval_queries": queries,
+        "retrieval_query": last_query,
+    }
 
 
 def check_evidence(state: AgentState) -> dict:
-    evidence = state.get("retrieved_chunks", [])
-    attempts = state.get("retrieval_attempt_count", 0) + 1
-    errors = list(state.get("tool_errors", []))
-    verifier_failed = False
-    try:
-        result = verify_evidence(
-            state["user_query"], evidence, state.get("retrieval_query") or state["user_query"]
-        )
-        verification = result.model_dump()
-    except (ValueError, OSError) as exc:
-        verifier_failed = True
-        verification = {
-            "sufficient": False,
-            "reason": "The local evidence verifier failed, so the system failed closed.",
-            "missing_information": ["A successful evidence verification."],
-            "suggested_query": state["user_query"],
-            "supported_evidence": [],
-        }
-        errors.append(f"verifier: {exc}")
-
-    proposed = (verification.get("suggested_query") or "").strip()
-    current = (state.get("retrieval_query") or state["user_query"]).strip()
-    if not verification["sufficient"] and (not proposed or proposed.casefold() == current.casefold()):
-        missing = " ".join(verification.get("missing_information") or []).strip()
-        proposed = (
-            f"{missing} specific mechanism terminology section table".strip()
-            if missing
-            else f"{current} specific evidence section table"
-        )
-    can_rewrite = (
-        not verification["sufficient"]
-        and not verifier_failed
-        and attempts <= settings.max_retrieval_rewrites
-        and bool(proposed)
-        and proposed.casefold() != current.casefold()
+    by_paper = state.get("retrieved_chunks_by_paper") or _group_evidence(
+        state.get("retrieved_chunks", [])
     )
+    targets = state.get("papers_to_retrieve") or list(by_paper)
+    queries = dict(state.get("retrieval_queries", {}))
+    attempts_by_paper = dict(state.get("retrieval_attempt_counts", {}))
+    verifications = dict(state.get("evidence_verifications", {}))
+    errors = list(state.get("tool_errors", []))
+    retry_papers = []
+    papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
+    multi_paper = state.get("coverage_mode") == "all" and state.get(
+        "required_paper_count", 1
+    ) > 1
+
+    for paper_id in targets:
+        evidence = by_paper.get(paper_id, [])
+        current = queries.get(paper_id, state["user_query"]).strip()
+        attempts = attempts_by_paper.get(paper_id, 0) + 1
+        verifier_failed = False
+        paper = papers.get(paper_id, {})
+        scope = None
+        if multi_paper:
+            scope = (
+                f"Assess coverage only for arXiv:{paper_id} "
+                f"({paper.get('title', 'Unknown title')}). Decide whether this paper supplies "
+                "enough evidence for its own side of the multi-paper question. Every requested "
+                "comparison dimension about this paper must have direct passage support. Do not "
+                "require passages about the other papers."
+            )
+            verification_question = (
+                f"For arXiv:{paper_id} only, do these passages provide this paper's own "
+                "information for every requested comparison dimension? If even one dimension "
+                "is absent, mark insufficient and target it in the new query. Ignore all missing "
+                f"information about other papers. Original comparison: {state['user_query']}"
+            )
+        else:
+            verification_question = state["user_query"]
+        try:
+            result = verify_evidence(verification_question, evidence, current, scope)
+            verification = result.model_dump()
+        except (ValueError, OSError) as exc:
+            verifier_failed = True
+            verification = {
+                "sufficient": False,
+                "reason": "The local evidence verifier failed, so the system failed closed.",
+                "missing_information": ["A successful evidence verification."],
+                "suggested_query": state["user_query"],
+                "supported_evidence": [],
+            }
+            errors.append(f"verifier {paper_id}: {exc}")
+
+        proposed = (verification.get("suggested_query") or "").strip()
+        if not verification["sufficient"] and (
+            not proposed or proposed.casefold() == current.casefold()
+        ):
+            missing = " ".join(verification.get("missing_information") or []).strip()
+            proposed = (
+                f"{missing} specific mechanism terminology section table".strip()
+                if missing
+                else f"{current} specific evidence section table"
+            )
+        can_rewrite = (
+            not verification["sufficient"]
+            and not verifier_failed
+            and attempts <= settings.max_retrieval_rewrites
+            and bool(proposed)
+            and proposed.casefold() != current.casefold()
+        )
+        queries[paper_id] = proposed if can_rewrite else current
+        attempts_by_paper[paper_id] = attempts
+        verification["retrieval_attempts"] = attempts
+        verification["final_retrieval_query"] = queries[paper_id]
+        verifications[paper_id] = verification
+        if can_rewrite:
+            retry_papers.append(paper_id)
+
+    enough = _coverage_sufficient(state, verifications)
+    aggregate = {
+        "sufficient": enough,
+        "coverage_mode": state.get("coverage_mode", "any"),
+        "required_paper_ids": state.get("required_paper_ids", []),
+        "required_paper_count": state.get("required_paper_count", 1),
+        "by_paper": verifications,
+    }
+    last_target = targets[-1] if targets else None
     return {
-        "evidence_sufficient": verification["sufficient"],
-        "evidence_verification": verification,
-        "retrieval_query": proposed if can_rewrite else current,
-        "retrieval_attempt_count": attempts,
-        "should_retry_retrieval": can_rewrite,
+        "evidence_sufficient": enough,
+        "evidence_verification": aggregate,
+        "evidence_verifications": verifications,
+        "retrieval_queries": queries,
+        "retrieval_query": queries.get(last_target, state["user_query"]),
+        "retrieval_attempt_counts": attempts_by_paper,
+        "retrieval_attempt_count": max(attempts_by_paper.values(), default=0),
+        "papers_to_retrieve": retry_papers,
+        "should_retry_retrieval": bool(retry_papers),
         "tool_errors": errors,
     }
 
@@ -165,29 +307,76 @@ def check_evidence(state: AgentState) -> dict:
 def route_after_check(state: AgentState) -> str:
     if state.get("evidence_sufficient"):
         return "synthesize"
-    if state.get("should_retry_retrieval"):
+    if state.get("papers_to_retrieve"):
         return "retrieve"
-    remaining = len(state.get("candidate_papers", [])) - len(state.get("selected_papers", []))
-    can_index = (
-        remaining > 0
-        and len(state.get("selected_papers", [])) < AUTO_INDEX_LIMIT
-        and state.get("iteration_count", 0) < settings.max_tool_loops
+
+    selected = set(state.get("selected_papers", []))
+    required_remaining = [
+        paper_id
+        for paper_id in state.get("required_paper_ids", [])
+        if paper_id not in selected
+    ]
+    within_tool_limit = state.get("iteration_count", 0) < settings.max_tool_loops
+    if required_remaining and within_tool_limit:
+        return "index_next"
+
+    all_remaining = [
+        paper["arxiv_id"]
+        for paper in state.get("candidate_papers", [])
+        if paper["arxiv_id"] not in selected
+    ]
+    can_try_optional = (
+        state.get("coverage_mode") == "any"
+        and bool(all_remaining)
+        and len(selected) < AUTO_INDEX_LIMIT
+        and within_tool_limit
     )
-    return "index_next" if can_index else "synthesize"
+    return "index_next" if can_try_optional else "synthesize"
 
 
 def synthesize(state: AgentState) -> dict:
     papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
-    verification = state.get("evidence_verification", {})
+    verifications = state.get("evidence_verifications", {})
+    by_paper = state.get("retrieved_chunks_by_paper") or _group_evidence(
+        state.get("retrieved_chunks", [])
+    )
     if not state.get("evidence_sufficient"):
-        missing = verification.get("missing_information") or ["Direct supporting evidence."]
         answer = "Insufficient evidence to answer without guessing."
-        answer += f"\n\nReason: {verification.get('reason', 'The retrieved passages were insufficient.')}"
-        answer += "\n\nMissing:\n- " + "\n- ".join(missing)
+        details = []
+        relevant = state.get("required_paper_ids") or state.get("selected_papers", [])
+        required_count = state.get("required_paper_count", len(relevant))
+        if state.get("coverage_mode") == "all" and len(relevant) < required_count:
+            details.append(
+                f"Required coverage from {required_count} papers, but only "
+                f"{len(relevant)} candidate paper(s) were available."
+            )
+        for paper_id in relevant:
+            verification = verifications.get(paper_id)
+            if not verification:
+                details.append(f"arXiv:{paper_id}: evidence was not verified.")
+                continue
+            if verification.get("sufficient"):
+                continue
+            missing = verification.get("missing_information") or ["Direct supporting evidence."]
+            details.append(
+                f"arXiv:{paper_id}: {verification.get('reason', 'Evidence was insufficient.')} "
+                f"Missing: {'; '.join(missing)}"
+            )
+        answer += "\n\nCoverage gaps:\n- " + "\n- ".join(
+            details or ["No paper had sufficient verified evidence."]
+        )
     else:
-        evidence = state.get("retrieved_chunks", [])
-        supported = verification.get("supported_evidence", [])
-        verified_evidence = [evidence[number - 1] for number in supported]
+        verified_evidence = []
+        for paper_id in state.get("selected_papers", []):
+            verification = verifications.get(paper_id, {})
+            if not verification.get("sufficient"):
+                continue
+            evidence = by_paper.get(paper_id, [])
+            verified_evidence.extend(
+                evidence[number - 1]
+                for number in verification.get("supported_evidence", [])
+                if 1 <= number <= len(evidence)
+            )
         answer = answer_from_evidence(state["user_query"], verified_evidence, papers)
     if state.get("tool_errors"):
         answer += "\n\nRetrieval notes:\n- " + "\n- ".join(state["tool_errors"])

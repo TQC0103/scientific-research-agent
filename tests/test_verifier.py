@@ -17,6 +17,13 @@ def _chunk(index: int, text: str = "Direct supporting passage.") -> dict:
     }
 
 
+def _paper_chunk(paper_id: str, index: int, text: str) -> dict:
+    item = _chunk(index, text)
+    item["arxiv_id"] = paper_id
+    item["versioned_id"] = f"{paper_id}v1"
+    return item
+
+
 def test_extract_json_accepts_fenced_or_prefixed_model_output() -> None:
     payload = _extract_json('```json\n{"sufficient": false, "reason": "missing"}\n```')
     assert payload == {"sufficient": False, "reason": "missing"}
@@ -47,7 +54,7 @@ def test_check_rewrites_query_when_llm_verifier_finds_a_gap(monkeypatch) -> None
     monkeypatch.setattr(
         graph,
         "verify_evidence",
-        lambda question, evidence, current_query: EvidenceVerification(
+        lambda question, evidence, current_query, scope: EvidenceVerification(
             sufficient=False,
             reason="The passages do not explain token order.",
             missing_information=["The positional encoding formula and purpose."],
@@ -58,15 +65,22 @@ def test_check_rewrites_query_when_llm_verifier_finds_a_gap(monkeypatch) -> None
     result = graph.check_evidence(
         {
             "user_query": "How is token order represented?",
-            "retrieval_query": "How is token order represented?",
+            "selected_papers": ["1706.03762"],
+            "coverage_mode": "any",
+            "papers_to_retrieve": ["1706.03762"],
+            "retrieval_queries": {"1706.03762": "How is token order represented?"},
             "retrieved_chunks": [_chunk(0)],
-            "retrieval_attempt_count": 0,
+            "retrieved_chunks_by_paper": {"1706.03762": [_chunk(0)]},
+            "retrieval_attempt_counts": {},
             "tool_errors": [],
         }
     )
     assert result["evidence_sufficient"] is False
     assert result["should_retry_retrieval"] is True
-    assert result["retrieval_query"] == "positional encoding token order sine cosine"
+    assert result["retrieval_queries"]["1706.03762"] == (
+        "positional encoding token order sine cosine"
+    )
+    assert result["papers_to_retrieve"] == ["1706.03762"]
 
 
 def test_synthesis_uses_only_passages_approved_by_verifier(monkeypatch) -> None:
@@ -82,9 +96,13 @@ def test_synthesis_uses_only_passages_approved_by_verifier(monkeypatch) -> None:
         {
             "user_query": "Question",
             "candidate_papers": [{"arxiv_id": "1706.03762", "title": "Paper"}],
+            "selected_papers": ["1706.03762"],
             "retrieved_chunks": evidence,
+            "retrieved_chunks_by_paper": {"1706.03762": evidence},
             "evidence_sufficient": True,
-            "evidence_verification": {"supported_evidence": [2]},
+            "evidence_verifications": {
+                "1706.03762": {"sufficient": True, "supported_evidence": [2]}
+            },
             "tool_errors": [],
         }
     )
@@ -101,12 +119,17 @@ def test_insufficient_evidence_stops_without_calling_synthesis_model(monkeypatch
         {
             "user_query": "Question",
             "candidate_papers": [],
+            "selected_papers": ["1706.03762"],
             "retrieved_chunks": [_chunk(0)],
+            "retrieved_chunks_by_paper": {"1706.03762": [_chunk(0)]},
             "evidence_sufficient": False,
-            "evidence_verification": {
-                "reason": "No direct result was retrieved.",
-                "missing_information": ["The measured result."],
-                "supported_evidence": [],
+            "evidence_verifications": {
+                "1706.03762": {
+                    "sufficient": False,
+                    "reason": "No direct result was retrieved.",
+                    "missing_information": ["The measured result."],
+                    "supported_evidence": [],
+                }
             },
             "tool_errors": [],
         }
@@ -123,22 +146,124 @@ def test_invalid_verifier_response_fails_closed(monkeypatch) -> None:
     result = graph.check_evidence(
         {
             "user_query": "Question",
-            "retrieval_query": "Question",
+            "selected_papers": ["1706.03762"],
+            "coverage_mode": "any",
+            "papers_to_retrieve": ["1706.03762"],
+            "retrieval_queries": {"1706.03762": "Question"},
             "retrieved_chunks": [_chunk(0)],
-            "retrieval_attempt_count": 0,
+            "retrieved_chunks_by_paper": {"1706.03762": [_chunk(0)]},
+            "retrieval_attempt_counts": {},
             "tool_errors": [],
         }
     )
     assert result["evidence_sufficient"] is False
     assert result["should_retry_retrieval"] is False
-    assert result["tool_errors"] == ["verifier: bad JSON"]
+    assert result["tool_errors"] == ["verifier 1706.03762: bad JSON"]
+
+
+def test_multi_paper_verification_retries_only_the_missing_paper(monkeypatch) -> None:
+    paper_a = "2401.00001"
+    paper_b = "2401.00002"
+    scoped_questions = []
+
+    def fake_verify(question, evidence, current_query, scope):
+        scoped_questions.append((question, scope))
+        if evidence[0]["arxiv_id"] == paper_a:
+            return EvidenceVerification(
+                sufficient=True,
+                reason="Paper A is covered.",
+                supported_evidence=[1],
+            )
+        return EvidenceVerification(
+            sufficient=False,
+            reason="Paper B lacks its measured result.",
+            missing_information=["Paper B measured result"],
+            suggested_query="paper B experiment measured result table",
+        )
+
+    monkeypatch.setattr(graph, "verify_evidence", fake_verify)
+    chunks = {
+        paper_a: [_paper_chunk(paper_a, 0, "Paper A evidence")],
+        paper_b: [_paper_chunk(paper_b, 0, "Paper B background")],
+    }
+    result = graph.check_evidence(
+        {
+            "user_query": "Compare paper A and paper B.",
+            "candidate_papers": [
+                {"arxiv_id": paper_a, "title": "A"},
+                {"arxiv_id": paper_b, "title": "B"},
+            ],
+            "selected_papers": [paper_a, paper_b],
+            "required_paper_ids": [paper_a, paper_b],
+            "required_paper_count": 2,
+            "coverage_mode": "all",
+            "papers_to_retrieve": [paper_a, paper_b],
+            "retrieved_chunks_by_paper": chunks,
+            "retrieval_queries": {},
+            "retrieval_attempt_counts": {},
+            "tool_errors": [],
+        }
+    )
+    assert result["evidence_sufficient"] is False
+    assert result["papers_to_retrieve"] == [paper_b]
+    assert result["evidence_verifications"][paper_a]["sufficient"] is True
+    assert result["evidence_verifications"][paper_b]["sufficient"] is False
+    assert all(
+        "Ignore all missing information about other papers" in item[0]
+        for item in scoped_questions
+    )
+    assert all(
+        "Do not require passages about the other papers" in item[1]
+        for item in scoped_questions
+    )
+
+
+def test_multi_paper_synthesis_keeps_approved_evidence_separate(monkeypatch) -> None:
+    paper_a = "2401.00001"
+    paper_b = "2401.00002"
+    chunks = {
+        paper_a: [
+            _paper_chunk(paper_a, 0, "A unsupported"),
+            _paper_chunk(paper_a, 1, "A supported"),
+        ],
+        paper_b: [_paper_chunk(paper_b, 0, "B supported")],
+    }
+    captured = {}
+
+    def fake_answer(question, evidence, papers):
+        captured["evidence"] = evidence
+        return "Comparison."
+
+    monkeypatch.setattr(graph, "answer_from_evidence", fake_answer)
+    result = graph.synthesize(
+        {
+            "user_query": "Compare A and B",
+            "candidate_papers": [
+                {"arxiv_id": paper_a, "title": "A"},
+                {"arxiv_id": paper_b, "title": "B"},
+            ],
+            "selected_papers": [paper_a, paper_b],
+            "retrieved_chunks_by_paper": chunks,
+            "evidence_sufficient": True,
+            "evidence_verifications": {
+                paper_a: {"sufficient": True, "supported_evidence": [2]},
+                paper_b: {"sufficient": True, "supported_evidence": [1]},
+            },
+            "tool_errors": [],
+        }
+    )
+    assert result["answer"] == "Comparison."
+    assert [item["text"] for item in captured["evidence"]] == [
+        "A supported",
+        "B supported",
+    ]
 
 
 @pytest.mark.parametrize(
     ("state", "route"),
     [
         ({"evidence_sufficient": True}, "synthesize"),
-        ({"evidence_sufficient": False, "should_retry_retrieval": True}, "retrieve"),
+        ({"evidence_sufficient": False, "papers_to_retrieve": ["1706.03762"]}, "retrieve"),
         (
             {
                 "evidence_sufficient": False,
@@ -146,6 +271,20 @@ def test_invalid_verifier_response_fails_closed(monkeypatch) -> None:
                 "candidate_papers": [],
             },
             "synthesize",
+        ),
+        (
+            {
+                "evidence_sufficient": False,
+                "papers_to_retrieve": [],
+                "selected_papers": ["2401.00001"],
+                "required_paper_ids": ["2401.00001", "2401.00002"],
+                "candidate_papers": [
+                    {"arxiv_id": "2401.00001"},
+                    {"arxiv_id": "2401.00002"},
+                ],
+                "iteration_count": 1,
+            },
+            "index_next",
         ),
     ],
 )

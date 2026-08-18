@@ -11,6 +11,7 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - per-paper Ollama embeddings and FAISS indexes
 - hybrid dense + lexical retrieval with reciprocal-rank fusion
 - local Qwen evidence verification, query rewrite, and fail-closed abstention
+- per-paper evidence coverage for explicit and automatically detected comparisons
 - evidence retrieval with page/section citations
 - a bounded LangGraph search/index/retrieve/answer loop
 - CLI, Gradio UI, smoke tests, and local data isolation
@@ -39,6 +40,13 @@ retrieved passages actually cover the question, identifies supported passages,
 and proposes a focused retrieval query when information is missing. Only verified
 passages reach answer synthesis. After two rewrites, unresolved questions return
 an explicit insufficient-evidence response instead of a guessed answer.
+
+Repeated `--paper-id` options activate required coverage for every supplied
+paper. Comparison-style questions without explicit IDs require the first two
+discovered papers. Retrieval queries, retry counts, verifier decisions, and
+approved passages are isolated per paper, so evidence from one source cannot
+fill a missing side of another source. Use `chat --trace` to inspect per-paper
+attempt counts and the aggregate coverage decision.
 
 ## Data layout
 

@@ -16,6 +16,36 @@ def test_discover_uses_local_fts_without_remote_when_catalog_is_sufficient(monke
     result = graph.discover({"user_query": "scientific retrieval", "paper_ids": []})
     assert result["discovery_source"] == "sqlite_fts5"
     assert result["candidate_papers"] == local
+    assert result["coverage_mode"] == "any"
+
+
+def test_explicit_multi_paper_discovery_requires_every_paper(monkeypatch) -> None:
+    monkeypatch.setattr(
+        graph,
+        "get_arxiv_metadata",
+        lambda paper_id: {"arxiv_id": paper_id, "title": f"Paper {paper_id}"},
+    )
+    result = graph.discover(
+        {
+            "user_query": "Compare the two methods",
+            "paper_ids": ["2401.00001", "2401.00002"],
+        }
+    )
+    assert result["coverage_mode"] == "all"
+    assert result["required_paper_ids"] == ["2401.00001", "2401.00002"]
+    assert result["required_paper_count"] == 2
+
+
+def test_automatic_comparison_requires_two_candidates(monkeypatch) -> None:
+    local = [
+        {"arxiv_id": f"2401.0000{number}", "title": f"Paper {number}", "abstract": "x"}
+        for number in range(1, 4)
+    ]
+    monkeypatch.setattr(graph, "search_local", lambda query, limit: local)
+    result = graph.discover({"user_query": "Compare these approaches", "paper_ids": []})
+    assert result["coverage_mode"] == "all"
+    assert result["required_paper_ids"] == ["2401.00001", "2401.00002"]
+    assert result["required_paper_count"] == 2
 
 
 def test_pdf_failure_falls_back_to_abstract(monkeypatch) -> None:

@@ -30,7 +30,9 @@ def main() -> None:
                 "evidence_sufficient": state.get("evidence_sufficient"),
                 "verification": state.get("evidence_verification"),
                 "retrieval_attempt_count": state.get("retrieval_attempt_count"),
+                "retrieval_attempt_counts": state.get("retrieval_attempt_counts"),
                 "final_retrieval_query": state.get("retrieval_query"),
+                "final_retrieval_queries": state.get("retrieval_queries"),
                 "retrieved_chunks": [
                     {
                         key: chunk.get(key)

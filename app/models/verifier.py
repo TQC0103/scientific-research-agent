@@ -30,7 +30,10 @@ def _extract_json(content: Any) -> dict:
 
 
 def verify_evidence(
-    question: str, evidence: list[dict], current_query: str | None = None
+    question: str,
+    evidence: list[dict],
+    current_query: str | None = None,
+    scope_instruction: str | None = None,
 ) -> EvidenceVerification:
     """Use the local reasoning model to decide whether passages answer the question."""
     if not evidence:
@@ -47,8 +50,10 @@ def verify_evidence(
         excerpts.append(f"[{number}] {item['versioned_id']} — {location}\n{item['text']}")
 
     prompt = f"""You are an evidence sufficiency verifier, not an answer writer.
-Decide whether an answer writer can answer the user's exact question completely using only
-the supplied passages. Judge semantic support, not wording or presentation format. Do not
+Decide whether an answer writer can satisfy the verification scope for the user's exact
+question using only the supplied passages. For a paper-specific scope in a multi-paper
+question, judge only whether that paper supplies its own side; do not require the complete
+cross-paper comparison. Judge semantic support, not wording or presentation format. Do not
 invent extra requirements beyond the question: a stated mechanism or advantage can answer
 "how" or "why" without an experiment; prose can answer a request for a numbered list without
 being pre-enumerated. Do not require an explicit comparison unless the user asks for an
@@ -69,6 +74,15 @@ Calibration examples:
 - Question: "How is event time encoded?" Evidence: "Components exchange information globally,
   and a mask hides future events." Decision: sufficient=false. Interaction and masking do not
   state how time itself is encoded; retrieve evidence about timestamps or time encoding.
+- Original request: "Compare paper A and paper B." Scope: "paper A only." Evidence from paper A
+  states its method and result but never mentions paper B. Decision: sufficient=true for paper A.
+  In paper-specific verification, absence of the other paper is irrelevant; each paper is checked
+  separately before the final comparison.
+- Original request: "Compare device A and B on architecture and energy use." Scope: "device A
+  paper only." Evidence explains A's architecture but gives no energy measurement or energy-use
+  method. Decision: sufficient=false for A, missing_information=["device A energy use"]. Every
+  requested comparison dimension must be supported for that paper; coverage of one dimension
+  cannot substitute for another.
 
 First identify exactly what the question requests without strengthening it. Then check whether
 each requested element can be stated as a faithful paraphrase of one or more passages. Mark
@@ -76,6 +90,9 @@ sufficient=true when all requested elements are supported; do not demand extra d
 
 Current retrieval query:
 {current_query or question}
+
+Verification scope:
+{scope_instruction or "Assess whether the passages support the complete question."}
 
 Question:
 {question}

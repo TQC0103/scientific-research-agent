@@ -54,14 +54,15 @@ Implementation: `app/agent/graph.py`, `app/agent/state.py`.
 ```mermaid
 flowchart TD
     START(["START"]) --> DISCOVER["discover"]
-    DISCOVER --> INDEX["index_next"]
+    DISCOVER --> COVERAGE["Choose any/all coverage and required paper IDs"]
+    COVERAGE --> INDEX["index_next required paper"]
     INDEX --> RETRIEVE["retrieve_evidence"]
     RETRIEVE --> CHECK["check_evidence"]
 
-    CHECK -->|"sufficient"| SYNTH["synthesize answer"]
-    CHECK -->|"insufficient + rewrite available"| RETRIEVE
-    CHECK -->|"insufficient + another candidate"| INDEX
-    CHECK -->|"insufficient + limits reached"| ABSTAIN["synthesize abstention"]
+    CHECK -->|"coverage policy satisfied"| SYNTH["synthesize answer"]
+    CHECK -->|"paper insufficient + rewrite available"| RETRIEVE
+    CHECK -->|"required paper not processed"| INDEX
+    CHECK -->|"a required paper exhausts retries"| ABSTAIN["paper-specific coverage gaps"]
 
     SYNTH --> END(["END"])
     ABSTAIN --> END
@@ -69,9 +70,10 @@ flowchart TD
     LIMITS["Limits: 2 query rewrites; 2 auto-indexed papers; 6 tool loops"] -.-> CHECK
 ```
 
-The state carries the original question, current retrieval query, candidates,
-selected/failed papers, accumulated chunks, verifier result, attempt counters,
-tool errors, and final answer.
+The state carries the original question, coverage mode, required paper IDs,
+selected/failed papers, and per-paper maps for retrieval queries, accumulated
+chunks, verifier results, and attempt counters. Aggregate fields remain for CLI
+trace and final routing.
 
 ## 3. Discovery and catalog module
 
@@ -91,6 +93,9 @@ flowchart TD
     META --> UPSERT
     LOCAL --> OUTPUT["Ranked candidate papers"]
     MERGE --> OUTPUT
+    OUTPUT --> INTENT{"Explicit multi-ID or comparison intent?"}
+    INTENT -->|"yes"| ALL["coverage=all; require each paper"]
+    INTENT -->|"no"| ANY["coverage=any; try up to two papers"]
 ```
 
 The catalog preserves base ID, versioned ID, version number, first-submitted
@@ -129,16 +134,16 @@ Implementation: `app/retrieval/vector_store.py`.
 
 ```mermaid
 flowchart TD
-    QUERY["Current retrieval query"] --> DENSE_EMBED["Qwen query embedding"]
+    QUERY["Current query for one paper"] --> DENSE_EMBED["Qwen query embedding"]
     DENSE_EMBED --> FAISS["FAISS cosine ranking"]
     QUERY --> TOKENS["Normalize meaningful lexical terms"]
     TOKENS --> LEXICAL["BM25-like lexical ranking over chunks"]
     FAISS --> RRF["Reciprocal-rank fusion"]
     LEXICAL --> RRF
     RRF --> TOP["Top fused chunks per selected paper"]
-    TOP --> MERGE["Merge with earlier retrieval attempts"]
-    MERGE --> DEDUPE["Deduplicate and cap at 12 passages"]
-    DEDUPE --> EVIDENCE["Candidate evidence for verifier"]
+    TOP --> MERGE["Merge with earlier attempts for the same paper"]
+    MERGE --> DEDUPE["Deduplicate; cap at 12 passages per paper"]
+    DEDUPE --> EVIDENCE["Paper-isolated evidence map"]
 ```
 
 `score` remains the dense normalized-dot-product score for inspection;
@@ -151,26 +156,36 @@ Implementation: `app/models/verifier.py`, `app/agent/graph.py`.
 
 ```mermaid
 flowchart TD
-    INPUT["Question + current query + candidate passages"] --> QWEN["Qwen3 4B verifier; temperature 0; fixed seed"]
-    QWEN --> JSON["Structured JSON: sufficient, reason, missing, suggested query, supported IDs"]
+    INPUT["Question + required paper set"] --> LOOP["For each required paper"]
+    LOOP --> SCOPE["Paper-scoped question + that paper's passages"]
+    SCOPE --> QWEN["Qwen3 4B verifier; temperature 0; fixed seed"]
+    QWEN --> JSON["Per-paper JSON: sufficient, reason, missing, query, supported IDs"]
     JSON --> VALIDATE["Parse schema and validate passage IDs"]
     VALIDATE --> CONSISTENCY["Repair one defined boolean/list contradiction"]
-    CONSISTENCY --> DECISION{"Evidence sufficient?"}
+    CONSISTENCY --> DIMENSIONS{"Every requested dimension covered for this paper?"}
 
-    DECISION -->|"yes"| FILTER["Keep only approved passages"]
-    FILTER --> SYNTHESIS["Answer synthesis"]
+    DIMENSIONS -->|"yes"| PAPER_OK["Mark this paper covered"]
+    DIMENSIONS -->|"no"| RETRIES{"This paper's rewrite budget remains?"}
+    RETRIES -->|"yes"| REWRITE["Rewrite query only for this paper"]
+    REWRITE --> RETRIEVAL["Run hybrid retrieval for this paper"]
+    RETRIEVAL --> SCOPE
+    RETRIES -->|"no"| PAPER_GAP["Record paper-specific gap"]
 
-    DECISION -->|"no"| RETRIES{"Rewrite budget remains?"}
-    RETRIES -->|"yes"| REWRITE["Use suggested query or missing-information fallback"]
-    REWRITE --> RETRIEVAL["Run hybrid retrieval again"]
-    RETRIES -->|"no"| STOP["Insufficient-evidence result; skip synthesis"]
+    PAPER_OK --> AGGREGATE{"All required papers covered?"}
+    PAPER_GAP --> AGGREGATE
+    AGGREGATE -->|"yes"| FILTER["Union approved passages, preserving paper identity"]
+    FILTER --> SYNTHESIS["Cross-paper synthesis"]
+    AGGREGATE -->|"no"| STOP["Coverage gaps by arXiv ID; skip synthesis"]
 
     ERROR["Model, JSON, or validation failure"] --> STOP
 ```
 
 Semantic similarity is treated only as retrieval evidence, never as proof that
 a passage answers the question. Negative and exhaustive questions require
-enough scope; silence in a few passages is not accepted as proof.
+enough scope; silence in a few passages is not accepted as proof. For a
+multi-paper question, each paper must cover every requested comparison
+dimension on its own side. Missing evidence about another paper is ignored
+during that paper's check, but missing dimensions within the paper are not.
 
 ## 7. Answer and citation module
 

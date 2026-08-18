@@ -31,6 +31,9 @@ Answer the question using ONLY the evidence below. Every substantive scientific 
 must end with one or more matching citation labels such as [1] or [2]. Keep papers
 separate when comparing them. If evidence is incomplete or conflicting, say so plainly.
 Do not invent bibliographic details, results, page numbers, or citations.
+For multi-part comparisons, address only dimensions explicitly supported for each paper.
+Do not infer a training objective, loss, directionality, or model capability merely from
+an architecture description; state it only when a cited passage directly supports it.
 
 Question:
 {question}
