@@ -5,7 +5,7 @@ Last updated: 2026-08-21
 ## Current baseline
 
 - Version: `0.4.0`
-- Branch: `codex/consolidate-v05-evaluation`
+- Branch: `main`
 - Baseline commit before this implementation: `34ceb54`
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
