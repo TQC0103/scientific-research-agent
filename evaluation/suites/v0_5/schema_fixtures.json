@@ -1,0 +1,252 @@
+{
+  "schema_version": "1.1.0",
+  "suite_id": "v0_5_schema_fixtures",
+  "dataset_version": "0.1.0",
+  "benchmark_status": "schema_fixture",
+  "description": "Small non-benchmark fixture set demonstrating the v0.5 evaluation schema.",
+  "cases": [
+    {
+      "case_id": "transformer_multi_head_rationale",
+      "question": "Why does the Transformer use multi-head attention instead of a single attention head?",
+      "question_type": "method",
+      "evaluation_split": "fixture",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 schema fixtures",
+        "dataset_version": "0.1.0",
+        "source_url": null,
+        "source_case_id": "transformer_multi_head_rationale",
+        "source_split": "fixture",
+        "license": "Repository license",
+        "adaptation_notes": "Authored only to exercise the schema; not eligible for benchmark claims."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "Requires independent review before promotion to a benchmark split."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "Multi-head attention lets the model attend jointly to information from different representation subspaces and positions; a single head would average away some of that information.",
+        "answer_criteria": [
+          {
+            "criterion_id": "different_subspaces",
+            "description": "States that multiple heads jointly attend to information from different representation subspaces and positions.",
+            "required": true
+          },
+          {
+            "criterion_id": "single_head_averaging",
+            "description": "Explains that averaging by a single attention head inhibits this behavior.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims an empirical accuracy improvement not reported by the cited passage."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "multi_head_rationale_p5",
+          "evidence_group_id": "multi_head_rationale",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 5,
+          "section": "3.2.2 Multi-Head Attention",
+          "quote": "Multi-head attention allows the model to jointly attend to information from different representation subspaces at different positions. With a single attention head, averaging inhibits this.",
+          "supports": ["different_subspaces", "single_head_averaging"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "mechanism"]
+    },
+    {
+      "case_id": "transformer_bert_architecture_comparison",
+      "question": "Compare the central architectural idea introduced by the Transformer paper with the representation-learning idea introduced by BERT.",
+      "question_type": "multi_paper_comparison",
+      "evaluation_split": "fixture",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 schema fixtures",
+        "dataset_version": "0.1.0",
+        "source_url": null,
+        "source_case_id": "transformer_bert_architecture_comparison",
+        "source_split": "fixture",
+        "license": "Repository license",
+        "adaptation_notes": "Authored only to exercise required-paper coverage; not eligible for benchmark claims."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "Requires independent review before promotion to a benchmark split."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        },
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7", "1810.04805v2"],
+        "reference_answer": "The Transformer replaces recurrence and convolution with an attention-only sequence architecture, while BERT uses a Transformer encoder to pre-train deep bidirectional representations by conditioning on both left and right context.",
+        "answer_criteria": [
+          {
+            "criterion_id": "transformer_attention_only",
+            "description": "Attributes an attention-only architecture without recurrence or convolution to the Transformer paper.",
+            "required": true
+          },
+          {
+            "criterion_id": "bert_bidirectional_pretraining",
+            "description": "Attributes deep bidirectional pre-training using both left and right context to BERT.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Attributes BERT's masked-language-model objective to the Transformer paper.",
+          "Claims the two papers report a direct head-to-head experiment."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "transformer_abstract_architecture",
+          "evidence_group_id": "transformer_architecture",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "abstract",
+          "page": null,
+          "section": "Abstract",
+          "quote": "We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.",
+          "supports": ["transformer_attention_only"]
+        },
+        {
+          "evidence_id": "bert_abstract_bidirectional",
+          "evidence_group_id": "bert_bidirectional_pretraining",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "abstract",
+          "page": null,
+          "section": "Abstract",
+          "quote": "BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers.",
+          "supports": ["bert_bidirectional_pretraining"]
+        }
+      ],
+      "tags": ["multi-paper", "positive", "comparison", "required-coverage"]
+    },
+    {
+      "case_id": "transformer_training_energy_missing",
+      "question": "How much electrical energy did the authors consume to train the Transformer big model?",
+      "question_type": "evidence_missing",
+      "evaluation_split": "fixture",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 schema fixtures",
+        "dataset_version": "0.1.0",
+        "source_url": null,
+        "source_case_id": "transformer_training_energy_missing",
+        "source_split": "fixture",
+        "license": "Repository license",
+        "adaptation_notes": "Authored only to exercise missing-evidence abstention; not eligible for benchmark claims."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "Requires full-paper review and independent adjudication before benchmark use."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "abstain",
+        "abstention_reason": "evidence_missing",
+        "required_paper_ids": ["1706.03762v7"],
+        "answer_criteria": [],
+        "forbidden_claims": [
+          "Converts reported training time or hardware into an unreported energy value.",
+          "Supplies an energy estimate from outside the paper."
+        ]
+      },
+      "gold_evidence": [],
+      "challenge": {
+        "kinds": ["negative", "evidence_missing"],
+        "description": "The paper reports hardware and training time, which are plausible distractors but do not establish electrical energy consumption."
+      },
+      "tags": ["single-paper", "negative", "abstention"]
+    },
+    {
+      "case_id": "transformer_imagenet_false_premise",
+      "question": "What ImageNet top-1 accuracy does the Transformer paper report?",
+      "question_type": "unsupported_question",
+      "evaluation_split": "fixture",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 schema fixtures",
+        "dataset_version": "0.1.0",
+        "source_url": null,
+        "source_case_id": "transformer_imagenet_false_premise",
+        "source_split": "fixture",
+        "license": "Repository license",
+        "adaptation_notes": "Authored only to exercise adversarial abstention; not eligible for benchmark claims."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "Requires full-paper review and independent adjudication before benchmark use."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "abstain",
+        "abstention_reason": "unsupported_question",
+        "required_paper_ids": ["1706.03762v7"],
+        "answer_criteria": [],
+        "forbidden_claims": [
+          "Invents an ImageNet result.",
+          "Treats machine-translation BLEU results as ImageNet accuracy.",
+          "Claims that absence from a few retrieved passages proves absence from the entire paper."
+        ]
+      },
+      "gold_evidence": [],
+      "challenge": {
+        "kinds": ["negative", "adversarial", "unsupported_premise"],
+        "description": "The question presupposes an ImageNet experiment and can lure retrieval toward unrelated numeric result passages."
+      },
+      "tags": ["single-paper", "negative", "adversarial", "abstention"]
+    }
+  ]
+}

@@ -14,12 +14,28 @@
 
 ## Next validation work
 
-1. Add claim-by-claim verification after cross-paper synthesis.
-2. Curate 50 questions with page-level evidence labels.
-3. Measure dense vs lexical vs fused Recall@K on the labeled set.
-4. Correct section-boundary metadata around tables and mid-page headings.
-5. Benchmark 1.7B/4B/8B using identical evidence and tool traces.
-6. Run batch/model benchmarks on Kaggle GPU rather than the 4 GB laptop GPU.
+The v0.5 evaluation schema, provenance/publication gate, semantic loader,
+QASPER/SciFact adapters, deterministic metrics, checksum-pinned downloader,
+portable QASPER runner, four non-benchmark fixtures, and completed external
+QASPER R11 development checkpoint are preserved. R11 supports retaining hybrid
+retrieval but does not replace an independently reviewed internal benchmark.
+Continue in this order:
+
+1. Curate and independently review a 10-case internal regression suite before
+   expanding to 25 and 50 cases.
+2. Extend the shared report format from QASPER ablations to the internal suite.
+3. Evaluate verifier sufficiency, false positives/negatives, supported-passage
+   selection, and the separate retrieval-rewrite recovery loop.
+4. Remove unsafe citation fallback behavior, then add claim-level models,
+   verification, and claim/citation metrics.
+5. Build the SciFact runner once claim verification exists; do not conflate its
+   claim labels with the current evidence-sufficiency verifier.
+6. Integrate bounded answer revision/abstention into LangGraph.
+7. Add end-to-end reporting and regression comparison without committing runtime
+   evaluation outputs.
+8. Correct section-boundary metadata around tables and mid-page headings.
+9. Benchmark 1.7B/4B/8B on identical evidence and traces, preferring Kaggle GPU
+   for batch runs over the 4 GB laptop GPU.
 
 ## Deferred
 

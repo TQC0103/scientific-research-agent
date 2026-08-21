@@ -15,6 +15,9 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - evidence retrieval with page/section citations
 - a bounded LangGraph search/index/retrieve/answer loop
 - CLI, Gradio UI, smoke tests, and local data isolation
+- versioned evaluation schema with revision-pinned evidence fixtures
+- validated QASPER/SciFact adapters and deterministic external metrics
+- portable QASPER lexical/dense/hybrid runner with guarded test-set access
 
 ## Quick start (Windows PowerShell)
 
@@ -55,6 +58,61 @@ Runtime artifacts stay under `data/` and are ignored by Git:
 - `data/research.db`: paper metadata
 - `data/papers/`: downloaded PDFs
 - `data/indexes/<arxiv-id>/`: FAISS index and chunk metadata
+- `data/evaluations/`: generated evaluation runs and reports
+
+Committed evaluation source data lives under `evaluation/`. Its JSON Schema,
+evidence identity rules, decision taxonomy, and metric contract are documented
+in `evaluation/README.md`. The initial four cases are schema fixtures, not a
+reported benchmark.
+
+Download the checksum-pinned public QASPER v0.3 and SciFact artifacts with:
+
+```powershell
+python scripts/download_external_benchmarks.py
+```
+
+The downloaded datasets remain ignored runtime data. Loading and metric tests
+are CPU-only; full embedding/model benchmark runs should use the configured
+Kaggle GPU path rather than the laptop.
+
+Run a two-question CPU-only retrieval smoke without loading a model:
+
+```powershell
+python scripts/run_qasper.py `
+  --dataset data/evaluations/external/qasper/qasper-dev-v0.3.json `
+  --split dev --retrieval-mode lexical --generator none --limit 2 `
+  --output-dir data/evaluations/runs/qasper-smoke
+```
+
+`--generator none` always predicts `Unanswerable`; its answer F1 is therefore
+not a model score. Dense/hybrid retrieval and Transformers generation are
+optional heavy modes intended for Kaggle Control Plane. Test data additionally
+requires `--allow-test`, so a development command cannot accidentally consume
+the held-out split. Transformers prompts are passed to the pipeline together
+with configurable `--generation-batch-size` (default 8); CUDA out-of-memory
+errors retry at successively smaller batch sizes without moving generation onto
+the laptop.
+
+Prepare the narrow, ignored Control Plane source folder with:
+
+```powershell
+python scripts/prepare_qasper_kaggle_job.py
+```
+
+The generated folder contains one embedded application entrypoint, pinned
+Kaggle requirements, a checksum manifest, and private T4 kernel metadata. It
+does not package the repository root, credentials, held-out test data, or prior
+evaluation runs. The remote entrypoint creates a clean virtual environment
+without system packages, verifies a real CUDA matrix operation, and records its
+resolved dependency fingerprint before starting the full dev benchmark.
+
+The exact self-contained source used by the completed QASPER R11 development
+run is archived under `evaluation/kaggle/qasper_v0_5_r11/`. Across 892
+retrieval-eligible cases, hybrid Recall@5 was `0.5237`, compared with `0.4957`
+for dense and `0.4605` for lexical retrieval. This supports retaining hybrid
+retrieval, but it is not a strong absolute-quality result and the answer scores
+are not apples-to-apples because only the hybrid configuration used a model.
+Generated predictions and Kaggle runtime artifacts remain uncommitted.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

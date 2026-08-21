@@ -24,6 +24,9 @@ flowchart LR
     RETRIEVAL <--> MODELS["Local model runtime module"]
     VERIFIER <--> MODELS
     ANSWER <--> MODELS
+
+    EVALUATION["Evaluation module"] <--> MODELS
+    EVALUATION --> STORAGE
 ```
 
 ## 1. Interface module
@@ -254,6 +257,61 @@ flowchart TD
 The laptop remains the local smoke-test runtime. Kaggle GPU is the preferred
 future execution environment for parallel batch evaluations and model-size
 comparisons when its Control Plane connection is available.
+
+## 10. Evaluation data artifacts
+
+Implementation: `evaluation/schema/evaluation-suite.schema.json`,
+`evaluation/suites/v0_5/schema_fixtures.json`, `app/evaluation/`,
+`scripts/download_external_benchmarks.py`, `evaluation/README.md`.
+
+```mermaid
+flowchart TD
+    SCHEMA["Committed JSON Schema 1.1.0"] --> LOADER["Pydantic loader + semantic cross-reference validation"]
+    LOADER --> CASES["Versioned internal evaluation cases"]
+    CASES --> PAPERS["Exact arXiv revisions + required-paper set"]
+    CASES --> EXPECTED["Answer/abstain decision + atomic criteria"]
+    CASES --> GOLD["Gold evidence groups"]
+    CASES --> PROVENANCE["Fixture/development/test + provenance + annotation"]
+    GOLD --> ANCHOR["Versioned ID + source type + page + exact quote"]
+    GOLD --> OPTIONAL["Optional chunk index; never sole identity"]
+
+    DOWNLOAD["Checksum-pinned public downloader"] --> QASPER["Native QASPER v0.3 adapter"]
+    DOWNLOAD --> SCIFACT["Native SciFact adapter"]
+    QASPER --> RUNNER["Portable lexical / dense / hybrid runner"]
+    RUNNER --> GUARD["Gold-hidden prediction + explicit test access gate"]
+    GUARD --> GENERATOR["No-model smoke or Transformers generation"]
+    GENERATOR --> BATCH["Batched pipeline inference + bounded OOM batch fallback"]
+    BATCH --> METRICS["Official-style answer/evidence F1 + Recall@K/MRR"]
+    SCIFACT --> METRICS2["Label and sufficiency metrics"]
+    DOWNLOAD --> RUNTIME["Ignored data/evaluations/external/"]
+
+    RUNNER --> OUTPUTS["Ignored predictions JSONL + metrics JSON"]
+    RUNNER --> PACKAGE["Narrow dev-only Kaggle source package + checksums"]
+    PACKAGE --> VENV["Clean Kaggle venv + pinned direct requirements"]
+    VENV --> PREFLIGHT["T4 identity + CUDA matmul + dependency fingerprint"]
+    PREFLIGHT -.-> KAGGLE["Heavy dense/model batch via Kaggle Control Plane"]
+    PREFLIGHT --> OUTPUTS
+    R11["Archived QASPER R11 source snapshot"] --> R11ENV["Embedded app + pinned isolated T4 runtime"]
+    R11ENV --> R11RUN["Lexical / dense / hybrid + generation"]
+    R11RUN --> R11RESULT["Recorded dev metrics; runtime outputs not committed"]
+    SCIFACT -.-> FUTURE["Claim-verifier runner — planned"]
+    FUTURE -.-> OUTPUTS
+```
+
+Committed suites are source artifacts, while generated model responses, metric
+reports, and baselines are runtime artifacts and remain outside version control.
+Negative cases have no retrieval denominator; their retrieval metrics are not
+applicable and they are evaluated later through verifier/abstention behavior.
+External datasets remain in their native format, preventing repo-authored schema
+adaptation from silently changing official answer, evidence, or claim labels.
+The no-model mode is a retrieval smoke only and is never presented as an answer
+model result. Dense encoders are cached per active paper. Generator prompts are
+submitted to Transformers together and internally batched; a CUDA OOM halves
+the batch down to one instead of falling back to local compute. Test-set access
+is an explicit CLI decision rather than the default development path. The R11
+directory is a historical, immutable source snapshot; future evaluator changes
+remain in `app/evaluation/` and the packaging script rather than being made in
+the archived runner.
 
 ## Maintenance rule
 

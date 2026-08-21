@@ -275,3 +275,284 @@ cross-paper synthesis and paper-specific fail-closed behavior. The suite grew
 from 22 to 28 passing tests, including required-paper discovery, isolated retry,
 per-paper supported-passage filtering, full two-paper graph execution, and
 routing to the next required paper.
+
+## 2026-08-21 — Versioned evaluation data contract
+
+Before implementing claim verification or changing LangGraph, v0.5 work began
+with a shared evaluation data contract. The two empty, unconstrained
+`evaluation/questions.json` and `evaluation/ground_truth.json` placeholders were
+replaced by JSON Schema Draft 2020-12 and a versioned suite layout.
+
+The schema pins papers to exact arXiv revisions and separates expected
+answer/abstention decisions, atomic answer criteria, forbidden claims, required
+paper coverage, gold evidence, and challenge labels. Gold evidence uses the
+versioned paper ID, source type, page, section, and exact quote as its stable
+anchor. Chunk indexes are optional because chunking changes can renumber them.
+Equivalent passages can share an evidence-group ID.
+
+The matching contract defines evidence-group Recall@K and MRR, required-paper
+coverage for comparisons, and annotation-relative Precision@K. Retrieval metrics
+are not applicable for negative cases with no gold evidence, preventing correct
+abstention cases from being inserted as retrieval zeroes. Four illustrative
+fixtures cover a supported single-paper method question, a required two-paper
+comparison, missing evidence, and an adversarial unsupported premise. They are
+schema examples and are not reported as benchmark results.
+
+Executable loading, cross-reference validation, metric calculation, retrieval
+ablation, and graph changes remain deliberately out of scope for this step.
+
+The Draft 2020-12 schema and all four fixtures validated successfully. Ruff
+passed and the unchanged application suite passed all 28 tests. Verification
+ran from the repository's new non-OneDrive location at
+`C:\Users\ASUS\Documents\GitHub\scientific-research-agent`.
+
+## 2026-08-21 — Public benchmark provenance and adapters
+
+The initial schema was intentionally not treated as evaluation evidence. It was
+revised to version 1.1.0 with mandatory fixture/development/test splits,
+provenance, annotation metadata, and suite freeze status. An executable
+publication gate rejects schema fixtures, unfrozen suites, synthetic test cases,
+and repo-curated test cases without independent review and adjudication.
+
+QASPER and SciFact remain native external benchmarks rather than being rewritten
+as repo-authored arXiv cases. The QASPER adapter preserves multiple annotator
+answers, unanswerable labels, and paragraph evidence; its deterministic answer
+and evidence F1 take the best reference in the same manner as the released
+evaluator. The SciFact adapter preserves SUPPORT, CONTRADICT, and
+NOT_ENOUGH_INFO labels and resolves gold rationale sentence indices against the
+official corpus. SciFact is reserved for the future claim verifier because the
+current evidence-sufficiency verifier solves a different task.
+
+The official QASPER v0.3 and SciFact archives were downloaded to ignored runtime
+storage. A reproducible downloader now pins all three archives by SHA-256 and
+performs path-safe extraction. Full CPU-only parsing found the expected 5,049
+QASPER questions (2,593 train, 1,005 dev, 1,451 test) and 300 labeled SciFact dev
+claims (124 SUPPORT, 64 CONTRADICT, 112 NOT_ENOUGH_INFO). These are dataset
+inventory counts, not model scores.
+
+No model or embedding batch was run locally. Kaggle Control Plane was not
+available among the tools exposed to this session, so the future external model
+benchmark remains pending rather than falling back to the laptop GPU.
+
+## 2026-08-21 — Portable QASPER runner and Kaggle control boundary
+
+A native QASPER runner now separates paper text from QA annotations before
+retrieval or generation. It implements dependency-free BM25, optional Sentence
+Transformers dense retrieval, reciprocal-rank hybrid fusion, and optional
+Transformers answer generation. Dense document embeddings are created once per
+active paper rather than once per question. Predictions retain exact paragraph
+strings so the released QASPER evidence metric remains meaningful.
+
+The CLI writes per-case JSONL and aggregate answer/evidence F1, retrieval
+Recall@K/MRR, denominators, latency, and model-call counts to ignored runtime
+storage. Test-set access requires an explicit `--allow-test`; development runs
+cannot consume held-out data accidentally. A two-question lexical/no-model smoke
+produced retrieval Recall@5 `0.75`, MRR `0.6667`, and evidence F1 `0.3095` in
+about 0.01 seconds. Answer F1 was `0.0` by design because no-model mode always
+abstains; it is not a model score.
+
+A personal `kaggle-control-plane` plugin was also scaffolded outside the repo.
+It exposes bounded MCP tools for status, account/quota inspection, submission,
+monitoring, job actions, and artifact download while redacting credentials and
+requiring explicit source directories. Its manifest and skill validated, four
+offline contract tests passed, and the stdio MCP handshake returned all tools.
+The current Codex task cannot load a newly created plugin, and the running
+Control Plane desktop API did not answer HTTP requests, so no remote batch was
+submitted. No dense encoder, generator model, or GPU benchmark was run locally.
+The QASPER dev job source was prepared under ignored runtime storage with a
+per-file SHA-256 manifest; it excludes credentials, repository-wide files,
+previous runs, and the held-out test split.
+
+## 2026-08-21 — First QASPER dev GPU submission
+
+After restarting Windows, the installed Kaggle Control Plane plugin reported two
+enabled accounts with available GPU quota. The first submission was rejected
+locally before reaching Kaggle because the prepared source contained both
+`main.py` and `run_qasper.py` at top level; no remote quota was consumed. The
+packager now places the runner at `app/run_qasper.py`, invokes it as
+`python -m app.run_qasper`, excludes Python caches, and has a regression test for
+the single-entrypoint contract. The Kaggle bootstrap also installs Pydantic and
+Accelerate when missing.
+
+Control Plane's configured source allowlist still points to its dedicated
+experiments directory, so a narrow credential-free staging copy was used rather
+than broadening the allowlist or moving the repository back. GPU job
+`job_c810b8e0e5164f528654f23a3b2a7300` was accepted by Kaggle and reached
+`running`, then failed remotely before producing artifacts. Control Plane's log
+download contained orchestration events but no Kaggle traceback, and the private
+kernel was unavailable in the current browser account, so another retry would be
+speculative. No external model score is recorded. Ruff passed and all 43 pytest
+tests passed locally; no dense/model workload was run on the laptop.
+
+## 2026-08-21 — Remote failure diagnostics and self-contained Kaggle source
+
+Kaggle Control Plane was upgraded so failed jobs automatically call the Kaggle
+output API, redact credential values from downloaded text artifacts, and append
+the bounded remote `.log` to the existing log download. The same endpoint can
+fetch diagnostics on demand for failures created before the upgrade. Its backend
+suite passed all 18 tests with one platform-specific skip, and the rebuilt
+desktop app was installed without replacing accounts, encrypted tokens, or job
+history.
+
+The recovered r2 traceback showed that Kaggle kernel source uploads did not keep
+the packaged QASPER JSON. r3 therefore downloaded the checksum-pinned upstream
+train/dev archive and extracted only the dev member, but its new automatic
+traceback showed that nested local Python modules were also absent. The r4
+packager embeds a path-checked ZIP of the portable runner inside the single
+top-level `main.py`, expands it under `/kaggle/working`, and retains the pinned
+runtime dataset download. Ruff and all 43 local pytest tests passed. GPU job
+`job_c379a019f6b845178e37145736ae7f3f` remained running beyond both earlier
+failure points at the latest check; no benchmark score is recorded yet.
+
+## 2026-08-21 — Kaggle P100 runtime compatibility
+
+The upgraded Control Plane successfully downloaded r4's private remote log. It
+showed that dataset download, embedded application extraction, imports, and the
+lexical run all completed. Dense encoding then failed because Kaggle assigned a
+Tesla P100 (`sm_60`) while the preinstalled PyTorch build only contained kernels
+for `sm_70` and newer.
+
+The Kaggle bootstrap now probes the assigned device capability against
+`torch.cuda.get_arch_list()` before model work. For the exact P100 mismatch it
+installs the pinned PyTorch 2.7.1 CUDA 11.8 wheel and verifies `sm_60` support;
+unknown incompatibilities fail explicitly instead of silently moving a large
+benchmark onto CPU. Ruff passed and all 44 pytest tests passed. No model workload
+was run on the laptop. Corrected r5 job
+`job_6edee16ce413407eaeb14ea2e4f4ac8f` was accepted by Kaggle and reached
+`running`, but failed while validating the newly installed wheel. Its automatic
+traceback showed the 905 MB Torch CUDA 11.8 wheel installed successfully, then
+the fresh Python import exited unsuccessfully because the install had omitted
+its dependency set. The bootstrap now installs matching Torch 2.7.1 and
+Torchvision 0.22.1 with dependencies and includes bounded probe stderr in any
+future failure.
+
+Corrected r6 job `job_6fa1d28aac674a80957f75c25c71e441` was submitted through
+Kaggle Control Plane on account `acct_d321057bf0954d048b448711e0efed7f`
+with GPU acceleration. It remained `running` beyond the point where r5's
+dependency-free validation had already failed; aggregate metrics and artifacts
+remain pending.
+
+## 2026-08-21 — Isolated T4 evaluation runtime
+
+r6 later failed after the full 1,005-case lexical stage. Its downloaded log
+confirmed that Torch 2.7.1 CUDA 11.8 and CUDA dependencies installed, but the
+Kaggle system environment still exposed TorchCodec/Torchaudio components built
+for Torch 2.10 CUDA 12.8. Importing Sentence Transformers therefore loaded an
+ABI-incompatible `libtorchcodec` before dense retrieval. The lexical metrics are
+retained only as partial diagnostics; no dense/hybrid result exists.
+
+The runtime design no longer mutates Kaggle's system Python or attempts a P100
+downgrade. The Control Plane path now requests an explicit Tesla T4, while the
+job creates a clean venv without system-site packages, installs pinned direct
+requirements, verifies T4 capability with a CUDA matrix operation, and records
+the complete resolved freeze plus its SHA-256 before starting evaluation. This
+environment boundary prevents leftover Kaggle audio/video packages from
+entering the text-only benchmark.
+
+r7 verified that the new Control Plane preserves `NvidiaTeslaT4` in job
+metadata and successfully submits the exact CLI accelerator, but Kaggle dropped
+the separate top-level requirements text file and the preflight stopped after
+two seconds without installing packages or entering the dataset loop. The
+packager now embeds the reviewed requirements inside the single accepted Python
+entrypoint and materializes them only inside `/kaggle/working`.
+
+r8 materialized the requirements successfully but Kaggle's Python installation
+could not complete stdlib `venv` because its `ensurepip` command exits nonzero.
+The job again stopped in about three seconds before package installation or
+evaluation. The bootstrap now installs pinned `virtualenv` 20.36.1 into a
+separate working-directory target, uses its bundled seed wheels to create the
+clean environment, and leaves Kaggle's system site-packages unchanged.
+
+r9 `job_ff63a643af4f42ca86baf5f87b58d94a` was accepted with persisted
+`NvidiaTeslaT4` metadata and remained running beyond both earlier preflight
+failures. Its terminal dense/hybrid artifacts remained pending at that check;
+no heavy workload was moved to the laptop.
+
+The live r9 log subsequently confirmed a successful isolated runtime: Python
+3.12.13, Tesla T4 capability 7.5, Torch 2.10.0+cu128, CUDA runtime 12.8, and a
+CUDA matrix result of 262144.0. The resolved dependency freeze hash is
+`acd1f87cac27f70514f090795c1145290cf45bed684a19714ec7559194a619ae`.
+All 1,005 lexical dev cases completed before dense retrieval began. Kaggle's
+global `sitecustomize` emitted a non-fatal missing-`wrapt` warning, but it did
+not prevent the isolated imports, CUDA operation, or lexical run.
+
+The live log later reached `Device set to use cuda:0`, confirming the Qwen
+hybrid-answer generator loaded on the T4 after dense retrieval. Transformers
+warned that sampling flags were ignored; this is expected because the runner
+uses deterministic `do_sample=False`. The terminal hybrid metrics remain pending.
+
+## 2026-08-21 — Batched T4 answer generation
+
+r9 was cancelled locally after Transformers warned that repeated sequential
+pipeline calls underused the T4. Control Plane cancellation stops its monitor,
+so the record correctly retains `remote_may_be_running=true`; it is not treated
+as proof that Kaggle terminated the kernel.
+
+The QASPER runner now retrieves without consulting gold annotations, collects
+the resulting prompts, and submits them to the Transformers pipeline together
+with batch size 8. Output order remains tied to question IDs, model calls count
+questions, and a CUDA out-of-memory error retries the pipeline at 4, 2, then 1.
+No CPU or laptop fallback was added. Metrics now also record physical generation
+batch calls. A regression test verifies one batched pipeline invocation and
+evidence-index filtering.
+
+An initial r10 dispatch was stopped before Kaggle returned a remote job because
+the currently loaded MCP cache dropped accelerator metadata. The signed-in
+Kaggle page confirmed that kernel URL did not exist. After reconciling that
+account, r10 `job_b6bdf13428fa4c31bb4d0bfaefd1d927` was submitted through the
+Control Plane backend with explicit `NvidiaTeslaT4` metadata from the narrow
+source directory. Ruff passed and all 46 pytest tests passed; no model workload
+ran on the laptop.
+
+r10's live generation log later exposed decoder-only right padding during
+batched inference. Because right padding can change decoder-only outputs, r10's
+answer-generation result is not eligible as a baseline even if the kernel
+finishes. The generator now forces tokenizer left padding, reuses the EOS token
+for padding when needed, and clears inactive sampling parameters while retaining
+deterministic `do_sample=False`. A regression test locks this batch contract.
+
+## 2026-08-21 — External QASPER R11 checkpoint archived
+
+The final self-contained Kaggle R11 source bundle was recovered from the local
+Control Plane experiment directory and checked against its source manifest. The
+executed `main.py` SHA-256 was
+`f6dc6c080374d00894b181344745abac9aeecd29425e8112c12dd0931f5dd157`.
+Restoring Windows CRLF line endings reproduces that manifest hash. The committed
+kernel metadata replaces the submitted Kaggle owner with `replace-me`, and the
+manifest separately records the sanitized LF repository hashes. Downloading a
+duplicate runtime artifact from Kaggle was therefore unnecessary.
+
+R11 embeds the exact application snapshot, pins the model environment, verifies
+the public QASPER archive by SHA-256, requires Tesla T4 compute capability 7.5,
+and runs lexical-only, dense-only, and hybrid-plus-generation configurations.
+The completed log contained 1,005 predictions and no missing cases. Retrieval
+metrics used 892 eligible QASPER dev cases:
+
+| Configuration | Recall@5 | MRR | Evidence F1 | Answer F1 |
+|---|---:|---:|---:|---:|
+| Lexical, no generator | 0.4605 | 0.3072 | 0.1606 | 0.1350 |
+| Dense, no generator | 0.4957 | 0.3538 | 0.1823 | 0.1350 |
+| Hybrid + Qwen2.5-1.5B-Instruct | 0.5237 | 0.3886 | 0.2396 | 0.1651 |
+
+This establishes a reproducible external reason to retain hybrid retrieval, not
+a claim that retrieval or answer quality is already strong. Recall@5 still
+recovers only about half of annotated evidence. Answer F1 is not a clean
+retrieval ablation because the lexical and dense configurations made no model
+calls while the hybrid configuration made 1,005. The hybrid generation phase
+took roughly 7,332 seconds and the complete Kaggle job roughly 8,013 seconds,
+so environment reuse and generation throughput remain optimization targets.
+
+The source bundle is committed under `evaluation/kaggle/qasper_v0_5_r11/`.
+Predictions, downloaded data, model caches, resolved environments, and runtime
+reports remain uncommitted artifacts.
+
+## 2026-08-21 — Local repository consolidation
+
+Evaluation implementation work had diverged between the canonical checkout
+under `C:\Users\ASUS\Documents\GitHub` and a stale OneDrive checkout. The
+canonical repository retained the newer schema 1.1.0 loader, provenance gate,
+external adapters, runner, packaging scripts, and tests; the OneDrive checkout
+retained the final R11 provenance snapshot. The two lines were reconciled by
+keeping the newer canonical implementation and importing only the immutable R11
+bundle and its verified result record. The OneDrive checkout is removed only
+after verification and GitHub publication succeed.

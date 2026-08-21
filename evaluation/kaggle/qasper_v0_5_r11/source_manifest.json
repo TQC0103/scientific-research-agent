@@ -1,0 +1,11 @@
+{
+  "source": "scientific-research-agent v0.5 QASPER dev package",
+  "executed_windows_sha256": {
+    "main.py": "f6dc6c080374d00894b181344745abac9aeecd29425e8112c12dd0931f5dd157"
+  },
+  "repository_lf_sha256": {
+    "kernel-metadata.json": "1964a662827af6a573aad116d5dce5aae34205b86936bcadbff585c6983e67ef",
+    "main.py": "ec9f7d69a97895b01637657b56983efdcd1e6ea47142f01a13bee343a21a1629"
+  },
+  "notes": "The executed kernel-metadata hash is not retained because its Kaggle owner was replaced with replace-me. The committed text uses LF; restoring CRLF reproduces the executed main.py hash."
+}

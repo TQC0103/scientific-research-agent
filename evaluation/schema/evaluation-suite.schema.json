@@ -1,0 +1,463 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TQC0103/scientific-research-agent/evaluation/schema/evaluation-suite.schema.json",
+  "title": "Scientific Research Agent Evaluation Suite",
+  "description": "Versioned cases shared by retrieval, evidence verification, and end-to-end answer evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "dataset_version",
+    "benchmark_status",
+    "description",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1.0"
+    },
+    "suite_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "dataset_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "benchmark_status": {
+      "enum": ["schema_fixture", "development", "frozen"]
+    },
+    "frozen_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evaluation_case"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "benchmark_status": {
+            "const": "frozen"
+          }
+        }
+      },
+      "then": {
+        "required": ["frozen_at"]
+      }
+    }
+  ],
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "dataset_name", "source_case_id", "source_split", "license", "adaptation_notes"],
+      "properties": {
+        "kind": {
+          "enum": ["external", "repo_curated", "synthetic"]
+        },
+        "dataset_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_version": {
+          "type": ["string", "null"]
+        },
+        "source_url": {
+          "type": ["string", "null"],
+          "format": "uri"
+        },
+        "source_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_split": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adaptation_notes": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "external"
+              }
+            }
+          },
+          "then": {
+            "required": ["source_url"],
+            "properties": {
+              "source_url": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "annotator_count", "reviewer_count", "adjudicated", "notes"],
+      "properties": {
+        "source": {
+          "enum": ["external_dataset", "repo_authored", "synthetic"]
+        },
+        "annotator_count": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "reviewer_count": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "adjudicated": {
+          "type": ["boolean", "null"]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "paper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paper_id", "versioned_id", "revision", "title"],
+      "properties": {
+        "paper_id": {
+          "type": "string",
+          "pattern": "^[0-9]{4}\\.[0-9]{4,5}$"
+        },
+        "versioned_id": {
+          "type": "string",
+          "pattern": "^[0-9]{4}\\.[0-9]{4,5}v[1-9][0-9]*$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "answer_criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion_id", "description", "required"],
+      "properties": {
+        "criterion_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "required_paper_ids",
+        "answer_criteria",
+        "forbidden_claims"
+      ],
+      "properties": {
+        "decision": {
+          "enum": ["answer", "abstain"]
+        },
+        "abstention_reason": {
+          "enum": [
+            "evidence_missing",
+            "unsupported_question",
+            "unresolved_conflict"
+          ]
+        },
+        "required_paper_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]{4}\\.[0-9]{4,5}v[1-9][0-9]*$"
+          }
+        },
+        "reference_answer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answer_criteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/answer_criterion"
+          }
+        },
+        "forbidden_claims": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "answer"
+              }
+            }
+          },
+          "then": {
+            "required": ["reference_answer"],
+            "properties": {
+              "required_paper_ids": {
+                "minItems": 1
+              },
+              "answer_criteria": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "abstain"
+              }
+            }
+          },
+          "then": {
+            "required": ["abstention_reason"]
+          }
+        }
+      ]
+    },
+    "gold_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "evidence_group_id",
+        "paper_id",
+        "versioned_id",
+        "source_type",
+        "page",
+        "section",
+        "quote",
+        "supports"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "evidence_group_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "paper_id": {
+          "type": "string",
+          "pattern": "^[0-9]{4}\\.[0-9]{4,5}$"
+        },
+        "versioned_id": {
+          "type": "string",
+          "pattern": "^[0-9]{4}\\.[0-9]{4,5}v[1-9][0-9]*$"
+        },
+        "source_type": {
+          "enum": ["full_text", "abstract"]
+        },
+        "page": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "section": {
+          "type": ["string", "null"]
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 20
+        },
+        "chunk_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "supports": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source_type": {
+                "const": "full_text"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source_type": {
+                "const": "abstract"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "page": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kinds", "description"],
+      "properties": {
+        "kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "negative",
+              "adversarial",
+              "evidence_missing",
+              "unsupported_premise",
+              "partial_evidence",
+              "conflicting_evidence",
+              "cross_paper_leakage"
+            ]
+          }
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evaluation_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "question",
+        "question_type",
+        "evaluation_split",
+        "provenance",
+        "annotation",
+        "papers",
+        "expected",
+        "gold_evidence",
+        "tags"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question_type": {
+          "enum": [
+            "single_paper_fact",
+            "method",
+            "result",
+            "multi_paper_comparison",
+            "evidence_missing",
+            "unsupported_question",
+            "conflicting_evidence",
+            "partial_evidence"
+          ]
+        },
+        "evaluation_split": {
+          "enum": ["fixture", "development", "test"]
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "annotation": {
+          "$ref": "#/$defs/annotation"
+        },
+        "papers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/paper"
+          }
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        },
+        "gold_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gold_evidence"
+          }
+        },
+        "challenge": {
+          "$ref": "#/$defs/challenge"
+        },
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

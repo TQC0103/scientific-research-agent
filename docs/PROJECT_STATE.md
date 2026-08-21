@@ -1,16 +1,19 @@
 # Project state
 
-Last updated: 2026-08-18
+Last updated: 2026-08-21
 
 ## Current baseline
 
 - Version: `0.4.0`
-- Branch: `main`
-- Latest pushed commit before this implementation: `245844a`
+- Branch: `codex/consolidate-v05-evaluation`
+- Baseline commit before this implementation: `34ceb54`
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
-- Verification: Ruff passed; 28 pytest tests passed; Ollama doctor and Gradio
-  import passed
+- Verification: JSON Schema 1.1.0 and four fixtures validated; Ruff passed; 47
+  pytest tests passed. Native QASPER loaded all 5,049 questions and native
+  SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
+  The earlier Ollama doctor and Gradio import checks remain the latest runtime
+  smoke checks.
 
 ## Implemented
 
@@ -24,6 +27,18 @@ Last updated: 2026-08-18
 - Shared LangGraph path for CLI `ask`, CLI `chat`, and Gradio UI
 - Six-case baseline runner and complete architecture visualization
 - Reproducible two-case multi-paper smoke runner
+- Versioned evaluation data contract with exact-revision papers, stable evidence
+  anchors, answer/abstention expectations, challenge labels, and four schema
+  fixtures
+- Provenance, split/freeze metadata, and a publication gate that blocks fixture,
+  synthetic, or unreviewed internal results from being presented as held-out
+- Executable semantic suite loader plus native QASPER/SciFact adapters,
+  deterministic metrics, and checksum-pinned public-dataset download
+- Portable QASPER BM25/dense/hybrid runner with gold-hidden prediction,
+  batched Transformers generation with CUDA-OOM batch fallback, explicit
+  held-out access, and JSONL/metric outputs
+- Archived self-contained QASPER R11 source with a pinned isolated T4 runtime,
+  verified public-dataset download, source manifest, and recorded dev metrics
 
 ## Latest evaluation
 
@@ -38,6 +53,17 @@ architecture-and-training-objective comparison correctly stopped after the
 Transformer side exhausted three verifier calls without direct loss/objective
 evidence; the BERT side was independently sufficient after one call.
 
+A two-question QASPER dev lexical/no-model smoke reached retrieval Recall@5
+`0.75`, MRR `0.6667`, and evidence F1 `0.3095`. Its answer F1 `0.0` is expected
+because the smoke generator always abstains; this is not an external model score.
+
+The completed external QASPER v0.3 dev R11 run produced all 1,005 predictions.
+Across 892 retrieval-eligible cases, Recall@5 was `0.4605` lexical, `0.4957`
+dense, and `0.5237` hybrid. Hybrid MRR was `0.3886`, evidence F1 `0.2396`, and
+answer F1 `0.1651`. This supports retaining hybrid retrieval but is not a strong
+absolute-quality result. Answer F1 is not apples-to-apples because only hybrid
+used the Qwen generator.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -50,10 +76,22 @@ evidence; the BERT side was independently sufficient after one call.
 - Per-paper coverage reduces evidence leakage, but a separate final
   claim-by-claim cross-paper answer verifier is not implemented.
 - arXiv `last_revised` search is bounded and not an exhaustive corpus harvest.
+- SciFact evaluates scientific claim labels and rationales; the current verifier
+  only judges evidence sufficiency, so using SciFact as its score would be invalid.
+- External QASPER R11 still retrieves only about half of annotated evidence at
+  K=5. Generation took roughly 7,332 seconds and the complete job roughly 8,013
+  seconds on a Kaggle T4.
+- R11 emitted non-fatal missing-`wrapt` sitecustomize warnings and ignored
+  deterministic sampling flags; clean these before a future external rerun.
+- Dense/generator modes depend on optional Sentence Transformers and
+  Transformers runtimes; keep heavy runs on Kaggle rather than the laptop.
 
 ## Next priorities
 
-1. Add claim-by-claim verification of the synthesized cross-paper answer.
-2. Build a 50-question page-level evidence set and measure fused Recall@K.
-3. Fix section boundaries and table-associated metadata.
-4. Connect and use Kaggle Control Plane/GPU for parallel model/evaluation runs.
+1. Curate and independently review a 10-case internal regression suite.
+2. Add retrieval and retrieval-rewrite metrics to the internal suite.
+3. Evaluate verifier sufficiency and false-positive/false-negative behavior.
+4. Add citation safety and claim-level verification, then use native SciFact for
+   claim-label/rationale evaluation.
+5. Add end-to-end regression comparison without committing runtime outputs.
+6. Fix section boundaries and table-associated metadata.
