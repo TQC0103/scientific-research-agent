@@ -28,6 +28,7 @@ def _source_files() -> dict[Path, str]:
         ROOT / "app" / "__init__.py": "app/__init__.py",
         ROOT / "app" / "evaluation" / "__init__.py": "app/evaluation/__init__.py",
         ROOT / "app" / "evaluation" / "verifier.py": "app/evaluation/verifier.py",
+        ROOT / "app" / "evaluation" / "external.py": "app/evaluation/external.py",
         ROOT / "app" / "evaluation" / "loader.py": "app/evaluation/loader.py",
         ROOT / "app" / "evaluation" / "metrics.py": "app/evaluation/metrics.py",
         ROOT / "app" / "evaluation" / "models.py": "app/evaluation/models.py",

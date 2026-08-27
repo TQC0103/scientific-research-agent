@@ -47,6 +47,7 @@ def test_prepared_verifier_job_is_narrow_and_embeds_both_suites(
     with zipfile.ZipFile(io.BytesIO(base64.b64decode(encoded))) as archive:
         names = set(archive.namelist())
     assert "app/evaluation/verifier.py" in names
+    assert "app/evaluation/external.py" in names
     assert "app/models/verifier.py" in names
     assert "scripts/run_verifier_benchmark.py" in names
     assert "evaluation/suites/v0_5/development_10.json" in names
