@@ -713,3 +713,10 @@ The 2.3 MB script payload had embedded compressed PDFs. The next bundle removes
 PDFs from the submitted payload and downloads only the two checksum-locked
 public sources at runtime, reducing source size while preserving exact input
 identity.
+
+R2 `job_a7f2fe8ce6674934b646d05c9b2a533b` successfully submitted the reduced
+43 KB source and downloaded the verified PDFs, but failed after 31 seconds while
+creating the environment because Kaggle's Python 3.12 image lacks a working
+`ensurepip`. The package now bootstraps pinned `virtualenv` into `/tmp`, uses it
+to create the required `--system-site-packages` environment, and still leaves
+the system interpreter and PyTorch installation unchanged.

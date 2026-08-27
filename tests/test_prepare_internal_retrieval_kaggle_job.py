@@ -88,10 +88,13 @@ def test_kaggle_entrypoint_preserves_system_torch_and_cleans_environment() -> No
         / "requirements-kaggle.txt"
     ).read_text(encoding="utf-8")
     assert '"--system-site-packages"' in entrypoint
+    assert 'VIRTUALENV_VERSION = "20.36.1"' in entrypoint
+    assert '"--target"' in entrypoint
     assert '"--no-deps"' in entrypoint
     assert "torch.cuda.device_count()" in entrypoint
     assert "_download_papers()" in entrypoint
     assert "Downloaded PDF checksum mismatch" in entrypoint
     assert "shutil.rmtree(ENV_ROOT" in entrypoint
+    assert "shutil.rmtree(VIRTUALENV_BOOTSTRAP" in entrypoint
     assert "torch==" not in requirements
     assert "wrapt==" in requirements

@@ -6,6 +6,7 @@ import base64
 import hashlib
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,8 @@ ENV_PYTHON = ENV_ROOT / "bin" / "python"
 CODE_ROOT = Path("/tmp/internal_retrieval_source")
 PAPERS = CODE_ROOT / "papers"
 REQUIREMENTS = Path("/tmp/internal-retrieval-requirements.txt")
+VIRTUALENV_BOOTSTRAP = Path("/tmp/internal-retrieval-virtualenv")
+VIRTUALENV_VERSION = "20.36.1"
 APP_ARCHIVE_B64 = "__APP_ARCHIVE_B64__"
 REQUIREMENTS_B64 = "__KAGGLE_REQUIREMENTS_B64__"
 
@@ -61,8 +64,33 @@ def _download_papers() -> None:
 def _create_runtime() -> None:
     REQUIREMENTS.write_bytes(base64.b64decode(REQUIREMENTS_B64, validate=True))
     subprocess.run(
-        [sys.executable, "-m", "venv", "--system-site-packages", str(ENV_ROOT)],
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-cache-dir",
+            "--target",
+            str(VIRTUALENV_BOOTSTRAP),
+            f"virtualenv=={VIRTUALENV_VERSION}",
+        ],
         check=True,
+    )
+    bootstrap_env = os.environ.copy()
+    bootstrap_env["PYTHONPATH"] = str(VIRTUALENV_BOOTSTRAP)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "virtualenv",
+            "--clear",
+            "--no-download",
+            "--system-site-packages",
+            str(ENV_ROOT),
+        ],
+        check=True,
+        env=bootstrap_env,
     )
     subprocess.run(
         [
@@ -188,6 +216,7 @@ def main() -> None:
     finally:
         shutil.rmtree(ENV_ROOT, ignore_errors=True)
         shutil.rmtree(CODE_ROOT, ignore_errors=True)
+        shutil.rmtree(VIRTUALENV_BOOTSTRAP, ignore_errors=True)
         REQUIREMENTS.unlink(missing_ok=True)
 
 
