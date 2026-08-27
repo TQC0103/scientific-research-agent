@@ -173,9 +173,24 @@ python scripts/evaluate_internal_retrieval.py `
 
 It writes aggregate `metrics.json` and `per_case.jsonl`, including unmatched
 evidence groups, missing required papers, and explicit missing-case counts.
-Runtime inputs and reports remain ignored. Retriever execution and the
-lexical/dense/hybrid ablation runner are the next layer and remain separate from
-metric calculation.
+Runtime inputs and reports remain ignored. Retriever execution and metric
+calculation remain separate.
+
+`app/evaluation/internal_retrieval_runner.py` builds one checksum-verified,
+page-aware chunk corpus and uses it unchanged for all three arms. Lexical uses
+BM25; dense uses the pinned `Qwen/Qwen3-Embedding-0.6B` Sentence Transformers
+revision with its query prompt; hybrid applies reciprocal-rank fusion with the
+production constant 60 over up to 20 candidates from each arm. For multi-paper
+cases, chunks from all declared papers share one ranking so K and per-paper
+coverage remain directly comparable.
+
+The runner writes each arm's ranked chunks, per-case metrics, aggregate metrics,
+`ablation_summary.json`, and `ablation_report.md`. Gold evidence is consulted
+only after all rankings have been produced. The portable Kaggle package embeds
+only the required code and the two locally checksum-verified PDFs, uses an
+isolated `--system-site-packages` environment without replacing Kaggle PyTorch,
+verifies actual T4 devices and CUDA execution, and removes the environment
+before artifact collection.
 
 ## Advisory LLM judge
 

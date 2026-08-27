@@ -281,6 +281,11 @@ flowchart TD
     MATCHER --> CASEMETRICS["Per-case group recall / precision / RR + diagnostics"]
     CASEMETRICS --> INTERNALMETRICS["Eligible-case aggregate + paper coverage"]
     INTERNALMETRICS --> INTERNALOUTPUTS["Ignored metrics JSON + per-case JSONL"]
+    CASES --> ABLATION["Gold-hidden lexical / Qwen dense / RRF hybrid runner"]
+    PAPERS --> ABLATION
+    ABLATION --> RANKED
+    ABLATION --> ABLATIONREPORT["Ignored JSON summary + Markdown comparison"]
+    ABLATION -.-> ABLATIONGPU["Pinned isolated T4 package via Control Plane"]
 
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
@@ -323,6 +328,13 @@ requires the pinned `versioned_id`, then normalized quote containment or the
 documented token-recall threshold; page equality alone never creates a match.
 Evidence-group, item, and required-paper coverage remain distinct so one passage
 cannot hide a missing paper in a comparison case.
+The internal ablation branch creates one checksum-validated chunk corpus and
+holds it fixed across BM25, pinned Qwen3 dense retrieval, and RRF hybrid. It
+ranks the union of declared-paper chunks for each case, which gives all arms the
+same global K and makes missing-paper coverage visible. This differs from the
+production graph's sequential per-paper verifier loop and is documented as an
+evaluation boundary rather than silently presented as an identical execution
+trace.
 External datasets remain in their native format, preventing repo-authored schema
 adaptation from silently changing official answer, evidence, or claim labels.
 The no-model mode is a retrieval smoke only and is never presented as an answer

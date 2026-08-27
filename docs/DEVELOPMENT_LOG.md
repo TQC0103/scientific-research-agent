@@ -675,3 +675,32 @@ nine retrieval-eligible cases (the partial-evidence energy abstention is
 eligible) and one no-gold ImageNet case, matched the supplied case, and reported
 the other nine input rows as missing. The resulting 1/9 aggregate values are a
 deliberately incomplete wiring check, not retrieval-quality measurements.
+
+## 2026-08-27 — Internal retrieval ablation runner
+
+The ablation runner now creates one chunk corpus from the two checksum-pinned
+PDF revisions and holds chunking, questions, K, matcher, and aggregation fixed
+across lexical, dense, and hybrid arms. Lexical uses BM25. Dense uses the pinned
+`Qwen/Qwen3-Embedding-0.6B` Hugging Face revision corresponding to the repo's
+configured embedding-model family and applies the model's query prompt when
+available. Hybrid fuses up to 20 candidates per arm with reciprocal-rank
+constant 60. Gold evidence is read only after ranked outputs exist.
+
+Multi-paper cases use one global ranking over all declared-paper chunks. This
+keeps K comparable and makes paper-coverage failures measurable, but it is an
+evaluation boundary: the production graph retrieves and verifies papers
+sequentially. Generated output includes rankings and metrics per arm plus an
+aggregate JSON and human-readable Markdown failure report.
+
+A local CPU lexical run over the exact PDFs completed all 10 cases with nine
+retrieval-eligible cases and no missing predictions. Recall@5 was `0.7778`,
+annotation-relative Precision@5 `0.2000`, and MRR `0.6667`. It missed the BERT
+masked-LM mechanism evidence and both groups in the two-paper architecture
+comparison. Dense/hybrid were deliberately not run on the laptop.
+
+The Kaggle package embeds only required source modules and the two PDFs after
+local checksum validation. It creates a `--system-site-packages` environment,
+installs no PyTorch replacement, pins non-system model-library extras, includes
+`wrapt`, verifies every visible T4 plus a real CUDA operation, records the
+resolved environment, and removes its environment before artifact collection.
+Ruff passed and all 71 pytest tests passed before packaging.

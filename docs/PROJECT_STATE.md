@@ -10,7 +10,7 @@ Last updated: 2026-08-27
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, and the ten-case development
-  suite validated; Ruff passed and all 65 pytest tests passed. Native QASPER
+  suite validated; Ruff passed and all 71 pytest tests passed. Native QASPER
   loaded all 5,049 questions and native
   SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -52,6 +52,10 @@ Last updated: 2026-08-27
   evidence-group Recall@K, annotation-relative Precision@K, MRR, item coverage,
   required-paper coverage, macro paper recall, per-case diagnostics, and
   JSON/JSONL reports
+- Three-arm internal retrieval ablation runner using identical verified PDFs,
+  global per-case chunks and K, BM25 lexical retrieval, pinned Qwen3 dense
+  retrieval, RRF hybrid fusion, and JSON/Markdown reports; narrow isolated T4
+  packaging is implemented
 
 ## Latest evaluation
 
@@ -87,6 +91,13 @@ than treated as dataset failures or an accuracy score. Mean lint scores were
 4.8 clarity, 4.5 entailment, 4.5 answer alignment, 4.7 citation specificity, and
 4.8 challenge validity.
 
+The first local lexical-only internal run used the exact two pinned PDFs and
+reported Recall@5 `0.7778`, annotation-relative Precision@5 `0.2000`, MRR
+`0.6667`, and 9 eligible cases with zero missing predictions. It missed the BERT
+masked-LM case and both evidence groups in the two-paper architecture comparison.
+This is a development baseline and not a held-out result; dense/hybrid remain
+pending on Kaggle.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -111,6 +122,10 @@ than treated as dataset failures or an accuracy score. Mean lint scores were
 - The internal quote matcher uses a documented 0.8 token-recall threshold that
   is unit-tested but not yet calibrated against real retrieved chunks; inspect
   match diagnostics during the first ablation before treating it as fixed.
+- The internal ablation uses one global ranking across declared papers to make K
+  and per-paper coverage comparable. Production retrieval instead runs a
+  sequential per-paper verifier loop, so the ablation isolates retrieval quality
+  rather than reproducing the complete graph trace.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27,
   but the other eight cases still lack independent review and the suite remains
@@ -128,8 +143,7 @@ than treated as dataset failures or an accuracy score. Mean lint scores were
 
 ## Next priorities
 
-1. Build and run the lexical/dense/hybrid ablation adapter that supplies ranked
-   chunks to the internal retrieval evaluator.
+1. Run and inspect the packaged lexical/dense/hybrid comparison on Kaggle T4.
 2. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
 3. Evaluate verifier sufficiency and false-positive/false-negative behavior.

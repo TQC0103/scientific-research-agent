@@ -146,6 +146,26 @@ annotation-relative Recall@K, Precision@K, MRR, gold-evidence coverage,
 required-paper coverage, macro paper recall, and per-case failure reasons. It is
 CPU-only and does not invoke an embedding model or LLM.
 
+Run the three-arm internal ablation with identical PDFs, chunking, questions,
+K, and scoring using:
+
+```powershell
+python scripts/run_internal_retrieval_ablation.py `
+  --suite evaluation/suites/v0_5/development_10.json `
+  --sources evaluation/suites/v0_5/development_10_sources.json `
+  --papers-dir data/papers `
+  --modes lexical dense hybrid --top-k 5 `
+  --output-dir data/evaluations/runs/internal-retrieval-ablation
+```
+
+Dense and hybrid default to a pinned `Qwen/Qwen3-Embedding-0.6B` revision,
+matching the repo's configured embedding-model family. Run those arms through
+Kaggle Control Plane, not on the laptop.
+`scripts/prepare_internal_retrieval_kaggle_job.py` builds a narrow T4 bundle
+containing only required code and checksum-verified paper revisions. The
+Markdown report explicitly labels results as internal development signals
+rather than held-out accuracy.
+
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.
 Versioned IDs such as `1706.03762v7` are preserved in citations, and a new
