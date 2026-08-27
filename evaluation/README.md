@@ -192,6 +192,17 @@ SHA-256 before parsing, uses an isolated `--system-site-packages` environment
 without replacing Kaggle PyTorch, verifies actual T4 devices and CUDA execution,
 and removes the environment before artifact collection.
 
+The completed Kaggle R4 run used two visible Tesla T4 devices and scored all 10
+cases (nine with retrieval gold, one no-gold abstention). At K=5, lexical
+Recall/Precision/MRR was `0.7778/0.2000/0.6667`, dense was
+`0.7222/0.2222/0.6389`, and hybrid was `0.7222/0.2000/0.5000`, with zero missing
+predictions. Dense recovered the masked-LM case and half of the multi-paper
+comparison, but missed the sinusoidal-position and GLUE/MultiNLI cases that
+lexical recovered. Current RRF inherited those dense misses, so the internal
+result does not show a hybrid win. The suite has only nine eligible,
+repo-authored development cases; use the report for failure analysis and keep
+the external QASPER result as the stronger broad retrieval signal.
+
 ## Advisory LLM judge
 
 `app/evaluation/judge.py` builds a case-local audit prompt and validates a

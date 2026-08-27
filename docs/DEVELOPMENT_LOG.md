@@ -727,3 +727,26 @@ fingerprint. It then failed before model loading because invoking the runner by
 file path placed only `scripts/` on `sys.path`, so `app` could not be imported.
 The entry point now runs the same script as module
 `scripts.run_internal_retrieval_ablation` from the extracted code root.
+
+R4 `job_c5f6be04381e4b69ac2ea6fa8c9d57df` completed in 155 seconds on two visible
+Tesla T4 devices. The isolated runtime recorded Python 3.12.13, CUDA 12.8, Torch
+2.10.0+cu128, Sentence Transformers 5.1.2, Transformers 4.56.2, and dependency
+fingerprint `5116ce58f9f14a0bea8af0ead455dd9e0f47b7d38d6b942fade590cdf86f13a1`.
+Both PDF checksums matched; Transformer produced 34 chunks and BERT 47.
+
+All three arms produced all 10 predictions. Across nine retrieval-eligible
+cases at K=5, lexical Recall/Precision/MRR was
+`0.7778/0.2000/0.6667`, dense was `0.7222/0.2222/0.6389`, and hybrid was
+`0.7222/0.2000/0.5000`. Dense recovered masked-LM evidence and one of two
+multi-paper comparison groups, but lost the sinusoidal-position and
+GLUE/MultiNLI cases that lexical found. Current RRF inherited both misses and
+did not beat lexical on this tiny internal suite. This is intentionally recorded
+as a negative development result. It motivates fusion/global-ranking failure
+analysis, while the 892-eligible-case QASPER dev result remains the stronger
+evidence that hybrid retrieval can improve broad Recall@5.
+
+During R1 recovery, the Control Plane plugin translated an HTTP account-conflict
+response into a generic offline message. Direct read-only inspection of the
+local API showed that the rejected SaveKernel request had left conservative
+`remote_may_be_running` state even though no remote workload started; the state
+was reconciled with an audit note before R2. No remote job was cleared.

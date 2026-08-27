@@ -21,8 +21,9 @@ QASPER R11 development checkpoint are preserved. R11 supports retaining hybrid
 retrieval but does not replace an independently reviewed internal benchmark.
 Continue in this order:
 
-1. Run and inspect the implemented lexical/dense/hybrid ablation package on a
-   Kaggle T4, then preserve the first 10-case development comparison.
+1. Analyze why current RRF hybrid lost to lexical on the first complete internal
+   Kaggle comparison; compare fusion and per-paper ranking variants on the
+   development suite without presenting tuned gains as held-out accuracy.
 2. Independently review the remaining eight answer cases before freezing a
    benchmark snapshot. The two abstention cases were human-adjudicated on
    2026-08-27; the advisory LLM lint pass does not replace review.

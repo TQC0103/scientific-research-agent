@@ -55,7 +55,7 @@ Last updated: 2026-08-27
 - Three-arm internal retrieval ablation runner using identical verified PDFs,
   global per-case chunks and K, BM25 lexical retrieval, pinned Qwen3 dense
   retrieval, RRF hybrid fusion, and JSON/Markdown reports; narrow isolated T4
-  packaging is implemented
+  packaging and the first complete Kaggle comparison are implemented
 
 ## Latest evaluation
 
@@ -91,12 +91,16 @@ than treated as dataset failures or an accuracy score. Mean lint scores were
 4.8 clarity, 4.5 entailment, 4.5 answer alignment, 4.7 citation specificity, and
 4.8 challenge validity.
 
-The first local lexical-only internal run used the exact two pinned PDFs and
-reported Recall@5 `0.7778`, annotation-relative Precision@5 `0.2000`, MRR
-`0.6667`, and 9 eligible cases with zero missing predictions. It missed the BERT
-masked-LM case and both evidence groups in the two-paper architecture comparison.
-This is a development baseline and not a held-out result; dense/hybrid remain
-pending on Kaggle.
+The completed internal retrieval R4 run used the exact two pinned PDFs and two
+visible Kaggle Tesla T4 devices. Across nine retrieval-eligible cases at K=5,
+lexical Recall/Precision/MRR was `0.7778/0.2000/0.6667`, dense was
+`0.7222/0.2222/0.6389`, and hybrid was `0.7222/0.2000/0.5000`; all arms produced
+all 10 predictions. Lexical missed the BERT masked-LM case and the two-paper
+comparison. Dense recovered masked-LM and one of the comparison's two evidence
+groups but missed sinusoidal position encoding and GLUE/MultiNLI. Hybrid
+inherited those dense misses under the current RRF. This development result does
+not establish a hybrid advantage and contrasts with the larger QASPER dev run,
+where hybrid had the highest Recall@5.
 
 ## Known issues
 
@@ -126,6 +130,9 @@ pending on Kaggle.
   and per-paper coverage comparable. Production retrieval instead runs a
   sequential per-paper verifier loop, so the ablation isolates retrieval quality
   rather than reproducing the complete graph trace.
+- On the nine eligible internal cases, current RRF hybrid underperformed lexical
+  Recall and MRR. The suite is too small for a general conclusion, but fusion and
+  global multi-paper ranking need dev-set failure analysis before being frozen.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27,
   but the other eight cases still lack independent review and the suite remains
@@ -143,7 +150,8 @@ pending on Kaggle.
 
 ## Next priorities
 
-1. Run and inspect the packaged lexical/dense/hybrid comparison on Kaggle T4.
+1. Analyze the internal hybrid failures and compare fusion/per-paper ranking
+   changes on development data without presenting tuning gains as held-out.
 2. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
 3. Evaluate verifier sufficiency and false-positive/false-negative behavior.

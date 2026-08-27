@@ -167,6 +167,14 @@ paper revisions and verifies their SHA-256 before parsing. The Markdown report
 explicitly labels results as internal development signals rather than held-out
 accuracy.
 
+The first complete Kaggle T4 comparison (`R4`, 2026-08-27) scored nine
+retrieval-eligible development cases at K=5. Lexical achieved Recall `0.7778`,
+Precision `0.2000`, and MRR `0.6667`; dense achieved `0.7222`, `0.2222`, and
+`0.6389`; hybrid achieved `0.7222`, `0.2000`, and `0.5000`. Hybrid therefore did
+not win this small internal suite. Treat this as a fusion/failure-analysis
+signal, not a held-out model claim; the larger QASPER dev run still favored
+hybrid Recall@5.
+
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.
 Versioned IDs such as `1706.03762v7` are preserved in citations, and a new
