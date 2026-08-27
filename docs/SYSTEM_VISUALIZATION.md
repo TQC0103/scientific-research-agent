@@ -265,9 +265,11 @@ comparisons when its Control Plane connection is available.
 ## 10. Evaluation data artifacts
 
 Implementation: `evaluation/schema/evaluation-suite.schema.json`,
+`evaluation/schema/claim-verification.schema.json`,
 `evaluation/suites/v0_5/schema_fixtures.json`,
 `evaluation/suites/v0_5/development_10.json`, `app/evaluation/`,
-`scripts/download_external_benchmarks.py`, `evaluation/README.md`.
+`app/models/claims.py`, `scripts/download_external_benchmarks.py`,
+`evaluation/README.md`.
 
 ```mermaid
 flowchart TD
@@ -304,8 +306,11 @@ flowchart TD
     VRECOVERY --> VMETRICS
     VMETRICS --> VOUTPUTS["Ignored JSON + Markdown verifier report"]
 
-    CLAIMRECORDS["Explicit claim + cited/supporting evidence IDs"] --> CITEMETRICS["Precision + completeness + unsupported + invalid rates"]
+    CLAIMSCHEMA["Task 7 atomic claim + evidence-link contract"] --> CLAIMFIXTURE["Traceable structural fixture"]
+    CLAIMFIXTURE --> CLAIMBRIDGE["Validated labels + entails links to stable evidence IDs"]
+    CLAIMBRIDGE --> CITEMETRICS["Precision + completeness + unsupported + invalid rates"]
     CITEMETRICS --> CITEOUTPUTS["Ignored JSON + Markdown citation report"]
+    CLAIMSCHEMA -.-> CLAIMMODEL["Task 8 extraction and verification model — planned"]
 
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
@@ -361,11 +366,14 @@ synthesis. Its recovery edge is bounded to one execution, and initial decision,
 passage-selection, recovery, abstention, parsing, latency, and call-count metrics
 remain separate. The suite and outputs are development artifacts and do not
 cross the publication gate.
-The citation-safety branch consumes explicit atomic claim records; it does not
-heuristically split answers or infer support. Unknown predicted IDs are measured,
-unknown gold support IDs are rejected, and empty metric denominators remain null.
-The committed inputs are fixtures for contract validation rather than model
-quality results.
+The Task 7 claim contract preserves the exact answer substring behind each
+normalized atomic claim, visible citations, evidence relationships, and a
+derived verdict. It validates structure but does not run claim extraction or
+entailment; the dotted Task 8 edge is planned. Validated bundles adapt to the
+citation-safety branch through stable evidence IDs. Unknown predicted IDs are
+measured, unknown gold support IDs are rejected, and empty metric denominators
+remain null. The committed inputs are fixtures for contract validation rather
+than model quality results.
 External datasets remain in their native format, preventing repo-authored schema
 adaptation from silently changing official answer, evidence, or claim labels.
 The no-model mode is a retrieval smoke only and is never presented as an answer

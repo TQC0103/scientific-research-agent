@@ -22,6 +22,8 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - controlled verifier evaluator for sufficiency, passage selection, bounded
   rewrite recovery, and final abstention behavior
 - fail-closed citation labels plus deterministic claim-to-evidence safety metrics
+- versioned atomic-claim verification contract with strict cross-reference and
+  verdict invariants
 
 ## Quick start (Windows PowerShell)
 
@@ -223,6 +225,22 @@ python scripts/evaluate_citations.py `
 The included five cases are contract fixtures, so their scores test metric
 behavior and must not be reported as model quality. Real answer evaluation will
 consume the same contract after claim extraction and verification are added.
+
+Task 7 defines that next boundary in `app/models/claims.py`. Each atomic claim
+keeps both a normalized `claim_text` and exact `source_text` from the answer,
+its visible numeric citation labels, whether citation is required, one
+assessment per cited passage, and a derived `supported`, `partial`,
+`unsupported`, or `not_required` verdict. Export the synchronized schema after
+changing the contract with:
+
+```powershell
+python scripts/export_claim_verification_schema.py `
+  --output evaluation/schema/claim-verification.schema.json
+```
+
+The committed fixture covers all verdict shapes and connects directly to the
+Task 9 citation metrics. No claim-extraction or verification LLM runs yet; that
+is Task 8 rather than an implicit heuristic hidden inside this contract.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

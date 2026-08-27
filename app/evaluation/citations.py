@@ -9,6 +9,7 @@ from typing import Literal
 from pydantic import Field, field_validator, model_validator
 
 from app.evaluation.models import StrictModel
+from app.models.claims import ClaimVerificationBundle, EvidenceRelationship
 
 CITATION_SAFETY_CONTRACT_VERSION = "1.0.0"
 
@@ -196,6 +197,45 @@ def evaluate_citation_safety(suite: CitationSafetySuite) -> CitationSafetyReport
         case_count=len(suite.cases),
         metrics=_metrics(total),
         results=results,
+    )
+
+
+def citation_case_from_claim_verification(
+    bundle: ClaimVerificationBundle,
+    *,
+    case_id: str,
+    evidence_ids: list[str],
+) -> CitationSafetyCase:
+    """Adapt a validated Task 7 bundle to the Task 9 metric contract."""
+    if len(evidence_ids) != bundle.evidence_count:
+        raise ValueError("evidence_ids must match the bundle evidence_count.")
+    if len(evidence_ids) != len(set(evidence_ids)) or any(
+        not item.strip() for item in evidence_ids
+    ):
+        raise ValueError("evidence_ids must be unique and non-blank.")
+    assessments = {item.claim_id: item for item in bundle.assessments}
+    claims = []
+    for claim in bundle.claims:
+        assessment = assessments[claim.claim_id]
+        cited_ids = [evidence_ids[label - 1] for label in claim.citation_labels]
+        supporting_ids = [
+            evidence_ids[item.citation_label - 1]
+            for item in assessment.cited_evidence
+            if item.relationship == EvidenceRelationship.ENTAILS
+        ]
+        claims.append(
+            CitationClaimRecord(
+                claim_id=claim.claim_id,
+                text=claim.claim_text,
+                requires_citation=claim.requires_citation,
+                cited_evidence_ids=cited_ids,
+                supporting_evidence_ids=supporting_ids,
+            )
+        )
+    return CitationSafetyCase(
+        case_id=case_id,
+        available_evidence_ids=evidence_ids,
+        claims=claims,
     )
 
 

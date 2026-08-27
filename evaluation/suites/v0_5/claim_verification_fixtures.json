@@ -1,0 +1,111 @@
+{
+  "contract_version": "1.0.0",
+  "answer": "The model reports 28.4 BLEU [1]. The evidence describes part of its training setup [2]. It uses convolution throughout [3]. Citation [4] discusses a different result. The following sentence is a transition. It also reports electrical energy use.",
+  "evidence_count": 4,
+  "claims": [
+    {
+      "claim_id": "claim_1",
+      "claim_text": "The model reports 28.4 BLEU.",
+      "source_text": "The model reports 28.4 BLEU [1].",
+      "requires_citation": true,
+      "citation_labels": [1]
+    },
+    {
+      "claim_id": "claim_2",
+      "claim_text": "The evidence describes the complete training setup.",
+      "source_text": "The evidence describes part of its training setup [2].",
+      "requires_citation": true,
+      "citation_labels": [2]
+    },
+    {
+      "claim_id": "claim_3",
+      "claim_text": "The model uses convolution throughout.",
+      "source_text": "It uses convolution throughout [3].",
+      "requires_citation": true,
+      "citation_labels": [3]
+    },
+    {
+      "claim_id": "claim_4",
+      "claim_text": "The cited evidence supports the reported result.",
+      "source_text": "Citation [4] discusses a different result.",
+      "requires_citation": true,
+      "citation_labels": [4]
+    },
+    {
+      "claim_id": "claim_5",
+      "claim_text": "The following sentence is a transition.",
+      "source_text": "The following sentence is a transition.",
+      "requires_citation": false,
+      "citation_labels": []
+    },
+    {
+      "claim_id": "claim_6",
+      "claim_text": "The model reports electrical energy use.",
+      "source_text": "It also reports electrical energy use.",
+      "requires_citation": true,
+      "citation_labels": []
+    }
+  ],
+  "assessments": [
+    {
+      "claim_id": "claim_1",
+      "verdict": "supported",
+      "cited_evidence": [
+        {
+          "citation_label": 1,
+          "relationship": "entails",
+          "reason": "The passage directly reports the same BLEU value."
+        }
+      ],
+      "reason": "The cited evidence fully supports the atomic claim."
+    },
+    {
+      "claim_id": "claim_2",
+      "verdict": "partial",
+      "cited_evidence": [
+        {
+          "citation_label": 2,
+          "relationship": "partial",
+          "reason": "The passage covers only one component of the claimed setup."
+        }
+      ],
+      "reason": "Only part of the atomic claim is established."
+    },
+    {
+      "claim_id": "claim_3",
+      "verdict": "unsupported",
+      "cited_evidence": [
+        {
+          "citation_label": 3,
+          "relationship": "does_not_support",
+          "reason": "The passage describes an attention-only architecture."
+        }
+      ],
+      "reason": "The citation does not support the generated claim."
+    },
+    {
+      "claim_id": "claim_4",
+      "verdict": "unsupported",
+      "cited_evidence": [
+        {
+          "citation_label": 4,
+          "relationship": "does_not_support",
+          "reason": "The citation concerns a different result."
+        }
+      ],
+      "reason": "The citation is valid but attached to the wrong claim."
+    },
+    {
+      "claim_id": "claim_5",
+      "verdict": "not_required",
+      "cited_evidence": [],
+      "reason": "This is organizational text rather than a scientific claim."
+    },
+    {
+      "claim_id": "claim_6",
+      "verdict": "unsupported",
+      "cited_evidence": [],
+      "reason": "A citation-required claim has no cited evidence."
+    }
+  ]
+}

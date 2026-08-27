@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TQC0103/scientific-research-agent/evaluation/schema/claim-verification.schema.json",
+  "$defs": {
+    "AtomicClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "pattern": "^claim_[1-9][0-9]*$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "claim_text": {
+          "minLength": 1,
+          "title": "Claim Text",
+          "type": "string"
+        },
+        "source_text": {
+          "minLength": 1,
+          "title": "Source Text",
+          "type": "string"
+        },
+        "requires_citation": {
+          "title": "Requires Citation",
+          "type": "boolean"
+        },
+        "citation_labels": {
+          "items": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Citation Labels",
+          "type": "array"
+        }
+      },
+      "required": [
+        "claim_id",
+        "claim_text",
+        "source_text",
+        "requires_citation",
+        "citation_labels"
+      ],
+      "title": "AtomicClaim",
+      "type": "object"
+    },
+    "ClaimAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "pattern": "^claim_[1-9][0-9]*$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/ClaimVerdict"
+        },
+        "cited_evidence": {
+          "items": {
+            "$ref": "#/$defs/ClaimEvidenceLink"
+          },
+          "title": "Cited Evidence",
+          "type": "array"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim_id",
+        "verdict",
+        "cited_evidence",
+        "reason"
+      ],
+      "title": "ClaimAssessment",
+      "type": "object"
+    },
+    "ClaimEvidenceLink": {
+      "additionalProperties": false,
+      "properties": {
+        "citation_label": {
+          "minimum": 1,
+          "title": "Citation Label",
+          "type": "integer"
+        },
+        "relationship": {
+          "$ref": "#/$defs/EvidenceRelationship"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "citation_label",
+        "relationship",
+        "reason"
+      ],
+      "title": "ClaimEvidenceLink",
+      "type": "object"
+    },
+    "ClaimVerdict": {
+      "enum": [
+        "supported",
+        "partial",
+        "unsupported",
+        "not_required"
+      ],
+      "title": "ClaimVerdict",
+      "type": "string"
+    },
+    "EvidenceRelationship": {
+      "enum": [
+        "entails",
+        "partial",
+        "does_not_support"
+      ],
+      "title": "EvidenceRelationship",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "answer": {
+      "minLength": 1,
+      "title": "Answer",
+      "type": "string"
+    },
+    "evidence_count": {
+      "minimum": 0,
+      "title": "Evidence Count",
+      "type": "integer"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/AtomicClaim"
+      },
+      "minItems": 1,
+      "title": "Claims",
+      "type": "array"
+    },
+    "assessments": {
+      "items": {
+        "$ref": "#/$defs/ClaimAssessment"
+      },
+      "minItems": 1,
+      "title": "Assessments",
+      "type": "array"
+    }
+  },
+  "required": [
+    "contract_version",
+    "answer",
+    "evidence_count",
+    "claims",
+    "assessments"
+  ],
+  "title": "ClaimVerificationBundle",
+  "type": "object"
+}

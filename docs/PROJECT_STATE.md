@@ -1,18 +1,19 @@
 # Project state
 
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 ## Current baseline
 
 - Version: `0.4.0`
 - Branch: `main`
-- Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 is implemented
-  in the current working baseline.
+- Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
+  `1dc5f9d`; Task 7 is implemented in the current working baseline.
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
-  suite, and the 22-case controlled verifier definition validated; Ruff passed
-  and all 87 pytest tests passed. Native QASPER
+  suite, the 22-case controlled verifier definition, citation fixtures, and the
+  claim-verification contract validated; Ruff passed and all 99 pytest tests
+  passed. Native QASPER
   loaded all 5,049 questions and native
   SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -67,6 +68,10 @@ Last updated: 2026-08-27
 - Deterministic citation-safety contract and evaluator with citation precision,
   completeness, unsupported-claim rate, invalid-citation rate, per-case
   diagnostics, null empty denominators, and JSON/Markdown reports
+- Task 7 atomic-claim contract with answer-substring traceability, ordered
+  numeric citations, per-evidence entails/partial/does-not-support relations,
+  derived claim verdicts, strict cross-reference validation, generated JSON
+  Schema, Task 9 metric adaptation, and six structural fixture shapes
 
 ## Latest evaluation
 
@@ -136,6 +141,13 @@ claim that needs no citation. Their aggregate `0.3333/0.5000/0.7500/0.3333`
 precision/completeness/unsupported/invalid rates are intentionally imperfect
 contract checks, not model-quality results. No LLM or GPU run was needed.
 
+Task 7's structural fixture validates six claim shapes: fully supported,
+partial, unsupported, wrong citation, citation not required, and required but
+uncited. The bundle maps directly into Task 9 metrics with precision `0.2500`,
+completeness `0.8000`, unsupported-claim rate `0.8000`, and invalid-citation
+rate `0.0000`. These deliberately mixed values test the contract rather than a
+model; no LLM or GPU run occurred.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -154,7 +166,10 @@ contract checks, not model-quality results. No LLM or GPU run was needed.
   claim-by-claim cross-paper answer verifier is not implemented.
 - Numeric citation validation proves only that a label maps to an approved
   passage. It cannot yet prove that each nearby generated claim is entailed by
-  that passage; Task 7/8 claim extraction and verification remain necessary.
+  that passage; Task 8 claim extraction and verification remain necessary.
+- The Task 7 contract proves structural traceability and verdict consistency,
+  but cannot determine whether a paraphrase is truly atomic or a passage
+  semantically entails it.
 - arXiv `last_revised` search is bounded and not an exhaustive corpus harvest.
 - SciFact evaluates scientific claim labels and rationales; the current verifier
   only judges evidence sufficiency, so using SciFact as its score would be invalid.
@@ -195,9 +210,10 @@ contract checks, not model-quality results. No LLM or GPU run was needed.
 
 1. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
-2. Design claim-level verification without treating the current verifier's
-   selected-passage indices as fully reliable, then use native SciFact for
-   claim-label/rationale evaluation.
-3. Integrate bounded claim repair or abstention after synthesis.
+2. Implement Task 8's structured claim extractor/verifier against only
+   verifier-approved passages, including supported, partial, unsupported,
+   wrong-citation, and citation-not-required tests.
+3. Evaluate claim labels/rationales with native SciFact, then integrate bounded
+   claim repair or abstention after synthesis.
 4. Add end-to-end regression comparison without committing runtime outputs.
 5. Fix section boundaries and table-associated metadata.

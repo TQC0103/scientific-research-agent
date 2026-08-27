@@ -861,7 +861,42 @@ missing, invalid, and citation-not-required behavior. It intentionally produces
 precision `0.3333`, completeness `0.5000`, unsupported-claim rate `0.7500`, and
 invalid-citation rate `0.3333`; these values verify metric semantics and are not
 a model benchmark. No LLM or GPU workload was run. Claim extraction and
-entailment remain future Task 7/8 work, so numeric label validation must not be
+entailment remain future work, so numeric label validation must not be
 described as claim-level verification.
 
 Ruff passed and all 87 pytest tests passed.
+
+## 2026-08-28 — Atomic claim-verification contract
+
+Task 7 now defines the structured boundary that Task 8 must implement. Every
+atomic claim records a normalized fact, the exact answer substring from which it
+was extracted, whether citation is required, and the numeric labels visibly
+present in that substring. Each label receives an `entails`, `partial`, or
+`does_not_support` relationship plus a reason. Claim verdicts are derived from
+those relationships as `supported`, `partial`, `unsupported`, or
+`not_required`; a model cannot submit an inconsistent verdict and have it pass
+validation.
+
+The bundle rejects invented source text, non-sequential or reordered claims,
+duplicate IDs, citations that do not match the source substring, labels outside
+the supplied evidence set, missing assessments, reordered evidence links, and
+citations on statements marked as not requiring evidence. Multiple atomic
+claims may trace to the same compound sentence because semantic splitting can
+legitimately produce shared source text. This validation establishes structural
+traceability, not semantic atomicity or entailment.
+
+The Pydantic contract exports JSON Schema Draft 2020-12 to
+`evaluation/schema/claim-verification.schema.json`; a drift test requires the
+committed schema and model to match exactly. The structural fixture covers a
+fully supported claim, partial support, unsupported content, a valid-but-wrong
+citation, organizational text needing no citation, and a required but uncited
+claim. A validated bundle adapts directly to Task 9 metrics through stable
+evidence IDs, with only `entails` relationships treated as full support.
+
+The mixed fixture produces citation precision `0.2500`, completeness `0.8000`,
+unsupported-claim rate `0.8000`, and invalid-citation rate `0.0000`. These are
+contract checks, not model scores. No LLM, Kaggle job, production prompt,
+LangGraph node, answer repair, or abstention path was added. Those remain Task 8
+and Task 10 work.
+
+Ruff passed and all 99 pytest tests passed.

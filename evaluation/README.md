@@ -7,6 +7,8 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
 
 - `schema/evaluation-suite.schema.json`: JSON Schema Draft 2020-12 contract,
   currently schema version `1.1.0`.
+- `schema/claim-verification.schema.json`: generated JSON Schema for the Task 7
+  atomic-claim and evidence-assessment contract, version `1.0.0`.
 - `suites/v0_5/schema_fixtures.json`: four illustrative cases; these are schema
   fixtures, not a reported benchmark.
 - `suites/v0_5/development_10.json`: eight answer and two abstention cases over
@@ -20,6 +22,9 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
 - `suites/v0_5/citation_safety_fixtures.json`: five synthetic records covering
   supported, wrong, missing, invalid, and citation-free claims; scores validate
   metric semantics only.
+- `suites/v0_5/claim_verification_fixtures.json`: one traceable answer split
+  into supported, partial, unsupported, wrong-citation, citation-not-required,
+  and missing-citation claim shapes.
 - `app/evaluation/`: executable loader, semantic validator, public-dataset
   adapters, deterministic metrics, and a portable QASPER runner.
 - `scripts/download_external_benchmarks.py`: checksum-pinned QASPER v0.3 and
@@ -172,6 +177,48 @@ python scripts/evaluate_citations.py `
 The committed fixture intentionally yields imperfect numbers to exercise every
 metric. It is not generated-model output and is prohibited from being presented
 as a quality benchmark. Generated JSON and Markdown reports remain Git-ignored.
+
+## Atomic claim-verification contract
+
+`app/models/claims.py` is the Task 7 source of truth. `AtomicClaim` stores a
+normalized atomic fact, the exact answer substring it came from, whether the
+claim needs evidence, and the numeric labels visibly attached to that substring.
+The bundle validator requires source traceability, sequential claim IDs in answer
+order, labels that exactly match the source text, labels within the supplied
+evidence count, and exactly one ordered assessment per claim.
+
+Each cited passage receives one relationship:
+
+- `entails`: the passage fully establishes the atomic claim;
+- `partial`: it establishes only part of the claim;
+- `does_not_support`: it is topical, contradictory, or attached to the wrong
+  claim.
+
+The aggregate claim verdict is derived rather than trusted from model output. A
+required claim is `supported` when at least one cited passage entails it,
+`partial` when none entails it but at least one is partial, and `unsupported`
+otherwise, including a missing citation. A non-factual/organizational statement
+may be `not_required`, but then it cannot carry citation labels. Extra or
+inconsistent fields fail validation.
+
+The contract intentionally allows multiple atomic claims to trace to the same
+compound source sentence. Semantic atomicity and entailment still require the
+Task 8 model; substring membership alone is only an anti-invention audit. A
+validated bundle can be adapted directly to the Task 9 citation metrics using
+stable evidence IDs, with only `entails` links counted as fully supporting.
+
+`evaluation/schema/claim-verification.schema.json` is generated from the
+Pydantic model, and a drift test requires the committed file to match. Regenerate
+it only after an intentional contract change:
+
+```powershell
+python scripts/export_claim_verification_schema.py `
+  --output evaluation/schema/claim-verification.schema.json
+```
+
+The committed claim bundle is a structural fixture, not a model prediction or
+benchmark. `app/models/claim_verifier.py`, model prompts, and LangGraph edges do
+not exist yet and are not implied by the fixture.
 
 ## Retrieval matching contract
 
