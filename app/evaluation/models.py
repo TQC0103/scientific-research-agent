@@ -25,6 +25,17 @@ class EvaluationSplit(StrEnum):
     TEST = "test"
 
 
+class QuestionType(StrEnum):
+    SINGLE_PAPER_FACT = "single_paper_fact"
+    METHOD = "method"
+    RESULT = "result"
+    MULTI_PAPER_COMPARISON = "multi_paper_comparison"
+    EVIDENCE_MISSING = "evidence_missing"
+    UNSUPPORTED_QUESTION = "unsupported_question"
+    CONFLICTING_EVIDENCE = "conflicting_evidence"
+    PARTIAL_EVIDENCE = "partial_evidence"
+
+
 class ProvenanceKind(StrEnum):
     EXTERNAL = "external"
     REPO_CURATED = "repo_curated"
@@ -163,7 +174,7 @@ class Challenge(StrictModel):
 class EvaluationCase(StrictModel):
     case_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")
     question: str = Field(min_length=1)
-    question_type: str
+    question_type: QuestionType
     evaluation_split: EvaluationSplit
     provenance: Provenance
     annotation: Annotation

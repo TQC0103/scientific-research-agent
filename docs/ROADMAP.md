@@ -21,9 +21,11 @@ QASPER R11 development checkpoint are preserved. R11 supports retaining hybrid
 retrieval but does not replace an independently reviewed internal benchmark.
 Continue in this order:
 
-1. Curate and independently review a 10-case internal regression suite before
-   expanding to 25 and 50 cases.
-2. Extend the shared report format from QASPER ablations to the internal suite.
+1. Extend the shared report format from QASPER ablations to retrieval runs on
+   the internal suite.
+2. Independently review the remaining eight answer cases before freezing a
+   benchmark snapshot. The two abstention cases were human-adjudicated on
+   2026-08-27; the advisory LLM lint pass does not replace review.
 3. Evaluate verifier sufficiency, false positives/negatives, supported-passage
    selection, and the separate retrieval-rewrite recovery loop.
 4. Remove unsafe citation fallback behavior, then add claim-level models,

@@ -41,6 +41,15 @@ def test_rejects_arxiv_revision_mismatch(tmp_path: Path) -> None:
         load_suite(source)
 
 
+def test_rejects_question_type_outside_json_schema_enum(tmp_path: Path) -> None:
+    payload = json.loads(FIXTURE_SUITE.read_text(encoding="utf-8"))
+    payload["cases"][0]["question_type"] = "fact"
+    source = tmp_path / "bad-question-type.json"
+    source.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(DatasetValidationError, match="question_type"):
+        load_suite(source)
+
+
 def test_rejects_unreviewed_repo_case_as_publishable(tmp_path: Path) -> None:
     payload = json.loads(FIXTURE_SUITE.read_text(encoding="utf-8"))
     payload["benchmark_status"] = "frozen"

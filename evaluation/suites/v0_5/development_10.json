@@ -1,0 +1,665 @@
+{
+  "schema_version": "1.1.0",
+  "suite_id": "v0_5_development_10",
+  "dataset_version": "0.1.2",
+  "benchmark_status": "development",
+  "description": "Ten-case development suite for retrieval, evidence sufficiency, abstention, and multi-paper coverage. LLM judge output is advisory and does not make this suite held-out or publishable.",
+  "cases": [
+    {
+      "case_id": "transformer_scaled_dot_product_reason",
+      "question": "Why does the Transformer scale dot-product attention by 1/sqrt(d_k)?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_scaled_dot_product_reason",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v7 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "LLM judge review is advisory and is not counted as independent human review."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "For large key dimensions, unscaled dot products can grow large, push softmax into regions with extremely small gradients, and impair learning; dividing by sqrt(d_k) counteracts that effect.",
+        "answer_criteria": [
+          {
+            "criterion_id": "large_dot_products",
+            "description": "States that dot-product magnitude grows for large key dimensions.",
+            "required": true
+          },
+          {
+            "criterion_id": "small_softmax_gradients",
+            "description": "Connects large logits to softmax regions with extremely small gradients.",
+            "required": true
+          },
+          {
+            "criterion_id": "scaling_counteracts",
+            "description": "States that the 1/sqrt(d_k) factor counteracts this effect.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims the scaling factor was selected from a reported BLEU ablation."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "scaled_attention_reason_p4",
+          "evidence_group_id": "scaled_attention_reason",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 4,
+          "section": "3.2.1 Scaled Dot-Product Attention",
+          "quote": "We suspect that for large values of d_k, the dot products grow large in magnitude, pushing the softmax function into regions where it has extremely small gradients. To counteract this effect, we scale the dot products by 1/sqrt(d_k).",
+          "supports": ["large_dot_products", "small_softmax_gradients", "scaling_counteracts"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "method"]
+    },
+    {
+      "case_id": "transformer_sinusoidal_position_reason",
+      "question": "Why did the Transformer authors choose sinusoidal positional encodings instead of learned positional embeddings?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_sinusoidal_position_reason",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v7 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "LLM judge review is advisory and is not counted as independent human review."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "Learned and sinusoidal positional encodings produced nearly identical results, but the authors chose the sinusoidal version because it might extrapolate to sequence lengths longer than those seen during training.",
+        "answer_criteria": [
+          {
+            "criterion_id": "similar_results",
+            "description": "States that learned and sinusoidal positional encodings gave nearly identical results.",
+            "required": true
+          },
+          {
+            "criterion_id": "length_extrapolation",
+            "description": "States that sinusoidal encodings may extrapolate to longer unseen sequence lengths.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims the sinusoidal version achieved a reported accuracy improvement over learned embeddings."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "sinusoidal_choice_p6",
+          "evidence_group_id": "sinusoidal_choice",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 6,
+          "section": "3.5 Positional Encoding",
+          "quote": "We also experimented with using learned positional embeddings instead, and found that the two versions produced nearly identical results. We chose the sinusoidal version because it may allow the model to extrapolate to sequence lengths longer than the ones encountered during training.",
+          "supports": ["similar_results", "length_extrapolation"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "method"]
+    },
+    {
+      "case_id": "transformer_wmt14_en_de_result",
+      "question": "What BLEU score did Transformer (big) achieve on WMT 2014 English-to-German, and how did it compare with prior reported systems?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_wmt14_en_de_result",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v7 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "LLM judge review is advisory and is not counted as independent human review."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "Transformer (big) achieved 28.4 BLEU, more than 2.0 BLEU above the best previously reported systems, including ensembles, establishing a new state of the art for that task.",
+        "answer_criteria": [
+          {
+            "criterion_id": "bleu_28_4",
+            "description": "Reports the 28.4 BLEU score.",
+            "required": true
+          },
+          {
+            "criterion_id": "over_two_bleu",
+            "description": "Reports an improvement of more than 2.0 BLEU over prior systems including ensembles.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Reports the English-to-French BLEU score as the English-to-German result."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "wmt14_en_de_result_p8",
+          "evidence_group_id": "wmt14_en_de_result",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 8,
+          "section": "6.1 Machine Translation",
+          "quote": "On the WMT 2014 English-to-German translation task, the big transformer model outperforms the best previously reported models (including ensembles) by more than 2.0 BLEU, establishing a new state-of-the-art BLEU score of 28.4.",
+          "supports": ["bleu_28_4", "over_two_bleu"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "result", "numeric"]
+    },
+    {
+      "case_id": "bert_masked_lm_mechanism",
+      "question": "How does BERT's masked language model objective enable deep bidirectional pre-training?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1810.04805v2",
+        "source_case_id": "bert_masked_lm_mechanism",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v2 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "LLM judge review is advisory and is not counted as independent human review."
+      },
+      "papers": [
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1810.04805v2"],
+        "reference_answer": "BERT masks a random subset of input tokens and predicts those masked tokens from their context, allowing representations to condition on both left and right context instead of using only a left-to-right or right-to-left language model.",
+        "answer_criteria": [
+          {
+            "criterion_id": "mask_tokens",
+            "description": "States that a percentage of input tokens is masked at random.",
+            "required": true
+          },
+          {
+            "criterion_id": "predict_masked_tokens",
+            "description": "States that the model predicts the masked tokens from context.",
+            "required": true
+          },
+          {
+            "criterion_id": "bidirectional_context",
+            "description": "Connects the objective to deep bidirectional context rather than a one-directional LM.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims BERT reconstructs every input token like a standard autoencoder."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "bert_mlm_mechanism_p4",
+          "evidence_group_id": "bert_mlm_mechanism",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "full_text",
+          "page": 4,
+          "section": "3.1 Pre-training BERT",
+          "quote": "In order to train a deep bidirectional representation, we simply mask some percentage of the input tokens at random, and then predict those masked tokens. We refer to this procedure as a masked LM.",
+          "supports": ["mask_tokens", "predict_masked_tokens", "bidirectional_context"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "method"]
+    },
+    {
+      "case_id": "bert_pretraining_corpora",
+      "question": "Which corpora were used to pre-train BERT, and approximately how many words did each contain?",
+      "question_type": "single_paper_fact",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1810.04805v2",
+        "source_case_id": "bert_pretraining_corpora",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v2 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "LLM judge review is advisory and is not counted as independent human review."
+      },
+      "papers": [
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1810.04805v2"],
+        "reference_answer": "BERT used BooksCorpus with about 800 million words and English Wikipedia with about 2.5 billion words.",
+        "answer_criteria": [
+          {
+            "criterion_id": "bookscorpus_800m",
+            "description": "Names BooksCorpus and its approximately 800M words.",
+            "required": true
+          },
+          {
+            "criterion_id": "wikipedia_2500m",
+            "description": "Names English Wikipedia and its approximately 2,500M words.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims BERT was pre-trained only on BooksCorpus."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "bert_pretraining_data_p5",
+          "evidence_group_id": "bert_pretraining_data",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "full_text",
+          "page": 5,
+          "section": "3.1 Pre-training data",
+          "quote": "For the pre-training corpus we use the BooksCorpus (800M words) and English Wikipedia (2,500M words).",
+          "supports": ["bookscorpus_800m", "wikipedia_2500m"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "fact", "numeric"]
+    },
+    {
+      "case_id": "bert_glue_multinli_results",
+      "question": "What GLUE score and MultiNLI accuracy does BERT report, including the stated absolute improvements?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1810.04805v2",
+        "source_case_id": "bert_glue_multinli_results",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v2 abstract and full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "LLM judge review is advisory and is not counted as independent human review."
+      },
+      "papers": [
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1810.04805v2"],
+        "reference_answer": "BERT reports a GLUE score of 80.5%, a 7.7-point absolute improvement, and MultiNLI accuracy of 86.7%, a 4.6-point absolute improvement.",
+        "answer_criteria": [
+          {
+            "criterion_id": "glue_result",
+            "description": "Reports GLUE 80.5% and a 7.7-point absolute improvement.",
+            "required": true
+          },
+          {
+            "criterion_id": "multinli_result",
+            "description": "Reports MultiNLI 86.7% and a 4.6-point absolute improvement.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Swaps the GLUE and MultiNLI values or improvement amounts."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "bert_abstract_glue_multinli",
+          "evidence_group_id": "bert_glue_multinli_results",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "abstract",
+          "page": null,
+          "section": "Abstract",
+          "quote": "It obtains new state-of-the-art results on eleven natural language processing tasks, including pushing the GLUE score to 80.5% (7.7% point absolute improvement), MultiNLI accuracy to 86.7% (4.6% absolute improvement).",
+          "supports": ["glue_result", "multinli_result"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "result", "numeric", "abstract-evidence"]
+    },
+    {
+      "case_id": "transformer_bert_architecture_comparison_dev",
+      "question": "Compare the Transformer paper's central architecture with BERT's central representation-learning approach.",
+      "question_type": "multi_paper_comparison",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_bert_architecture_comparison_dev",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Cross-paper question authored from the pinned Transformer v7 and BERT v2 abstracts."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+        "notes": "LLM judge review is advisory and is not counted as independent human review."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        },
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7", "1810.04805v2"],
+        "reference_answer": "The Transformer introduces an attention-only sequence architecture that removes recurrence and convolution, while BERT uses a Transformer encoder to pre-train deep bidirectional representations by jointly conditioning on left and right context.",
+        "answer_criteria": [
+          {
+            "criterion_id": "transformer_attention_only",
+            "description": "Attributes an attention-only architecture without recurrence or convolution to the Transformer paper.",
+            "required": true
+          },
+          {
+            "criterion_id": "bert_bidirectional_pretraining",
+            "description": "Attributes deep bidirectional pre-training using both left and right context to BERT.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Attributes BERT's masked-language-model objective to the Transformer paper.",
+          "Claims the papers report a direct head-to-head experiment."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "transformer_abstract_architecture_dev",
+          "evidence_group_id": "transformer_architecture_dev",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "abstract",
+          "page": null,
+          "section": "Abstract",
+          "quote": "We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.",
+          "supports": ["transformer_attention_only"]
+        },
+        {
+          "evidence_id": "bert_abstract_bidirectional_dev",
+          "evidence_group_id": "bert_bidirectional_pretraining_dev",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "abstract",
+          "page": null,
+          "section": "Abstract",
+          "quote": "BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers.",
+          "supports": ["bert_bidirectional_pretraining"]
+        }
+      ],
+      "tags": ["multi-paper", "positive", "comparison", "required-coverage"]
+    },
+    {
+      "case_id": "transformer_training_energy_missing_dev",
+      "question": "How much electrical energy did the authors consume to train Transformer (big)?",
+      "question_type": "evidence_missing",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_training_energy_missing_dev",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Negative case authored after reviewing the pinned v7 full text for reported training resources."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Human-reviewed and retained on 2026-08-27 after the full-paper audit confirmed that training duration and GPU count are reported but electrical energy consumption is not. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "abstain",
+        "abstention_reason": "evidence_missing",
+        "required_paper_ids": ["1706.03762v7"],
+        "answer_criteria": [
+          {
+            "criterion_id": "training_resources_only",
+            "description": "Recognizes that the paper reports training duration and GPU count but not electrical energy consumption.",
+            "required": false
+          }
+        ],
+        "forbidden_claims": [
+          "Converts reported GPU count and training duration into an unreported energy value.",
+          "Imports an energy estimate from outside the pinned paper."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "transformer_training_resources_p8",
+          "evidence_group_id": "transformer_training_resources",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 8,
+          "section": "6.1 Machine Translation",
+          "quote": "Training took 3.5 days on 8 P100 GPUs.",
+          "supports": ["training_resources_only"]
+        }
+      ],
+      "challenge": {
+        "kinds": ["negative", "evidence_missing", "partial_evidence"],
+        "description": "The paper reports training time and GPU hardware but not electrical energy consumption."
+      },
+      "tags": ["single-paper", "negative", "abstention", "numeric-distractor"]
+    },
+    {
+      "case_id": "transformer_imagenet_unsupported_dev",
+      "question": "What ImageNet top-1 accuracy does the Transformer paper report?",
+      "question_type": "unsupported_question",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_imagenet_unsupported_dev",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Adversarial false-premise case authored from the pinned v7 task scope."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Human-reviewed and retained on 2026-08-27 after the full-paper audit confirmed that the paper does not report an ImageNet top-1 experiment. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "abstain",
+        "abstention_reason": "unsupported_question",
+        "required_paper_ids": ["1706.03762v7"],
+        "answer_criteria": [],
+        "forbidden_claims": [
+          "Invents an ImageNet result.",
+          "Treats machine-translation BLEU as ImageNet accuracy."
+        ]
+      },
+      "gold_evidence": [],
+      "challenge": {
+        "kinds": ["negative", "adversarial", "unsupported_premise"],
+        "description": "The question presupposes an ImageNet experiment outside the paper's reported task scope."
+      },
+      "tags": ["single-paper", "negative", "adversarial", "abstention"]
+    },
+    {
+      "case_id": "transformer_single_head_bleu_difference",
+      "question": "What BLEU difference did the Transformer authors report between single-head attention and the best attention-head setting?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.1",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_single_head_bleu_difference",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Numeric ablation question authored from Table 3 and the accompanying model-variations text in the pinned v7 paper."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 0,
+        "adjudicated": false,
+          "notes": "Corrected after a full-source audit found the reported 0.9 BLEU comparison on page 9. LLM judge review remains advisory and is not counted as independent human review."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "Single-head attention was 0.9 BLEU worse than the best attention-head setting in the reported English-to-German development-set ablation.",
+        "answer_criteria": [
+          {
+            "criterion_id": "single_head_0_9_worse",
+            "description": "Reports that single-head attention was 0.9 BLEU worse than the best setting.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims every multi-head configuration improves BLEU by 0.9.",
+          "Describes the reported development-set difference as a universal causal effect."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "single_head_bleu_difference_p9",
+          "evidence_group_id": "single_head_bleu_difference",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 9,
+          "section": "6.2 Model Variations",
+          "quote": "While single-head attention is 0.9 BLEU worse than the best setting, quality also drops off with too many heads.",
+          "supports": ["single_head_0_9_worse"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "result", "numeric", "ablation"]
+    }
+  ]
+}

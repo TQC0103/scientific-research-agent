@@ -18,6 +18,7 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - versioned evaluation schema with revision-pinned evidence fixtures
 - validated QASPER/SciFact adapters and deterministic external metrics
 - portable QASPER lexical/dense/hybrid runner with guarded test-set access
+- ten-case internal development suite with an advisory structured LLM judge
 
 ## Quick start (Windows PowerShell)
 
@@ -62,8 +63,9 @@ Runtime artifacts stay under `data/` and are ignored by Git:
 
 Committed evaluation source data lives under `evaluation/`. Its JSON Schema,
 evidence identity rules, decision taxonomy, and metric contract are documented
-in `evaluation/README.md`. The initial four cases are schema fixtures, not a
-reported benchmark.
+in `evaluation/README.md`. The initial four cases are schema fixtures, while
+`development_10.json` is a repo-authored development regression suite. Neither
+is a held-out or publishable benchmark.
 
 Download the checksum-pinned public QASPER v0.3 and SciFact artifacts with:
 
@@ -113,6 +115,19 @@ for dense and `0.4605` for lexical retrieval. This supports retaining hybrid
 retrieval, but it is not a strong absolute-quality result and the answer scores
 are not apples-to-apples because only the hybrid configuration used a model.
 Generated predictions and Kaggle runtime artifacts remain uncommitted.
+
+The internal suite's LLM judge checks question clarity, evidence entailment,
+answer alignment, citation specificity, and challenge design. It does not edit
+the gold data, count as a human reviewer, prove document-wide absence, or make
+the development suite publishable. Prepare its isolated T4 package with:
+
+```powershell
+python scripts/prepare_internal_judge_kaggle_job.py
+```
+
+The generated source remains under ignored runtime storage. The remote job uses
+batched deterministic generation with left padding and writes
+`judge_report.json`, `runtime.json`, and a resolved dependency fingerprint.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

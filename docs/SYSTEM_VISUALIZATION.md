@@ -261,7 +261,8 @@ comparisons when its Control Plane connection is available.
 ## 10. Evaluation data artifacts
 
 Implementation: `evaluation/schema/evaluation-suite.schema.json`,
-`evaluation/suites/v0_5/schema_fixtures.json`, `app/evaluation/`,
+`evaluation/suites/v0_5/schema_fixtures.json`,
+`evaluation/suites/v0_5/development_10.json`, `app/evaluation/`,
 `scripts/download_external_benchmarks.py`, `evaluation/README.md`.
 
 ```mermaid
@@ -274,6 +275,11 @@ flowchart TD
     CASES --> PROVENANCE["Fixture/development/test + provenance + annotation"]
     GOLD --> ANCHOR["Versioned ID + source type + page + exact quote"]
     GOLD --> OPTIONAL["Optional chunk index; never sole identity"]
+
+    CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
+    JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
+    JUDGEMODEL --> JUDGEJSON["Validated verdict + five scores + findings"]
+    JUDGEJSON --> HUMAN["Human review still required; publication state unchanged"]
 
     DOWNLOAD["Checksum-pinned public downloader"] --> QASPER["Native QASPER v0.3 adapter"]
     DOWNLOAD --> SCIFACT["Native SciFact adapter"]
@@ -300,6 +306,10 @@ flowchart TD
 
 Committed suites are source artifacts, while generated model responses, metric
 reports, and baselines are runtime artifacts and remain outside version control.
+The LLM judge is an annotation-lint branch: it reads committed development cases
+and writes a separate ignored report, but has no edge back into annotation or
+freeze state. Abstention cases always retain a human-review flag because selected
+context cannot prove document-wide absence.
 Negative cases have no retrieval denominator; their retrieval metrics are not
 applicable and they are evaluated later through verifier/abstention behavior.
 External datasets remain in their native format, preventing repo-authored schema

@@ -1,0 +1,20 @@
+{
+  "suite_id": "v0_5_development_10",
+  "verified_at": "2026-08-21",
+  "sources": [
+    {
+      "versioned_id": "1706.03762v7",
+      "abstract_url": "https://arxiv.org/abs/1706.03762v7",
+      "pdf_url": "https://arxiv.org/pdf/1706.03762v7",
+      "pdf_sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+      "page_count": 15
+    },
+    {
+      "versioned_id": "1810.04805v2",
+      "abstract_url": "https://arxiv.org/abs/1810.04805v2",
+      "pdf_url": "https://arxiv.org/pdf/1810.04805v2",
+      "pdf_sha256": "5692a5514787a8c6727b4ff3b726a3385798bc68e12138d1d4af83947e2acf6e",
+      "page_count": 16
+    }
+  ]
+}

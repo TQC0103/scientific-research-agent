@@ -556,3 +556,99 @@ retained the final R11 provenance snapshot. The two lines were reconciled by
 keeping the newer canonical implementation and importing only the immutable R11
 bundle and its verified result record. The OneDrive checkout is removed only
 after verification and GitHub publication succeed.
+
+## 2026-08-21 — Ten-case internal development suite and advisory judge
+
+The first internal v0.5 development suite initially contained ten repo-authored
+cases over exact Transformer v7 and BERT v2 revisions: seven answer cases and
+three abstentions spanning fact, method, result, multi-paper comparison,
+unsupported questions, missing evidence, and partial evidence. Exact PDF URLs, SHA-256
+hashes, and page counts are recorded beside the suite. The cases remain mutable
+development data with zero independent reviewers and cannot pass the publication
+gate.
+
+An advisory LLM judge now audits question clarity, quote-to-criterion
+entailment, answer alignment, citation specificity, and challenge validity. Its
+structured report is stored outside the dataset, and abstention cases always
+retain a human-review requirement. The judge therefore catches likely authoring
+errors without pretending to prove negative evidence or becoming an independent
+annotator.
+
+The GPU package uses Qwen2.5-3B-Instruct on an exact Tesla T4, creates a clean
+virtual environment, verifies CUDA capability 7.5, uses left padding and
+deterministic batched generation, and saves runtime provenance. Initial submits
+from the GitHub checkout were rejected because the desktop app permits sources
+only beneath its configured experiments root; the plugin misreported that HTTP
+validation error as an offline API. Staging only the three-file narrow package
+under the allowed root resolved submission without moving the repository or
+exposing credentials. Job `job_ab4973a1512145ae8ba4c6321d025b7a` was submitted
+on account `acct_91aab80993c247d4bb787a59c7d43fef` and was later cancelled before
+reporting because its embedded suite failed the independent JSON Schema check.
+
+R1 was cancelled after the independent JSON Schema check found two suite/source
+mismatches that the semantic loader had accepted: `fact` instead of the enum
+value `single_paper_fact`, and an explicit null optional reference answer. The
+suite was corrected, both validators now pass, and the loader now uses the same
+question-type enum as JSON Schema. R2 `job_d6abb593ac3a4ad9808cf05563e0949a`
+ran the schema-valid snapshot on account
+`acct_d321057bf0954d048b448711e0efed7f` and reached Kaggle COMPLETE.
+
+R2 also exposed an artifact-boundary defect: placing the isolated environment
+under `/kaggle/working` causes Kaggle output collection to download that entire
+environment before the small judge report. The template now keeps code,
+dependencies, and model cache under `/tmp`; only the report directory crosses
+the `/kaggle/working` persistence boundary.
+
+R3 `job_9883b1aa1230436e9458eb9855daf25a` verified the corrected boundary and
+succeeded in 292 seconds on Tesla T4 capability 7.5. The resolved environment
+hash was `49eeff9c46a9d77656003c79b49f6356e094c8548061d366558ad99abf912a5e`.
+The structured report validated all 10 unique cases: seven `pass` and three
+`needs_revision`. Every answer case passed. The three flags correspond exactly
+to abstention cases where the model cannot prove document-wide absence from
+empty or partial gold evidence, so they remain human-review items and no gold
+annotation was changed automatically. Mean lint scores were 4.7 clarity, 4.1
+evidence entailment, 4.4 answer alignment, 4.4 citation specificity, and 4.7
+challenge validity.
+
+R3 also emitted non-fatal Kaggle `sitecustomize`/`wrapt` noise and a Transformers
+warning for inactive sampling values inherited from the model's generation
+configuration. The runner now clears `temperature`, `top_p`, and `top_k`, and
+uses the current `dtype` load argument. R3 remains valid because generation was
+explicitly deterministic and no sampling argument was passed to `generate`.
+
+## 2026-08-21 — Source audit, suite v0.1.1, and advisory R4
+
+A full-paper audit found that the original single-head-attention abstention was
+invalid: Transformer v7 page 9 explicitly reports that single-head attention is
+0.9 BLEU worse than the best head-count setting. The case was corrected into a
+numeric answer case with the exact passage and criterion. The suite is now
+v0.1.1 with eight answer cases and two abstentions. The energy question remains
+a valid partial-evidence abstention: the paper reports 3.5 days on eight P100
+GPUs but does not report electrical energy consumption. Both JSON Schema and
+semantic validation accept the corrected suite.
+
+R4 `job_655a5faf69f5478cab66078afd223788` waited about 17 minutes for Kaggle T4
+capacity, then ran for about 4 minutes 36 seconds and succeeded. The isolated
+runtime used Tesla T4 capability 7.5 and resolved environment hash
+`49eeff9c46a9d77656003c79b49f6356e094c8548061d366558ad99abf912a5e`.
+Only four report/provenance files crossed the output boundary.
+
+The report validated 10 unique cases: eight `pass`, two `needs_revision`, and no
+`fail`. Every answer case passed, including the corrected single-head case. The
+energy and ImageNet abstentions remain human-review items because the judge
+cannot establish document-wide absence from selected evidence. Mean lint scores
+were 4.8 clarity, 4.5 entailment, 4.5 answer alignment, 4.7 citation specificity,
+and 4.8 challenge validity. R4 also confirmed removal of the inactive-generation
+and deprecated load-argument warnings; Kaggle's non-fatal global missing-`wrapt`
+warning remains outside the isolated runtime.
+
+## 2026-08-27 — Human adjudication of abstention cases
+
+The repository owner reviewed the two R4 abstention findings and explicitly
+retained both cases. The training-energy case remains an `evidence_missing`
+abstention because Transformer v7 reports 3.5 days on eight P100 GPUs but no
+electrical energy value. The ImageNet case remains an `unsupported_question`
+abstention because the paper reports no ImageNet top-1 experiment. Suite v0.1.2
+records one human reviewer and adjudication for those two cases only. The eight
+answer cases remain unreviewed development annotations, so the suite is not
+frozen or publishable.

@@ -9,8 +9,9 @@ Last updated: 2026-08-21
 - Baseline commit before this implementation: `34ceb54`
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
-- Verification: JSON Schema 1.1.0 and four fixtures validated; Ruff passed; 47
-  pytest tests passed. Native QASPER loaded all 5,049 questions and native
+- Verification: JSON Schema 1.1.0, four fixtures, and the ten-case development
+  suite validated; Ruff passed and all 57 pytest tests passed. Native QASPER
+  loaded all 5,049 questions and native
   SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
   smoke checks.
@@ -39,6 +40,14 @@ Last updated: 2026-08-21
   held-out access, and JSONL/metric outputs
 - Archived self-contained QASPER R11 source with a pinned isolated T4 runtime,
   verified public-dataset download, source manifest, and recorded dev metrics
+- Ten-case internal development suite v0.1.2 over pinned Transformer v7 and
+  BERT v2 sources: eight answer cases, two abstentions, multi-paper coverage,
+  missing and unsupported evidence, a numeric ablation, and partial evidence
+- Structured advisory LLM judge, separate report aggregation, and an isolated
+  deterministic T4 package; judge output cannot change human-review/publication
+  metadata
+- Generated human-review HTML combining questions, expected decisions, criteria,
+  evidence, challenge labels, and per-case judge findings
 
 ## Latest evaluation
 
@@ -64,6 +73,16 @@ answer F1 `0.1651`. This supports retaining hybrid retrieval but is not a strong
 absolute-quality result. Answer F1 is not apples-to-apples because only hybrid
 used the Qwen generator.
 
+The corrected internal-suite advisory R4 audit completed all 10 cases with
+Qwen2.5-3B-Instruct on a Tesla T4. Kaggle capacity queueing took about 17 minutes;
+once allocated, the job ran for about 4 minutes 36 seconds. All eight answer
+cases passed, including the repaired single-head ablation case. The two
+abstention cases received `needs_revision` because selected evidence cannot
+verify document-wide absence. Those flags are routed to human review rather
+than treated as dataset failures or an accuracy score. Mean lint scores were
+4.8 clarity, 4.5 entailment, 4.5 answer alignment, 4.7 citation specificity, and
+4.8 challenge validity.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -85,11 +104,26 @@ used the Qwen generator.
   deterministic sampling flags; clean these before a future external rerun.
 - Dense/generator modes depend on optional Sentence Transformers and
   Transformers runtimes; keep heavy runs on Kaggle rather than the laptop.
+- The ten internal cases are repo-authored and tuned development data. The two
+  negative cases were human-adjudicated after a full-paper audit on 2026-08-27,
+  but the other eight cases still lack independent review and the suite remains
+  development-only.
+- Control Plane currently reports source-root validation failures as a generic
+  offline error because its plugin catches HTTP 4xx as `URLError`; packages must
+  be staged beneath the configured KCP experiments root until that UI/plugin
+  diagnostic is fixed.
+- The completed internal-judge R2 used an environment under `/kaggle/working`,
+  so local result collection unnecessarily traverses the environment before the
+  report. The committed template moves all non-report files to `/tmp`.
+- R4 confirmed that the runner's inactive-sampling and deprecated `torch_dtype`
+  warning cleanup works. Kaggle still emits non-fatal global
+  `sitecustomize`/missing-`wrapt` warnings outside the isolated environment.
 
 ## Next priorities
 
-1. Curate and independently review a 10-case internal regression suite.
-2. Add retrieval and retrieval-rewrite metrics to the internal suite.
+1. Add retrieval and retrieval-rewrite metrics to the internal suite.
+2. Independently review the remaining eight answer cases before freezing any
+   benchmark snapshot.
 3. Evaluate verifier sufficiency and false-positive/false-negative behavior.
 4. Add citation safety and claim-level verification, then use native SciFact for
    claim-label/rationale evaluation.

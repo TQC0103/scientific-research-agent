@@ -9,12 +9,19 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
   currently schema version `1.1.0`.
 - `suites/v0_5/schema_fixtures.json`: four illustrative cases; these are schema
   fixtures, not a reported benchmark.
+- `suites/v0_5/development_10.json`: eight answer and two abstention cases over
+  exact Transformer v7 and BERT v2 sources; this is a tunable development suite,
+  not held-out evidence.
+- `suites/v0_5/development_10_sources.json`: source URLs, PDF hashes, and page
+  counts used while checking the committed quotes and page anchors.
 - `app/evaluation/`: executable loader, semantic validator, public-dataset
   adapters, deterministic metrics, and a portable QASPER runner.
 - `scripts/download_external_benchmarks.py`: checksum-pinned QASPER v0.3 and
   SciFact downloader. Downloads remain under ignored `data/evaluations/`.
 - `kaggle/qasper_v0_5_r11/`: immutable source snapshot and provenance record
   for the completed external QASPER R11 development ablation.
+- `kaggle/internal_judge_v0_5/`: isolated T4 template for advisory review of the
+  ten internal cases.
 
 The former empty `questions.json` and `ground_truth.json` placeholders were
 removed so there is one canonical data shape.
@@ -145,6 +152,59 @@ The initial v0.5 benchmark will use the following rules:
 The exact quote-normalization and overlap threshold will be implemented and
 tested with the loader/evaluator work. Task 1 deliberately defines the semantic
 contract without adding executable validation.
+
+## Advisory LLM judge
+
+`app/evaluation/judge.py` builds a case-local audit prompt and validates a
+structured response. The five 1–5 dimensions are question clarity, evidence
+entailment, reference-answer alignment, citation specificity, and challenge
+validity. Verdicts are `pass`, `needs_revision`, or `fail`; findings and a short
+rationale remain visible per case.
+
+Judge reports are generated artifacts under ignored `data/evaluations/`. They
+never mutate the suite, increase `reviewer_count`, set `adjudicated`, or satisfy
+`assert_publishable()`. Every abstention is forced to retain
+`human_review_required=true`, because a model shown selected evidence cannot
+establish that a fact is absent everywhere in a paper. This makes the judge a
+useful annotation lint pass, not an accuracy metric or an independent reviewer.
+
+`scripts/run_evaluation_judge.py` uses a dynamically imported Transformers GPU
+runtime. The Kaggle package sets left padding for decoder-only generation, uses
+`do_sample=False`, batches two cases at a time, verifies Tesla T4 capability 7.5
+with a real CUDA operation, and records the resolved environment. Do not run the
+model workload on the laptop. Code, model cache, and the isolated environment
+live under Kaggle's temporary filesystem; only the small report directory is
+placed under `/kaggle/working` for artifact download.
+
+The completed R4 development audit used Qwen2.5-3B-Instruct on a Tesla T4 and
+returned eight `pass` verdicts and two `needs_revision` verdicts. All eight
+answer cases passed, including the corrected single-head attention ablation
+case. The two flagged cases were the remaining abstentions; selected evidence
+cannot prove document-wide absence, so they remain queued for human full-paper
+review rather than being rewritten automatically. Mean scores were 4.8 question
+clarity, 4.5 evidence entailment, 4.5 answer alignment, 4.7 citation specificity,
+and 4.8 challenge validity. These are annotation-lint signals from one small
+judge model, not benchmark accuracy.
+
+The repository owner subsequently human-reviewed and retained the two
+abstention cases on 2026-08-27 after a full-paper audit. Their annotation
+metadata records that adjudication in suite v0.1.2. The other eight cases remain
+unreviewed development annotations, so the suite is still neither frozen nor
+publishable.
+
+Render a human-readable review page by combining the committed suite with an
+ignored judge report:
+
+```powershell
+python scripts/render_evaluation_review.py `
+  --suite evaluation/suites/v0_5/development_10.json `
+  --report data/evaluations/runs/internal_judge_v0_5_r4/judge_report.json `
+  --output data/evaluations/runs/internal_judge_v0_5_r4/review.html
+```
+
+The page places flagged cases first and shows the question, expected response,
+criteria, forbidden claims, gold passages, challenge labels, judge scores, and
+findings together. It is a generated review aid and remains Git-ignored.
 
 ## Authoring rules
 
