@@ -192,7 +192,8 @@ during that paper's check, but missing dimensions within the paper are not.
 
 ## 7. Answer and citation module
 
-Implementation: `app/models/llm.py`.
+Implementation: `app/models/llm.py`, `app/models/claims.py`,
+`app/models/claim_verifier.py`.
 
 ```mermaid
 flowchart TD
@@ -206,13 +207,24 @@ flowchart TD
 
     INSUFFICIENT["Verifier says insufficient"] --> ABSTAIN["Reason + missing information"]
     ABSTAIN --> FINAL
+
+    DIRECT["Standalone input: answer + verifier-approved passages"] --> CLAIMPROMPT["One bounded atomic extraction + verification prompt"]
+    CLAIMPROMPT --> CLAIMQWEN["Qwen3 4B structured JSON"]
+    CLAIMQWEN --> CLAIMGUARD["Lock answer/evidence count + Task 7 validation"]
+    CLAIMGUARD --> CLAIMBUNDLE["Ordered claims + evidence links + derived verdicts"]
+    CLAIMBUNDLE -.-> FUTUREGRAPH["Task 10 LangGraph integration — planned"]
 ```
 
 The model never authors bibliographic metadata. Abstract fallback citations are
 labeled `Abstract`; full-text citations use stored page and section metadata.
 Code never invents a citation when the model omits one. Missing citations and
 labels outside the verifier-approved passage list fail closed before any Sources
-block is rendered. Claim-level entailment remains a separate future boundary.
+block is rendered. Numeric-label validation alone does not establish entailment;
+the standalone claim-verifier branch performs that separate judgment.
+The claim verifier is callable but not part of the production graph. It strips
+the deterministic Sources block, receives only verifier-approved passages, and
+fails closed on altered inputs or invalid structured output. Its one-pass
+extraction/verification quality has unit coverage but no live-model benchmark.
 
 ## 8. Persistence module
 
@@ -253,6 +265,7 @@ flowchart TD
     EMBEDDING --> QUERY_EMBED["Query vector generation"]
     REASONING --> VERIFY["Evidence verification"]
     REASONING --> ANSWER["Evidence-grounded synthesis"]
+    REASONING --> CLAIMS["Standalone atomic claim verification"]
 
     DOCTOR["doctor command"] --> CONFIG
     DOCTOR --> OLLAMA
@@ -310,7 +323,10 @@ flowchart TD
     CLAIMFIXTURE --> CLAIMBRIDGE["Validated labels + entails links to stable evidence IDs"]
     CLAIMBRIDGE --> CITEMETRICS["Precision + completeness + unsupported + invalid rates"]
     CITEMETRICS --> CITEOUTPUTS["Ignored JSON + Markdown citation report"]
-    CLAIMSCHEMA -.-> CLAIMMODEL["Task 8 extraction and verification model — planned"]
+    CLAIMSCHEMA --> CLAIMMODEL["Task 8 one-call extraction + verification — implemented"]
+    CLAIMMODEL --> CLAIMBUNDLE2["Strict validated claim bundle"]
+    CLAIMBUNDLE2 --> CLAIMBRIDGE
+    CLAIMMODEL -.-> CLAIMGRAPH["Task 10 graph integration — planned"]
 
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
@@ -368,9 +384,9 @@ remain separate. The suite and outputs are development artifacts and do not
 cross the publication gate.
 The Task 7 claim contract preserves the exact answer substring behind each
 normalized atomic claim, visible citations, evidence relationships, and a
-derived verdict. It validates structure but does not run claim extraction or
-entailment; the dotted Task 8 edge is planned. Validated bundles adapt to the
-citation-safety branch through stable evidence IDs. Unknown predicted IDs are
+derived verdict. Task 8 now supplies a standalone one-call extraction and
+verification implementation, but its graph edge remains planned. Validated
+bundles adapt to the citation-safety branch through stable evidence IDs. Unknown predicted IDs are
 measured, unknown gold support IDs are rejected, and empty metric denominators
 remain null. The committed inputs are fixtures for contract validation rather
 than model quality results.

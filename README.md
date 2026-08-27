@@ -24,6 +24,7 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - fail-closed citation labels plus deterministic claim-to-evidence safety metrics
 - versioned atomic-claim verification contract with strict cross-reference and
   verdict invariants
+- standalone structured claim extractor/verifier over verifier-approved passages
 
 ## Quick start (Windows PowerShell)
 
@@ -239,8 +240,13 @@ python scripts/export_claim_verification_schema.py `
 ```
 
 The committed fixture covers all verdict shapes and connects directly to the
-Task 9 citation metrics. No claim-extraction or verification LLM runs yet; that
-is Task 8 rather than an implicit heuristic hidden inside this contract.
+Task 9 citation metrics. Task 8 now implements
+`app/models/claim_verifier.py`: one bounded Qwen call extracts claims and checks
+each attached label against verifier-approved evidence, then the Task 7 parser
+rejects altered answers, altered evidence counts, invented source text, missing
+links, and inconsistent verdicts. The function is standalone and is not yet a
+LangGraph node; tests use synthetic model responses, so no live-model quality
+claim is made.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

@@ -217,8 +217,36 @@ python scripts/export_claim_verification_schema.py `
 ```
 
 The committed claim bundle is a structural fixture, not a model prediction or
-benchmark. `app/models/claim_verifier.py`, model prompts, and LangGraph edges do
-not exist yet and are not implied by the fixture.
+benchmark. `app/models/claim_verifier.py` now implements one bounded structured
+extraction-and-verification call. It removes the deterministic Sources block,
+numbers only the supplied verifier-approved passages, includes the exact Task 7
+schema, and rejects responses that change the answer or evidence count before
+schema validation. It remains standalone: no LangGraph edge, repair policy, or
+claim benchmark is implied by the fixture.
+
+### Task 8 verifier boundary
+
+`verify_answer_claims(answer, evidence, question=None)` accepts only the answer
+and passages that the evidence verifier has already approved. The original
+question is optional context and cannot supply facts. The prompt requires every
+scientific, numeric, comparative, methodological, causal, or paper-specific
+assertion to remain citation-required even when the answer omitted a label.
+Purely organizational text alone may be `not_required`.
+
+Extraction and verification happen in one bounded call so the returned
+`source_text`, labels, and evidence relationships share one schema. This is a
+latency-conscious first implementation, not evidence that one-pass judgment is
+optimal. Model JSON is treated as untrusted: the parser checks immutable inputs,
+then the Task 7 validators derive verdicts and enforce all cross-references.
+Invalid output raises a fail-closed error; it is never repaired into a passing
+claim report.
+
+Synthetic tests cover fully supported, partially supported, unsupported,
+valid-but-wrong citation, missing citation, and citation-not-required claims,
+plus fenced JSON, altered inputs, malformed verdicts, empty inputs, exact prompt
+scope, and Sources-block removal. They validate control flow and contracts only.
+A live Qwen benchmark on independently checked claim labels is still required
+before graph integration.
 
 ## Retrieval matching contract
 

@@ -7,15 +7,16 @@ Last updated: 2026-08-28
 - Version: `0.4.0`
 - Branch: `main`
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
-  `1dc5f9d`; Task 7 is implemented in the current working baseline.
+  `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 is implemented in the current
+  working baseline.
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
-  claim-verification contract validated; Ruff passed and all 99 pytest tests
-  passed. Native QASPER
-  loaded all 5,049 questions and native
-  SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
+  claim-verification contract and synthetic claim-verifier outputs validated;
+  Ruff passed and all 107 pytest tests passed. Native QASPER loaded all 5,049
+  questions and native SciFact loaded all 300 labeled dev claims. No local model
+  benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
   smoke checks.
 
@@ -72,6 +73,9 @@ Last updated: 2026-08-28
   numeric citations, per-evidence entails/partial/does-not-support relations,
   derived claim verdicts, strict cross-reference validation, generated JSON
   Schema, Task 9 metric adaptation, and six structural fixture shapes
+- Task 8 standalone claim verifier with one bounded extraction/verification
+  prompt over approved passages, immutable answer/evidence-count guards,
+  Sources-block removal, strict Task 7 parsing, and fail-closed errors
 
 ## Latest evaluation
 
@@ -148,6 +152,13 @@ completeness `0.8000`, unsupported-claim rate `0.8000`, and invalid-citation
 rate `0.0000`. These deliberately mixed values test the contract rather than a
 model; no LLM or GPU run occurred.
 
+Task 8's mocked-model unit suite exercises the same six shapes through the real
+prompt, invocation, parser, and Task 7 validators. It additionally verifies
+fenced JSON handling, prompt evidence numbering, immutable answer/evidence
+inputs, deterministic Sources-block removal, malformed-verdict rejection, and
+no model load for empty input. These are implementation tests, not live Qwen
+accuracy; no LLM or GPU run occurred.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -170,6 +181,9 @@ model; no LLM or GPU run occurred.
 - The Task 7 contract proves structural traceability and verdict consistency,
   but cannot determine whether a paraphrase is truly atomic or a passage
   semantically entails it.
+- Task 8 currently asks one 4B model call to perform both extraction and
+  verification. Its exact-substring compliance, claim coverage, and entailment
+  accuracy have not yet been measured on independently checked outputs.
 - arXiv `last_revised` search is bounded and not an exhaustive corpus harvest.
 - SciFact evaluates scientific claim labels and rationales; the current verifier
   only judges evidence sufficiency, so using SciFact as its score would be invalid.
@@ -210,10 +224,9 @@ model; no LLM or GPU run occurred.
 
 1. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
-2. Implement Task 8's structured claim extractor/verifier against only
-   verifier-approved passages, including supported, partial, unsupported,
-   wrong-citation, and citation-not-required tests.
-3. Evaluate claim labels/rationales with native SciFact, then integrate bounded
-   claim repair or abstention after synthesis.
+2. Build and run a controlled Task 8 claim benchmark with independently checked
+   claim splits/labels, using Kaggle for the 4B batch if needed.
+3. Evaluate claim labels/rationales with native SciFact, then integrate Task 10's
+   bounded claim repair or abstention after synthesis.
 4. Add end-to-end regression comparison without committing runtime outputs.
 5. Fix section boundaries and table-associated metadata.

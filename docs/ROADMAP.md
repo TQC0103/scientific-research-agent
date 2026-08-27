@@ -28,13 +28,13 @@ Continue in this order:
    diagnostic. Task 6's runner is implemented: its first T4 result found zero
    false positives but a 30% false-negative rate on positive comparison scopes,
    70% rewrite recovery, and 67.5% supported-passage precision.
-3. Implement Task 8 claim extraction and verification on the completed Task 7
-   contract. Citation safety is now fail-closed:
+3. Benchmark the implemented Task 8 claim extractor/verifier on independently
+   checked atomic claims before graph integration. Citation safety is fail-closed:
    automatic `[1]` fallback is removed, invalid labels discard synthesis, and
    deterministic precision/completeness/unsupported/invalid metrics exist.
    Atomic claim, source-span, evidence-link, and derived-verdict models plus a
-   synchronized JSON Schema now exist, but no model yet performs extraction or
-   entailment.
+   synchronized JSON Schema exist. One bounded Qwen call now performs extraction
+   and entailment, but only synthetic mocked-output tests have run so far.
 4. Build the SciFact runner once claim verification exists; do not conflate its
    claim labels with the current evidence-sufficiency verifier.
 5. Integrate bounded answer revision/abstention into LangGraph.

@@ -900,3 +900,38 @@ LangGraph node, answer repair, or abstention path was added. Those remain Task 8
 and Task 10 work.
 
 Ruff passed and all 99 pytest tests passed.
+
+## 2026-08-28 — Standalone structured claim verifier
+
+Task 8 implements `app/models/claim_verifier.py` without adding a LangGraph
+edge. The verifier receives an answer and only the passages already approved by
+the evidence verifier. It removes the deterministic Sources metadata block,
+numbers the supplied passages, includes the Task 7 JSON Schema, and asks one
+bounded Qwen call to split the answer into atomic claims and assess every
+attached citation.
+
+The prompt treats all scientific, numeric, comparative, methodological, causal,
+and paper-specific assertions as citation-required, including claims whose
+answer text omitted a label. Only purely organizational or conversational text
+may be `not_required`. Compound sentences may yield multiple atomic claims with
+the same exact source substring. Each cited passage must be assessed exactly
+once as `entails`, `partial`, or `does_not_support`; outside knowledge and answer
+repair are forbidden.
+
+Model JSON remains untrusted. Before Pydantic validation, the parser verifies
+that the model echoed the exact immutable answer body and evidence count. The
+Task 7 bundle then enforces source traceability, citation visibility and range,
+ordered cross-references, and derived verdict consistency. Fenced or prefixed
+JSON is accepted, but altered inputs, malformed bundles, contradictory verdicts,
+empty answers, and empty evidence fail closed. The implementation uses
+temperature zero and a bounded 1,800-token response.
+
+Synthetic mocked-model tests cover fully supported, partial, unsupported,
+valid-but-wrong citation, missing citation, and citation-not-required claims.
+They also inspect the real prompt and invocation options, verify Sources-block
+removal and fenced JSON, and prove that empty inputs never load the model. No
+live Ollama or Kaggle inference was run, so this completion establishes code and
+contract behavior rather than claim-verification accuracy. A controlled labeled
+benchmark is required before Task 10 graph integration.
+
+Ruff passed and all 107 pytest tests passed.
