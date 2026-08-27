@@ -21,6 +21,7 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - ten-case internal development suite with an advisory structured LLM judge
 - controlled verifier evaluator for sufficiency, passage selection, bounded
   rewrite recovery, and final abstention behavior
+- fail-closed citation labels plus deterministic claim-to-evidence safety metrics
 
 ## Quick start (Windows PowerShell)
 
@@ -46,6 +47,12 @@ retrieved passages actually cover the question, identifies supported passages,
 and proposes a focused retrieval query when information is missing. Only verified
 passages reach answer synthesis. After two rewrites, unresolved questions return
 an explicit insufficient-evidence response instead of a guessed answer.
+
+Synthesis no longer attaches `[1]` when the model omits citations. An answer
+without a valid label, or with any label outside the verifier-approved evidence
+set, is discarded and replaced by an explicit citation-grounding failure. Valid
+labels are still resolved to trusted version, title, page, and section metadata
+by code rather than by the model.
 
 Repeated `--paper-id` options activate required coverage for every supplied
 paper. Comparison-style questions without explicit IDs require the first two
@@ -204,6 +211,18 @@ abstention accuracy `1.0000`. Bounded-flow accuracy was `0.7273`. These 22
 controlled snapshots are repo-authored development diagnostics, not held-out
 accuracy; the local Ollama model is a quantized runtime of the same family, not
 a bit-identical inference target.
+
+Evaluate an explicit claim-to-evidence citation record without a model using:
+
+```powershell
+python scripts/evaluate_citations.py `
+  --suite evaluation/suites/v0_5/citation_safety_fixtures.json `
+  --output-dir data/evaluations/runs/citation-safety-fixtures
+```
+
+The included five cases are contract fixtures, so their scores test metric
+behavior and must not be reported as model quality. Real answer evaluation will
+consume the same contract after claim extraction and verification are added.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

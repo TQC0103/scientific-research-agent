@@ -835,3 +835,33 @@ and rescore on the same development snapshots.
 
 Ruff passed and all 79 pytest tests passed locally. Model execution ran only on
 Kaggle; generated reports remain under ignored `data/evaluations/`.
+
+## 2026-08-27 — Citation safety and deterministic metrics
+
+Task 9 removed the synthesis fallback that appended `[1]` whenever the model
+returned an uncited answer. That behavior created a source relationship the
+model had never asserted. Citation labels are now parsed explicitly: if no valid
+label is present, or if any numeric label falls outside the verifier-approved
+evidence list, the generated answer is discarded and replaced by a clear
+citation-grounding failure. Valid labels alone are resolved to trusted arXiv
+version, title, page, and section metadata. This is intentionally fail-closed;
+an invalid label is not silently removed while the rest of the answer survives.
+
+A separate deterministic citation contract records atomic claims, whether each
+requires citation, the evidence IDs cited by the output, the evidence IDs
+available to the answer, and independently assigned supporting IDs. The
+evaluator reports citation precision, citation completeness, unsupported-claim
+rate, and invalid-citation rate, plus raw denominators and per-case diagnostics.
+Unknown predicted IDs are measured as invalid, while unknown gold support IDs
+and duplicate assignments are rejected. Empty denominators are null rather than
+misleading zeroes.
+
+The committed five-case fixture covers fully supported, wrong-but-existing,
+missing, invalid, and citation-not-required behavior. It intentionally produces
+precision `0.3333`, completeness `0.5000`, unsupported-claim rate `0.7500`, and
+invalid-citation rate `0.3333`; these values verify metric semantics and are not
+a model benchmark. No LLM or GPU workload was run. Claim extraction and
+entailment remain future Task 7/8 work, so numeric label validation must not be
+described as claim-level verification.
+
+Ruff passed and all 87 pytest tests passed.

@@ -1,8 +1,36 @@
 import re
+from dataclasses import dataclass
 
 from langchain_ollama import ChatOllama
 
 from app.config import settings
+
+MISSING_CITATION_MESSAGE = (
+    "Unable to provide a citation-grounded answer: synthesis did not include a valid "
+    "verified citation."
+)
+INVALID_CITATION_MESSAGE = (
+    "Unable to provide a citation-grounded answer: synthesis referenced an invalid "
+    "citation label."
+)
+
+
+@dataclass(frozen=True)
+class CitationLabels:
+    valid: tuple[int, ...]
+    invalid: tuple[int, ...]
+
+
+def parse_citation_labels(answer: str, evidence_count: int) -> CitationLabels:
+    """Resolve numeric labels without inventing or silently discarding citations."""
+    valid = []
+    invalid = []
+    for match in re.finditer(r"\[(\d+)]", answer):
+        number = int(match.group(1))
+        target = valid if 1 <= number <= evidence_count else invalid
+        if number not in target:
+            target.append(number)
+    return CitationLabels(valid=tuple(valid), invalid=tuple(invalid))
 
 
 def get_llm(*, temperature: float = 0.1, num_predict: int = 1000, seed: int = 42) -> ChatOllama:
@@ -50,16 +78,13 @@ the application adds it from verified metadata.
 
 def format_verified_sources(answer: str, evidence: list[dict], papers: dict[str, dict]) -> str:
     """Append source details from trusted chunk metadata, never model-generated text."""
-    cited = []
-    for match in re.finditer(r"\[(\d+)]", answer):
-        number = int(match.group(1))
-        if 1 <= number <= len(evidence) and number not in cited:
-            cited.append(number)
-    if not cited and evidence:
-        cited = [1]
-        answer = f"{answer} [1]"
+    citations = parse_citation_labels(answer, len(evidence))
+    if citations.invalid:
+        return INVALID_CITATION_MESSAGE
+    if not citations.valid:
+        return MISSING_CITATION_MESSAGE
     lines = []
-    for number in cited:
+    for number in citations.valid:
         item = evidence[number - 1]
         paper = papers.get(item["arxiv_id"], {})
         source_id = item.get("versioned_id") or paper.get("versioned_id") or item["arxiv_id"]

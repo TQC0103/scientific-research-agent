@@ -6,12 +6,13 @@ Last updated: 2026-08-27
 
 - Version: `0.4.0`
 - Branch: `main`
-- Task 6 implementation commits: `174d1c3`, `6ab0811`
+- Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 is implemented
+  in the current working baseline.
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, and the 22-case controlled verifier definition validated; Ruff passed
-  and all 79 pytest tests passed. Native QASPER
+  and all 87 pytest tests passed. Native QASPER
   loaded all 5,049 questions and native
   SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -25,7 +26,9 @@ Last updated: 2026-08-27
 - Hybrid dense + lexical retrieval with reciprocal-rank fusion
 - Structured LLM evidence verifier, bounded query rewrite, and fail-closed stop
 - Per-paper evidence/query/retry maps and required coverage for comparisons
-- Verified-passage-only synthesis and deterministic citation metadata
+- Verified-passage-only synthesis, fail-closed numeric citation labels, and
+  deterministic citation metadata; missing/invalid labels never receive an
+  automatic source
 - Shared LangGraph path for CLI `ask`, CLI `chat`, and Gradio UI
 - Six-case baseline runner and complete architecture visualization
 - Reproducible two-case multi-paper smoke runner
@@ -61,6 +64,9 @@ Last updated: 2026-08-27
   initial/recovery snapshots, fail-closed parsing, sufficiency FP/FN metrics,
   supported-passage metrics, bounded rewrite recovery, final abstention, model
   call/latency accounting, and an isolated pinned Qwen3-4B T4 package
+- Deterministic citation-safety contract and evaluator with citation precision,
+  completeness, unsupported-claim rate, invalid-citation rate, per-case
+  diagnostics, null empty denominators, and JSON/Markdown reports
 
 ## Latest evaluation
 
@@ -124,6 +130,12 @@ were rejected and three recoveries remained rejected. This is a repo-authored
 development diagnostic, not held-out accuracy, and the FP16 Transformers runtime
 is not bit-identical to the quantized production Ollama tag.
 
+Task 9's five synthetic citation fixtures exercise one supported citation, one
+wrong existing citation, one missing citation, one invalid evidence ID, and one
+claim that needs no citation. Their aggregate `0.3333/0.5000/0.7500/0.3333`
+precision/completeness/unsupported/invalid rates are intentionally imperfect
+contract checks, not model-quality results. No LLM or GPU run was needed.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -140,6 +152,9 @@ is not bit-identical to the quantized production Ollama tag.
   keyword heuristic; it is not yet a general query planner.
 - Per-paper coverage reduces evidence leakage, but a separate final
   claim-by-claim cross-paper answer verifier is not implemented.
+- Numeric citation validation proves only that a label maps to an approved
+  passage. It cannot yet prove that each nearby generated claim is entailed by
+  that passage; Task 7/8 claim extraction and verification remain necessary.
 - arXiv `last_revised` search is bounded and not an exhaustive corpus harvest.
 - SciFact evaluates scientific claim labels and rationales; the current verifier
   only judges evidence sufficiency, so using SciFact as its score would be invalid.
@@ -180,10 +195,9 @@ is not bit-identical to the quantized production Ollama tag.
 
 1. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
-2. Fix citation safety, beginning with removal of automatic `[1]` fallback and
-   explicit claim-to-evidence citation metrics.
-3. Design claim-level verification without treating the current verifier's
+2. Design claim-level verification without treating the current verifier's
    selected-passage indices as fully reliable, then use native SciFact for
    claim-label/rationale evaluation.
+3. Integrate bounded claim repair or abstention after synthesis.
 4. Add end-to-end regression comparison without committing runtime outputs.
 5. Fix section boundaries and table-associated metadata.

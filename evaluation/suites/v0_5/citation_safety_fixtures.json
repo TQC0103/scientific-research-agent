@@ -1,0 +1,74 @@
+{
+  "contract_version": "1.0.0",
+  "suite_id": "citation-safety-v0-5-fixtures",
+  "dataset_version": "0.1.0",
+  "benchmark_status": "fixture",
+  "description": "Synthetic contract fixtures for deterministic citation metrics; not a benchmark result.",
+  "cases": [
+    {
+      "case_id": "fully_supported",
+      "available_evidence_ids": ["e1"],
+      "claims": [
+        {
+          "claim_id": "claim_supported",
+          "text": "The reported value is 28.4 BLEU.",
+          "requires_citation": true,
+          "cited_evidence_ids": ["e1"],
+          "supporting_evidence_ids": ["e1"]
+        }
+      ]
+    },
+    {
+      "case_id": "wrong_citation",
+      "available_evidence_ids": ["e1", "e2"],
+      "claims": [
+        {
+          "claim_id": "claim_wrong_source",
+          "text": "The model uses sinusoidal positional encodings.",
+          "requires_citation": true,
+          "cited_evidence_ids": ["e2"],
+          "supporting_evidence_ids": ["e1"]
+        }
+      ]
+    },
+    {
+      "case_id": "missing_citation",
+      "available_evidence_ids": ["e1"],
+      "claims": [
+        {
+          "claim_id": "claim_uncited",
+          "text": "BERT conditions on left and right context.",
+          "requires_citation": true,
+          "cited_evidence_ids": [],
+          "supporting_evidence_ids": ["e1"]
+        }
+      ]
+    },
+    {
+      "case_id": "invalid_citation",
+      "available_evidence_ids": ["e1"],
+      "claims": [
+        {
+          "claim_id": "claim_out_of_range",
+          "text": "The result establishes a new state of the art.",
+          "requires_citation": true,
+          "cited_evidence_ids": ["missing-evidence"],
+          "supporting_evidence_ids": ["e1"]
+        }
+      ]
+    },
+    {
+      "case_id": "citation_not_required",
+      "available_evidence_ids": ["e1"],
+      "claims": [
+        {
+          "claim_id": "transition_text",
+          "text": "The papers can now be compared.",
+          "requires_citation": false,
+          "cited_evidence_ids": [],
+          "supporting_evidence_ids": []
+        }
+      ]
+    }
+  ]
+}

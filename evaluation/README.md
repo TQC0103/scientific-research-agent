@@ -17,6 +17,9 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
 - `suites/v0_5/verifier_development.json`: 22 controlled initial/recovery
   evidence snapshots derived from the development suite; this is a prompt and
   flow diagnostic, not an independently labeled benchmark.
+- `suites/v0_5/citation_safety_fixtures.json`: five synthetic records covering
+  supported, wrong, missing, invalid, and citation-free claims; scores validate
+  metric semantics only.
 - `app/evaluation/`: executable loader, semantic validator, public-dataset
   adapters, deterministic metrics, and a portable QASPER runner.
 - `scripts/download_external_benchmarks.py`: checksum-pinned QASPER v0.3 and
@@ -133,6 +136,42 @@ identify one of these reasons:
 `forbidden_claims` records high-risk outputs that must not appear. `challenge`
 labels negative, adversarial, partial, conflicting, or cross-paper-leakage
 conditions without overloading the main question type.
+
+## Citation safety contract
+
+`app/evaluation/citations.py` scores explicit atomic claim records against stable
+evidence IDs. It deliberately does not split prose or decide entailment; those
+are later claim-verifier responsibilities. Each record states whether a claim
+requires citation, the evidence IDs it cites, the evidence available to the
+answer, and the independently assigned IDs that support it.
+
+The four aggregate rates are:
+
+- `citation_precision`: supporting citation assignments divided by all citation
+  assignments; unknown IDs and wrong-but-existing evidence both count against it;
+- `citation_completeness`: citation-required claims with at least one available
+  citation divided by all citation-required claims;
+- `unsupported_claim_rate`: citation-required claims with no cited supporting
+  evidence divided by all citation-required claims;
+- `invalid_citation_rate`: cited IDs outside the answer's available evidence set
+  divided by all citation assignments.
+
+Metrics with an empty denominator are `null`, not zero. This distinguishes “not
+applicable” from perfect or failed performance. Duplicate IDs and unknown gold
+support references are rejected; predicted unknown citations remain valid input
+because measuring them is the purpose of `invalid_citation_rate`.
+
+Run the deterministic evaluator with:
+
+```powershell
+python scripts/evaluate_citations.py `
+  --suite evaluation/suites/v0_5/citation_safety_fixtures.json `
+  --output-dir data/evaluations/runs/citation-safety-fixtures
+```
+
+The committed fixture intentionally yields imperfect numbers to exercise every
+metric. It is not generated-model output and is prohibited from being presented
+as a quality benchmark. Generated JSON and Markdown reports remain Git-ignored.
 
 ## Retrieval matching contract
 

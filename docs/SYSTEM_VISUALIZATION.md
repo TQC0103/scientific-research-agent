@@ -199,8 +199,9 @@ flowchart TD
     VERIFIED["Verifier-approved passages only"] --> PROMPT["Evidence-only answer prompt"]
     PROMPT --> QWEN["Qwen3 4B synthesis"]
     QWEN --> RAW["Concise answer with numeric citation labels"]
-    RAW --> PARSE["Accept only labels that map to supplied passages"]
-    PARSE --> METADATA["Resolve trusted arXiv version, title, page, section"]
+    RAW --> PARSE["Resolve every numeric label against supplied passages"]
+    PARSE -->|"missing or any invalid label"| CITEFAIL["Discard generated answer; explicit grounding failure"]
+    PARSE -->|"all labels valid"| METADATA["Resolve trusted arXiv version, title, page, section"]
     METADATA --> FINAL["Answer + deterministic Sources block"]
 
     INSUFFICIENT["Verifier says insufficient"] --> ABSTAIN["Reason + missing information"]
@@ -209,6 +210,9 @@ flowchart TD
 
 The model never authors bibliographic metadata. Abstract fallback citations are
 labeled `Abstract`; full-text citations use stored page and section metadata.
+Code never invents a citation when the model omits one. Missing citations and
+labels outside the verifier-approved passage list fail closed before any Sources
+block is rendered. Claim-level entailment remains a separate future boundary.
 
 ## 8. Persistence module
 
@@ -300,6 +304,9 @@ flowchart TD
     VRECOVERY --> VMETRICS
     VMETRICS --> VOUTPUTS["Ignored JSON + Markdown verifier report"]
 
+    CLAIMRECORDS["Explicit claim + cited/supporting evidence IDs"] --> CITEMETRICS["Precision + completeness + unsupported + invalid rates"]
+    CITEMETRICS --> CITEOUTPUTS["Ignored JSON + Markdown citation report"]
+
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
     JUDGEMODEL --> JUDGEJSON["Validated verdict + five scores + findings"]
@@ -354,6 +361,11 @@ synthesis. Its recovery edge is bounded to one execution, and initial decision,
 passage-selection, recovery, abstention, parsing, latency, and call-count metrics
 remain separate. The suite and outputs are development artifacts and do not
 cross the publication gate.
+The citation-safety branch consumes explicit atomic claim records; it does not
+heuristically split answers or infer support. Unknown predicted IDs are measured,
+unknown gold support IDs are rejected, and empty metric denominators remain null.
+The committed inputs are fixtures for contract validation rather than model
+quality results.
 External datasets remain in their native format, preventing repo-authored schema
 adaptation from silently changing official answer, evidence, or claim labels.
 The no-model mode is a retrieval smoke only and is never presented as an answer
