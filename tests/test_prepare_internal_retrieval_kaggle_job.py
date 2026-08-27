@@ -64,8 +64,8 @@ def test_prepared_bundle_is_narrow_and_embeds_only_pinned_sources(
         names = set(archive.namelist())
     assert "app/evaluation/internal_retrieval_runner.py" in names
     assert "scripts/run_internal_retrieval_ablation.py" in names
-    assert "papers/1706.03762v7.pdf" in names
-    assert "papers/1810.04805v2.pdf" in names
+    assert "papers/1706.03762v7.pdf" not in names
+    assert "papers/1810.04805v2.pdf" not in names
     assert all("data/evaluations" not in name for name in names)
     manifest = json.loads((destination / "source_manifest.json").read_text(encoding="utf-8"))
     assert set(manifest["files"]) == {"kernel-metadata.json", "main.py"}
@@ -90,6 +90,8 @@ def test_kaggle_entrypoint_preserves_system_torch_and_cleans_environment() -> No
     assert '"--system-site-packages"' in entrypoint
     assert '"--no-deps"' in entrypoint
     assert "torch.cuda.device_count()" in entrypoint
+    assert "_download_papers()" in entrypoint
+    assert "Downloaded PDF checksum mismatch" in entrypoint
     assert "shutil.rmtree(ENV_ROOT" in entrypoint
     assert "torch==" not in requirements
     assert "wrapt==" in requirements

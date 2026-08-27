@@ -71,7 +71,8 @@ def _validated_pdfs() -> dict[Path, str]:
 
 def _embedded_app() -> str:
     payload = io.BytesIO()
-    files = {**_app_files(), **_validated_pdfs()}
+    _validated_pdfs()
+    files = _app_files()
     with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for source, target in sorted(files.items(), key=lambda item: item[1]):
             archive.write(source, target)

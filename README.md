@@ -162,9 +162,10 @@ Dense and hybrid default to a pinned `Qwen/Qwen3-Embedding-0.6B` revision,
 matching the repo's configured embedding-model family. Run those arms through
 Kaggle Control Plane, not on the laptop.
 `scripts/prepare_internal_retrieval_kaggle_job.py` builds a narrow T4 bundle
-containing only required code and checksum-verified paper revisions. The
-Markdown report explicitly labels results as internal development signals
-rather than held-out accuracy.
+containing only required code; the remote entrypoint downloads the two pinned
+paper revisions and verifies their SHA-256 before parsing. The Markdown report
+explicitly labels results as internal development signals rather than held-out
+accuracy.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

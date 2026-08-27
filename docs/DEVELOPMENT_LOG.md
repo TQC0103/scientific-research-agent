@@ -698,9 +698,18 @@ annotation-relative Precision@5 `0.2000`, and MRR `0.6667`. It missed the BERT
 masked-LM mechanism evidence and both groups in the two-paper architecture
 comparison. Dense/hybrid were deliberately not run on the laptop.
 
-The Kaggle package embeds only required source modules and the two PDFs after
-local checksum validation. It creates a `--system-site-packages` environment,
-installs no PyTorch replacement, pins non-system model-library extras, includes
-`wrapt`, verifies every visible T4 plus a real CUDA operation, records the
-resolved environment, and removes its environment before artifact collection.
-Ruff passed and all 71 pytest tests passed before packaging.
+The Kaggle package includes only required source modules and verifies local PDFs
+against the committed source manifest before packaging. The remote entry point
+downloads those same pinned revisions and checks SHA-256 before parsing. It
+creates a `--system-site-packages` environment, installs no PyTorch replacement,
+pins non-system model-library extras, includes `wrapt`, verifies every visible
+T4 plus a real CUDA operation, records the resolved environment, and removes its
+environment before artifact collection. Ruff passed and all 71 pytest tests
+passed before packaging.
+
+R1 submission `job_1afdd6e4ba0241f28c1f51b757735414` was rejected by Kaggle's
+`SaveKernel` endpoint with HTTP 400 before a remote run or GPU quota started.
+The 2.3 MB script payload had embedded compressed PDFs. The next bundle removes
+PDFs from the submitted payload and downloads only the two checksum-locked
+public sources at runtime, reducing source size while preserving exact input
+identity.

@@ -187,10 +187,10 @@ coverage remain directly comparable.
 The runner writes each arm's ranked chunks, per-case metrics, aggregate metrics,
 `ablation_summary.json`, and `ablation_report.md`. Gold evidence is consulted
 only after all rankings have been produced. The portable Kaggle package embeds
-only the required code and the two locally checksum-verified PDFs, uses an
-isolated `--system-site-packages` environment without replacing Kaggle PyTorch,
-verifies actual T4 devices and CUDA execution, and removes the environment
-before artifact collection.
+only the required code, downloads the two pinned PDFs remotely, verifies their
+SHA-256 before parsing, uses an isolated `--system-site-packages` environment
+without replacing Kaggle PyTorch, verifies actual T4 devices and CUDA execution,
+and removes the environment before artifact collection.
 
 ## Advisory LLM judge
 

@@ -9,6 +9,7 @@ import json
 import shutil
 import subprocess
 import sys
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -31,6 +32,30 @@ def _extract_app() -> None:
             if not target.is_relative_to(root):
                 raise ValueError("Embedded application archive contains an unsafe path.")
         archive.extractall(CODE_ROOT)
+
+
+def _download_papers() -> None:
+    manifest_path = (
+        CODE_ROOT / "evaluation" / "suites" / "v0_5" / "development_10_sources.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    PAPERS.mkdir(parents=True, exist_ok=True)
+    for source in manifest["sources"]:
+        versioned_id = source["versioned_id"]
+        destination = PAPERS / f"{versioned_id}.pdf"
+        request = urllib.request.Request(
+            source["pdf_url"],
+            headers={"User-Agent": "scientific-research-agent-evaluation/0.5"},
+        )
+        digest = hashlib.sha256()
+        with urllib.request.urlopen(request, timeout=120) as response, destination.open(
+            "wb"
+        ) as output:
+            while block := response.read(1024 * 1024):
+                digest.update(block)
+                output.write(block)
+        if digest.hexdigest() != source["pdf_sha256"]:
+            raise ValueError(f"Downloaded PDF checksum mismatch: {versioned_id}")
 
 
 def _create_runtime() -> None:
@@ -156,6 +181,7 @@ def main() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     try:
         _extract_app()
+        _download_papers()
         _create_runtime()
         _verify_runtime()
         _run_ablation()
