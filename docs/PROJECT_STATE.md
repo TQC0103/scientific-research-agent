@@ -10,7 +10,7 @@ Last updated: 2026-08-27
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, and the ten-case development
-  suite validated; Ruff passed and all 71 pytest tests passed. Native QASPER
+  suite validated; Ruff passed and all 72 pytest tests passed. Native QASPER
   loaded all 5,049 questions and native
   SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -52,10 +52,10 @@ Last updated: 2026-08-27
   evidence-group Recall@K, annotation-relative Precision@K, MRR, item coverage,
   required-paper coverage, macro paper recall, per-case diagnostics, and
   JSON/JSONL reports
-- Three-arm internal retrieval ablation runner using identical verified PDFs,
-  global per-case chunks and K, BM25 lexical retrieval, pinned Qwen3 dense
-  retrieval, RRF hybrid fusion, and JSON/Markdown reports; narrow isolated T4
-  packaging and the first complete Kaggle comparison are implemented
+- Six-configuration internal retrieval diagnostic using identical verified
+  PDFs, chunks, questions and total K: BM25, pinned Qwen3 dense, global RRF,
+  min-max CombSUM, and per-paper variants of both fusion methods; outputs remain
+  JSON/Markdown artifacts and production RRF is unchanged
 
 ## Latest evaluation
 
@@ -102,6 +102,13 @@ inherited those dense misses under the current RRF. This development result does
 not establish a hybrid advantage and contrasts with the larger QASPER dev run,
 where hybrid had the highest Recall@5.
 
+Internal retrieval R5 compared untuned fusion and paper-ranking variants on the
+same inputs. Global and per-paper min-max CombSUM reached Recall@5 `0.8333`,
+Precision@5 `0.2444`, and MRR `0.6204`. Both recovered sinusoidal position
+encoding and GLUE/MultiNLI but lost masked-LM. Per-paper RRF stayed at Recall@5
+`0.7222` and MRR `0.4944`; for the comparison case it swapped the covered paper
+instead of covering both. This trade-off does not justify a production change.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -126,13 +133,14 @@ where hybrid had the highest Recall@5.
 - The internal quote matcher uses a documented 0.8 token-recall threshold that
   is unit-tested but not yet calibrated against real retrieved chunks; inspect
   match diagnostics during the first ablation before treating it as fixed.
-- The internal ablation uses one global ranking across declared papers to make K
-  and per-paper coverage comparable. Production retrieval instead runs a
-  sequential per-paper verifier loop, so the ablation isolates retrieval quality
-  rather than reproducing the complete graph trace.
-- On the nine eligible internal cases, current RRF hybrid underperformed lexical
-  Recall and MRR. The suite is too small for a general conclusion, but fusion and
-  global multi-paper ranking need dev-set failure analysis before being frozen.
+- The internal baseline uses one global ranking across declared papers; R5 adds
+  fixed-total-K per-paper diagnostics. Production instead runs a sequential
+  per-paper verifier loop, so neither evaluation branch reproduces the complete
+  graph trace.
+- The R5 fusion diagnostic improved aggregate Recall with normalized CombSUM
+  but swapped one successful case for two others and still missed one paper in
+  the comparison. Nine eligible development cases are insufficient for fusion
+  selection, statistical testing, or parameter optimization.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27,
   but the other eight cases still lack independent review and the suite remains
@@ -150,12 +158,11 @@ where hybrid had the highest Recall@5.
 
 ## Next priorities
 
-1. Analyze the internal hybrid failures and compare fusion/per-paper ranking
-   changes on development data without presenting tuning gains as held-out.
-2. Independently review the remaining eight answer cases before freezing any
+1. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
-3. Evaluate verifier sufficiency and false-positive/false-negative behavior.
-4. Add citation safety and claim-level verification, then use native SciFact for
+2. Build Task 6's verifier evaluator for sufficiency, false-positive/negative,
+   abstention, and rewrite-recovery behavior.
+3. Add citation safety and claim-level verification, then use native SciFact for
    claim-label/rationale evaluation.
-5. Add end-to-end regression comparison without committing runtime outputs.
-6. Fix section boundaries and table-associated metadata.
+4. Add end-to-end regression comparison without committing runtime outputs.
+5. Fix section boundaries and table-associated metadata.

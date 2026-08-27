@@ -177,12 +177,12 @@ Runtime inputs and reports remain ignored. Retriever execution and metric
 calculation remain separate.
 
 `app/evaluation/internal_retrieval_runner.py` builds one checksum-verified,
-page-aware chunk corpus and uses it unchanged for all three arms. Lexical uses
-BM25; dense uses the pinned `Qwen/Qwen3-Embedding-0.6B` Sentence Transformers
-revision with its query prompt; hybrid applies reciprocal-rank fusion with the
-production constant 60 over up to 20 candidates from each arm. For multi-paper
-cases, chunks from all declared papers share one ranking so K and per-paper
-coverage remain directly comparable.
+page-aware chunk corpus and uses it unchanged for every configuration. Lexical
+uses BM25; dense uses the pinned `Qwen/Qwen3-Embedding-0.6B` Sentence
+Transformers revision with its query prompt. Hybrid diagnostics include the
+production-equivalent RRF constant 60, min-max-normalized CombSUM, and both
+fusion methods with per-paper rank reset plus a fair quota inside the same total
+K. Global RRF remains the production default.
 
 The runner writes each arm's ranked chunks, per-case metrics, aggregate metrics,
 `ablation_summary.json`, and `ablation_report.md`. Gold evidence is consulted
@@ -202,6 +202,27 @@ lexical recovered. Current RRF inherited those dense misses, so the internal
 result does not show a hybrid win. The suite has only nine eligible,
 repo-authored development cases; use the report for failure analysis and keep
 the external QASPER result as the stronger broad retrieval signal.
+
+R5 compared the four hybrid configurations without optimizing weights or RRF K.
+Global min-max CombSUM and its per-paper counterpart both produced Recall@5
+`0.8333`, Precision@5 `0.2444`, and MRR `0.6204`. They recovered sinusoidal
+position encoding and GLUE/MultiNLI but lost the masked-LM hit. RRF per-paper
+balancing stayed at Recall@5 `0.7222` and reduced MRR slightly to `0.4944`; in
+the multi-paper case it swapped which paper was covered rather than reaching
+both. No variant was promoted into production.
+
+The diagnostic design follows the separation used by
+[BEIR](https://github.com/beir-cellar/beir),
+[MTEB](https://github.com/embeddings-benchmark/mteb), and
+[Pyserini](https://github.com/castorini/pyserini): keep retrieval runs
+reproducible and compare sparse, dense, and hybrid rankings independently of
+generation. [ranx fusion](https://amenra.github.io/ranx/fusion/) provides the
+specific precedent for RRF and normalized CombSUM. Its parameter optimization
+was deliberately not used because this internal suite has no separate tuning
+and held-out partitions. BEIR-style NDCG/MAP are also deferred until the
+evidence-group annotations can be represented as defensible chunk-level qrels;
+inventing relevance labels from overlapping chunks would make those metrics
+misleading.
 
 ## Advisory LLM judge
 

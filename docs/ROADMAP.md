@@ -21,23 +21,20 @@ QASPER R11 development checkpoint are preserved. R11 supports retaining hybrid
 retrieval but does not replace an independently reviewed internal benchmark.
 Continue in this order:
 
-1. Analyze why current RRF hybrid lost to lexical on the first complete internal
-   Kaggle comparison; compare fusion and per-paper ranking variants on the
-   development suite without presenting tuned gains as held-out accuracy.
-2. Independently review the remaining eight answer cases before freezing a
+1. Independently review the remaining eight answer cases before freezing a
    benchmark snapshot. The two abstention cases were human-adjudicated on
    2026-08-27; the advisory LLM lint pass does not replace review.
-3. Evaluate verifier sufficiency, false positives/negatives, supported-passage
+2. Evaluate verifier sufficiency, false positives/negatives, supported-passage
    selection, and the separate retrieval-rewrite recovery loop.
-4. Remove unsafe citation fallback behavior, then add claim-level models,
+3. Remove unsafe citation fallback behavior, then add claim-level models,
    verification, and claim/citation metrics.
-5. Build the SciFact runner once claim verification exists; do not conflate its
+4. Build the SciFact runner once claim verification exists; do not conflate its
    claim labels with the current evidence-sufficiency verifier.
-6. Integrate bounded answer revision/abstention into LangGraph.
-7. Add end-to-end reporting and regression comparison without committing runtime
+5. Integrate bounded answer revision/abstention into LangGraph.
+6. Add end-to-end reporting and regression comparison without committing runtime
    evaluation outputs.
-8. Correct section-boundary metadata around tables and mid-page headings.
-9. Benchmark 1.7B/4B/8B on identical evidence and traces, preferring Kaggle GPU
+7. Correct section-boundary metadata around tables and mid-page headings.
+8. Benchmark 1.7B/4B/8B on identical evidence and traces, preferring Kaggle GPU
    for batch runs over the 4 GB laptop GPU.
 
 ## Deferred

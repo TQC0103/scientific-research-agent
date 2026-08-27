@@ -3,6 +3,12 @@
 This log records what was built, why decisions were made, failures discovered
 during real runs, and the evidence used to choose the next step.
 
+## 2026-08-27 — Post-R4 verification
+
+Ruff passed and all 72 pytest tests passed. This confirms the current post-R4
+working tree remains healthy; no runtime benchmark outputs were generated or
+committed.
+
 ## 2026-08-18 — Project bootstrap
 
 ### Starting goal
@@ -750,3 +756,32 @@ response into a generic offline message. Direct read-only inspection of the
 local API showed that the rejected SaveKernel request had left conservative
 `remote_may_be_running` state even though no remote workload started; the state
 was reconciled with an audit note before R2. No remote job was cleared.
+
+## 2026-08-27 — Hybrid fusion and per-paper diagnostic
+
+The follow-up design was checked against official open-source IR harnesses
+before implementation. BEIR and MTEB reinforced keeping retrieval evaluation
+separate from generation and reporting multiple ranking metrics. Pyserini
+provided a reproducible sparse/dense/hybrid precedent. ranx specifically
+supports RRF, score normalization, CombSUM, and fusion optimization. This repo
+adopted only untuned min-max CombSUM alongside the existing RRF. Automatic
+weight/K optimization was rejected because nine internal development cases do
+not provide separate train and held-out partitions. NDCG/MAP were not added by
+inventing chunk qrels from overlapping evidence anchors; that mapping requires
+a separate defensible contract.
+
+The runner now evaluates global RRF, global min-max CombSUM, and per-paper
+versions of both. Per-paper modes restart ranks and normalization inside each
+declared paper, then reserve an equal floor quota within the same total K before
+filling remaining slots by fused score. These are diagnostic branches only;
+production retrieval remains global RRF within each graph paper step.
+
+Kaggle R5 `job_eee87905d55a44278d0d3cbf3f873f39` completed in 184 seconds on
+two visible Tesla T4 devices using the same resolved dependency fingerprint as
+R4. All six configurations produced all 10 predictions. Global and per-paper
+CombSUM both reached Recall@5 `0.8333`, Precision@5 `0.2444`, and MRR `0.6204`.
+They recovered sinusoidal position encoding and GLUE/MultiNLI but lost the
+masked-LM hit. Per-paper RRF remained at Recall@5 `0.7222` and reduced MRR from
+`0.5000` to `0.4944`; the multi-paper case still covered only one of two papers,
+although the quota changed which paper was covered. The result is a useful
+trade-off diagnosis, not evidence to promote a new production default.

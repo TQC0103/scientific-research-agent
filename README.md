@@ -146,15 +146,16 @@ annotation-relative Recall@K, Precision@K, MRR, gold-evidence coverage,
 required-paper coverage, macro paper recall, and per-case failure reasons. It is
 CPU-only and does not invoke an embedding model or LLM.
 
-Run the three-arm internal ablation with identical PDFs, chunking, questions,
-K, and scoring using:
+Run the six-configuration internal diagnostic with identical PDFs, chunking,
+questions, K, and scoring using:
 
 ```powershell
 python scripts/run_internal_retrieval_ablation.py `
   --suite evaluation/suites/v0_5/development_10.json `
   --sources evaluation/suites/v0_5/development_10_sources.json `
   --papers-dir data/papers `
-  --modes lexical dense hybrid --top-k 5 `
+  --modes lexical dense hybrid hybrid_score hybrid_per_paper `
+    hybrid_score_per_paper --top-k 5 `
   --output-dir data/evaluations/runs/internal-retrieval-ablation
 ```
 
@@ -174,6 +175,13 @@ Precision `0.2000`, and MRR `0.6667`; dense achieved `0.7222`, `0.2222`, and
 not win this small internal suite. Treat this as a fusion/failure-analysis
 signal, not a held-out model claim; the larger QASPER dev run still favored
 hybrid Recall@5.
+
+The follow-up R5 diagnostic added two intentionally untuned axes based on
+established IR practice: min-max-normalized CombSUM and fixed-K per-paper
+balancing. CombSUM reached Recall@5 `0.8333`, Precision@5 `0.2444`, and MRR
+`0.6204`; per-paper balancing did not improve coverage. Because CombSUM traded
+away the masked-LM hit and the suite is development-only, production remains on
+the existing RRF path pending independent validation.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.
