@@ -18,7 +18,15 @@ from app.evaluation.retrieval import RetrievalReport, evaluate_retrieval
 from app.ingestion.chunking import chunk_pages
 from app.ingestion.pdf_parser import parse_pdf
 
-SUPPORTED_MODES = ("lexical", "dense", "hybrid")
+SUPPORTED_MODES = (
+    "lexical",
+    "dense",
+    "hybrid",
+    "hybrid_score",
+    "hybrid_per_paper",
+    "hybrid_score_per_paper",
+)
+HYBRID_MODES = frozenset(SUPPORTED_MODES[2:])
 DEFAULT_DENSE_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 DEFAULT_DENSE_REVISION = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
 
@@ -213,12 +221,119 @@ def _dense_ranking(
     return [(corpus[index], float(scores[index])) for index in order[:candidate_k]]
 
 
+def _normalized_scores(
+    ranking: list[tuple[CorpusChunk, float]],
+    *,
+    by_paper: bool = False,
+) -> dict[int, float]:
+    if not ranking:
+        return {}
+    if by_paper:
+        paper_ids = dict.fromkeys(chunk.paper_id for chunk, _score in ranking)
+        result = {}
+        for paper_id in paper_ids:
+            result.update(
+                _normalized_scores(
+                    [item for item in ranking if item[0].paper_id == paper_id]
+                )
+            )
+        return result
+    values = [score for _chunk, score in ranking]
+    minimum = min(values)
+    span = max(values) - minimum
+    if span <= 1e-12:
+        return {chunk.corpus_index: 1.0 for chunk, _score in ranking}
+    return {
+        chunk.corpus_index: (score - minimum) / span for chunk, score in ranking
+    }
+
+
+def _hybrid_payload(
+    lexical: list[tuple[CorpusChunk, float]],
+    dense: list[tuple[CorpusChunk, float]],
+    *,
+    top_k: int,
+    method: str,
+    paper_order: tuple[str, ...] = (),
+) -> list[dict[str, Any]]:
+    fused: dict[int, float] = {}
+    chunks: dict[int, CorpusChunk] = {}
+    lexical_ranks = {}
+    dense_ranks = {}
+    lexical_scores = {chunk.corpus_index: score for chunk, score in lexical}
+    dense_scores = {chunk.corpus_index: score for chunk, score in dense}
+    by_paper = bool(paper_order)
+    lexical_normalized = (
+        _normalized_scores(lexical, by_paper=by_paper) if method == "score" else {}
+    )
+    dense_normalized = (
+        _normalized_scores(dense, by_paper=by_paper) if method == "score" else {}
+    )
+    lexical_paper_ranks: dict[str, int] = {}
+    for global_rank, (chunk, _score) in enumerate(lexical, 1):
+        lexical_paper_ranks[chunk.paper_id] = lexical_paper_ranks.get(chunk.paper_id, 0) + 1
+        rank = lexical_paper_ranks[chunk.paper_id] if by_paper else global_rank
+        contribution = (
+            lexical_normalized[chunk.corpus_index]
+            if method == "score"
+            else 1 / (60 + rank)
+        )
+        fused[chunk.corpus_index] = fused.get(chunk.corpus_index, 0.0) + contribution
+        chunks[chunk.corpus_index] = chunk
+        lexical_ranks[chunk.corpus_index] = rank
+    dense_paper_ranks: dict[str, int] = {}
+    for global_rank, (chunk, _score) in enumerate(dense, 1):
+        dense_paper_ranks[chunk.paper_id] = dense_paper_ranks.get(chunk.paper_id, 0) + 1
+        rank = dense_paper_ranks[chunk.paper_id] if by_paper else global_rank
+        contribution = (
+            dense_normalized[chunk.corpus_index]
+            if method == "score"
+            else 1 / (60 + rank)
+        )
+        fused[chunk.corpus_index] = fused.get(chunk.corpus_index, 0.0) + contribution
+        chunks[chunk.corpus_index] = chunk
+        dense_ranks[chunk.corpus_index] = rank
+    order = sorted(fused, key=lambda index: (-fused[index], index))
+    if len(paper_order) > 1 and top_k >= len(paper_order):
+        quota = top_k // len(paper_order)
+        selected = []
+        selected_set = set()
+        for paper_id in paper_order:
+            for index in order:
+                if chunks[index].paper_id == paper_id and index not in selected_set:
+                    selected.append(index)
+                    selected_set.add(index)
+                    if sum(chunks[item].paper_id == paper_id for item in selected) >= quota:
+                        break
+        for index in order:
+            if len(selected) >= top_k:
+                break
+            if index not in selected_set:
+                selected.append(index)
+                selected_set.add(index)
+        order = sorted(selected, key=lambda index: (-fused[index], index))
+    order = order[:top_k]
+    return [
+        chunks[index].retrieval_payload(
+            score=fused[index],
+            retrieval_score=fused[index],
+            fusion_method=method,
+            lexical_score=lexical_scores.get(index),
+            dense_score=dense_scores.get(index),
+            lexical_rank=lexical_ranks.get(index),
+            dense_rank=dense_ranks.get(index),
+        )
+        for index in order
+    ]
+
+
 def _ranking_payload(
     mode: str,
     lexical: list[tuple[CorpusChunk, float]],
     dense: list[tuple[CorpusChunk, float]],
     *,
     top_k: int,
+    paper_order: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
     if mode == "lexical":
         return [
@@ -230,29 +345,13 @@ def _ranking_payload(
             chunk.retrieval_payload(score=score, dense_rank=rank)
             for rank, (chunk, score) in enumerate(dense[:top_k], 1)
         ]
-
-    fused: dict[int, float] = {}
-    chunks: dict[int, CorpusChunk] = {}
-    lexical_ranks = {}
-    dense_ranks = {}
-    for rank, (chunk, _score) in enumerate(lexical, 1):
-        fused[chunk.corpus_index] = fused.get(chunk.corpus_index, 0.0) + 1 / (60 + rank)
-        chunks[chunk.corpus_index] = chunk
-        lexical_ranks[chunk.corpus_index] = rank
-    for rank, (chunk, _score) in enumerate(dense, 1):
-        fused[chunk.corpus_index] = fused.get(chunk.corpus_index, 0.0) + 1 / (60 + rank)
-        chunks[chunk.corpus_index] = chunk
-        dense_ranks[chunk.corpus_index] = rank
-    order = sorted(fused, key=lambda index: (-fused[index], index))[:top_k]
-    return [
-        chunks[index].retrieval_payload(
-            score=fused[index],
-            retrieval_score=fused[index],
-            lexical_rank=lexical_ranks.get(index),
-            dense_rank=dense_ranks.get(index),
-        )
-        for index in order
-    ]
+    return _hybrid_payload(
+        lexical,
+        dense,
+        top_k=top_k,
+        method="score" if "score" in mode else "rrf",
+        paper_order=paper_order if "per_paper" in mode else (),
+    )
 
 
 def run_internal_retrieval_ablation(
@@ -287,7 +386,7 @@ def run_internal_retrieval_ablation(
         versioned_id: sum(chunk.versioned_id == versioned_id for chunk in corpus)
         for versioned_id in sorted(source_hashes)
     }
-    uses_dense = any(mode in {"dense", "hybrid"} for mode in modes)
+    uses_dense = any(mode == "dense" or mode in HYBRID_MODES for mode in modes)
     encoder = dense_encoder
     document_vectors = None
     if uses_dense:
@@ -319,16 +418,53 @@ def run_internal_retrieval_ablation(
                 encoder=encoder,
             )
             dense_seconds = time.perf_counter() - dense_started
+        per_paper_lexical = []
+        per_paper_dense = []
+        per_paper_seconds = 0.0
+        if any("per_paper" in mode for mode in modes):
+            per_paper_started = time.perf_counter()
+            for paper in case.papers:
+                paper_corpus = [
+                    chunk
+                    for chunk in case_corpus
+                    if chunk.versioned_id == paper.versioned_id
+                ]
+                per_paper_lexical.extend(
+                    _lexical_ranking(
+                        case.question,
+                        paper_corpus,
+                        candidate_k=min(candidate_k, len(paper_corpus)),
+                    )
+                )
+                assert encoder is not None and document_vectors is not None
+                per_paper_dense.extend(
+                    _dense_ranking(
+                        case.question,
+                        paper_corpus,
+                        candidate_k=min(candidate_k, len(paper_corpus)),
+                        document_vectors=document_vectors,
+                        encoder=encoder,
+                    )
+                )
+            per_paper_seconds = time.perf_counter() - per_paper_started
         for mode in modes:
             mode_started = time.perf_counter()
+            mode_lexical = per_paper_lexical if "per_paper" in mode else lexical
+            mode_dense = per_paper_dense if "per_paper" in mode else dense
             rankings[mode][case.case_id] = _ranking_payload(
-                mode, lexical, dense, top_k=top_k
+                mode,
+                mode_lexical,
+                mode_dense,
+                top_k=top_k,
+                paper_order=tuple(paper.paper_id for paper in case.papers),
             )
             fusion_seconds = time.perf_counter() - mode_started
             if mode == "lexical":
                 latency[mode] += lexical_seconds + fusion_seconds
             elif mode == "dense":
                 latency[mode] += dense_seconds + fusion_seconds
+            elif "per_paper" in mode:
+                latency[mode] += per_paper_seconds + fusion_seconds
             else:
                 latency[mode] += lexical_seconds + dense_seconds + fusion_seconds
 

@@ -116,6 +116,52 @@ def test_dense_and_hybrid_share_chunks_and_emit_reports(tmp_path: Path) -> None:
     assert "annotation-relative" in render_ablation_markdown(result)
 
 
+def test_fusion_variants_emit_scores_and_per_paper_quota(tmp_path: Path) -> None:
+    suite, sources, papers = _single_case_inputs(tmp_path)
+    first_case = suite.cases[0]
+    second_paper = first_case.papers[0].model_copy(
+        update={"paper_id": "1810.04805", "versioned_id": "1810.04805v2"}
+    )
+    suite = suite.model_copy(
+        update={
+            "cases": [
+                first_case.model_copy(update={"papers": [first_case.papers[0], second_paper]})
+            ]
+        }
+    )
+    second_pdf = papers / "1810.04805v2.pdf"
+    second_text = "Unrelated second paper text about optimization and batching. " * 8
+    _write_pdf(second_pdf, [second_text, second_text])
+    payload = json.loads(sources.read_text(encoding="utf-8"))
+    payload["sources"].append(
+        {
+            "versioned_id": "1810.04805v2",
+            "pdf_sha256": _sha256(second_pdf),
+            "page_count": 2,
+        }
+    )
+    sources.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = run_internal_retrieval_ablation(
+        suite,
+        sources_path=sources,
+        papers_dir=papers,
+        modes=("hybrid_score", "hybrid_per_paper", "hybrid_score_per_paper"),
+        top_k=2,
+        dense_encoder=FakeDenseEncoder(),
+        dense_model="fake/dense",
+    )
+
+    score_item = result.rankings["hybrid_score"][first_case.case_id][0]
+    assert score_item["fusion_method"] == "score"
+    assert "lexical_score" in score_item
+    for mode in ("hybrid_per_paper", "hybrid_score_per_paper"):
+        retrieved_papers = {
+            item["arxiv_id"] for item in result.rankings[mode][first_case.case_id]
+        }
+        assert retrieved_papers == {"1706.03762", "1810.04805"}
+
+
 def test_corpus_rejects_pdf_hash_mismatch(tmp_path: Path) -> None:
     suite, sources, papers = _single_case_inputs(tmp_path)
     payload = json.loads(sources.read_text(encoding="utf-8"))

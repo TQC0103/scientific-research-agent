@@ -31,6 +31,9 @@ class RetrievedChunk(StrictModel):
     chunk_index: int | None = Field(default=None, ge=0)
     score: float | None = None
     retrieval_score: float | None = None
+    fusion_method: str | None = None
+    dense_score: float | None = None
+    lexical_score: float | None = None
     dense_rank: int | None = Field(default=None, ge=1)
     lexical_rank: int | None = Field(default=None, ge=1)
 
