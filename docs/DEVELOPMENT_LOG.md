@@ -652,3 +652,26 @@ abstention because the paper reports no ImageNet top-1 experiment. Suite v0.1.2
 records one human reviewer and adjudication for those two cases only. The eight
 answer cases remain unreviewed development annotations, so the suite is not
 frozen or publishable.
+
+## 2026-08-27 — Internal retrieval evaluator
+
+The internal evaluation path now scores ranked chunks independently of any one
+retriever. A match requires the same pinned `versioned_id` plus normalized quote
+containment or at least 0.8 multiset token recall; page equality is diagnostic
+only. The report separates evidence-group Recall@K, annotation-relative
+Precision@K, MRR, gold-evidence item coverage, required-paper coverage, and
+macro paper recall. Cases without gold evidence receive null retrieval metrics
+and are excluded from aggregates rather than contributing artificial zeroes.
+
+The JSONL input/output boundary records missing case predictions, unmatched gold
+groups, missing required papers, and fewer-than-K results. This keeps scoring
+deterministic and CPU-only while allowing the next ablation runner to produce
+lexical, dense, and hybrid rankings on Kaggle when a model is required. Ruff
+passed and all 65 pytest tests passed; no embedding or LLM benchmark was run on
+the laptop.
+
+A one-row contract smoke then exercised the CLI against suite v0.1.2. It found
+nine retrieval-eligible cases (the partial-evidence energy abstention is
+eligible) and one no-gold ImageNet case, matched the supplied case, and reported
+the other nine input rows as missing. The resulting 1/9 aggregate values are a
+deliberately incomplete wiring check, not retrieval-quality measurements.

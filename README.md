@@ -129,6 +129,23 @@ The generated source remains under ignored runtime storage. The remote job uses
 batched deterministic generation with left padding and writes
 `judge_report.json`, `runtime.json`, and a resolved dependency fingerprint.
 
+Score ranked retrieval output against the internal gold evidence with:
+
+```powershell
+python scripts/evaluate_internal_retrieval.py `
+  --suite evaluation/suites/v0_5/development_10.json `
+  --retrievals data/evaluations/runs/internal-retrieval/retrieved.jsonl `
+  --config-name hybrid-current --top-k 5 `
+  --output-dir data/evaluations/runs/internal-retrieval/scored
+```
+
+The input has one JSON object per case with `case_id` and an ordered `retrieved`
+array. Every chunk must include `versioned_id` and `text`; page, section, chunk
+index, and retrieval scores are optional diagnostics. The evaluator reports
+annotation-relative Recall@K, Precision@K, MRR, gold-evidence coverage,
+required-paper coverage, macro paper recall, and per-case failure reasons. It is
+CPU-only and does not invoke an embedding model or LLM.
+
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.
 Versioned IDs such as `1706.03762v7` are preserved in citations, and a new

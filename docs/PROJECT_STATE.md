@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-21
+Last updated: 2026-08-27
 
 ## Current baseline
 
@@ -10,7 +10,7 @@ Last updated: 2026-08-21
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, and the ten-case development
-  suite validated; Ruff passed and all 57 pytest tests passed. Native QASPER
+  suite validated; Ruff passed and all 65 pytest tests passed. Native QASPER
   loaded all 5,049 questions and native
   SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -48,6 +48,10 @@ Last updated: 2026-08-21
   metadata
 - Generated human-review HTML combining questions, expected decisions, criteria,
   evidence, challenge labels, and per-case judge findings
+- Revision-safe internal retrieval evaluator with normalized quote matching,
+  evidence-group Recall@K, annotation-relative Precision@K, MRR, item coverage,
+  required-paper coverage, macro paper recall, per-case diagnostics, and
+  JSON/JSONL reports
 
 ## Latest evaluation
 
@@ -104,6 +108,9 @@ than treated as dataset failures or an accuracy score. Mean lint scores were
   deterministic sampling flags; clean these before a future external rerun.
 - Dense/generator modes depend on optional Sentence Transformers and
   Transformers runtimes; keep heavy runs on Kaggle rather than the laptop.
+- The internal quote matcher uses a documented 0.8 token-recall threshold that
+  is unit-tested but not yet calibrated against real retrieved chunks; inspect
+  match diagnostics during the first ablation before treating it as fixed.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27,
   but the other eight cases still lack independent review and the suite remains
@@ -121,7 +128,8 @@ than treated as dataset failures or an accuracy score. Mean lint scores were
 
 ## Next priorities
 
-1. Add retrieval and retrieval-rewrite metrics to the internal suite.
+1. Build and run the lexical/dense/hybrid ablation adapter that supplies ranked
+   chunks to the internal retrieval evaluator.
 2. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
 3. Evaluate verifier sufficiency and false-positive/false-negative behavior.

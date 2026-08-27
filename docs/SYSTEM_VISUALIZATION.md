@@ -276,6 +276,12 @@ flowchart TD
     GOLD --> ANCHOR["Versioned ID + source type + page + exact quote"]
     GOLD --> OPTIONAL["Optional chunk index; never sole identity"]
 
+    RANKED["Ranked retrieval JSONL"] --> MATCHER["Revision-safe normalized quote matcher"]
+    GOLD --> MATCHER
+    MATCHER --> CASEMETRICS["Per-case group recall / precision / RR + diagnostics"]
+    CASEMETRICS --> INTERNALMETRICS["Eligible-case aggregate + paper coverage"]
+    INTERNALMETRICS --> INTERNALOUTPUTS["Ignored metrics JSON + per-case JSONL"]
+
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
     JUDGEMODEL --> JUDGEJSON["Validated verdict + five scores + findings"]
@@ -312,6 +318,11 @@ freeze state. Abstention cases always retain a human-review flag because selecte
 context cannot prove document-wide absence.
 Negative cases have no retrieval denominator; their retrieval metrics are not
 applicable and they are evaluated later through verifier/abstention behavior.
+Internal retrieval scoring is isolated from retriever execution. Matching first
+requires the pinned `versioned_id`, then normalized quote containment or the
+documented token-recall threshold; page equality alone never creates a match.
+Evidence-group, item, and required-paper coverage remain distinct so one passage
+cannot hide a missing paper in a comparison case.
 External datasets remain in their native format, preventing repo-authored schema
 adaptation from silently changing official answer, evidence, or claim labels.
 The no-model mode is a retrieval smoke only and is never presented as an answer

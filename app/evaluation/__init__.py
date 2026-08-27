@@ -1,4 +1,4 @@
-"""Evaluation data contracts, external adapters, and deterministic metrics."""
+"""Evaluation contracts, adapters, advisory audits, and deterministic metrics."""
 
 from app.evaluation.loader import DatasetValidationError, load_suite
 from app.evaluation.models import EvaluationSuite

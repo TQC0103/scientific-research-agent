@@ -131,7 +131,7 @@ conditions without overloading the main question type.
 
 ## Retrieval matching contract
 
-The initial v0.5 benchmark will use the following rules:
+The internal evaluator implements the following rules:
 
 1. Match only evidence from the same `versioned_id`.
 2. Prefer normalized quote containment or token overlap within the retrieved
@@ -149,9 +149,33 @@ The initial v0.5 benchmark will use the following rules:
 7. Compute aggregate metrics over eligible cases and publish the eligible-case
    denominator with every metric.
 
-The exact quote-normalization and overlap threshold will be implemented and
-tested with the loader/evaluator work. Task 1 deliberately defines the semantic
-contract without adding executable validation.
+`app/evaluation/retrieval.py` normalizes Unicode, case, and punctuation, then
+accepts exact normalized quote containment or at least 0.8 multiset token recall
+of the gold quote. It always requires the same `versioned_id`; page equality is
+diagnostic only. Precision@K uses K as its denominator and is explicitly
+annotation-relative because the gold passages are not exhaustive.
+
+The evaluator consumes JSONL with one row per case:
+
+```json
+{"case_id":"transformer_scaled_dot_product_reason","retrieved":[{"versioned_id":"1706.03762v7","page":4,"text":"..."}]}
+```
+
+Run it without a model:
+
+```powershell
+python scripts/evaluate_internal_retrieval.py `
+  --suite evaluation/suites/v0_5/development_10.json `
+  --retrievals data/evaluations/runs/internal-retrieval/retrieved.jsonl `
+  --config-name lexical-current --top-k 5 `
+  --output-dir data/evaluations/runs/internal-retrieval/scored
+```
+
+It writes aggregate `metrics.json` and `per_case.jsonl`, including unmatched
+evidence groups, missing required papers, and explicit missing-case counts.
+Runtime inputs and reports remain ignored. Retriever execution and the
+lexical/dense/hybrid ablation runner are the next layer and remain separate from
+metric calculation.
 
 ## Advisory LLM judge
 
