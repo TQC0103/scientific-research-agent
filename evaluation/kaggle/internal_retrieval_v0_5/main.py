@@ -174,7 +174,8 @@ print(json.dumps({
 def _run_ablation() -> None:
     command = [
         str(ENV_PYTHON),
-        str(CODE_ROOT / "scripts" / "run_internal_retrieval_ablation.py"),
+        "-m",
+        "scripts.run_internal_retrieval_ablation",
         "--suite",
         str(CODE_ROOT / "evaluation" / "suites" / "v0_5" / "development_10.json"),
         "--sources",

@@ -720,3 +720,10 @@ creating the environment because Kaggle's Python 3.12 image lacks a working
 `ensurepip`. The package now bootstraps pinned `virtualenv` into `/tmp`, uses it
 to create the required `--system-site-packages` environment, and still leaves
 the system interpreter and PyTorch installation unchanged.
+
+R3 `job_4de80b5ae09c445490d11af70a1c6af9` validated the corrected environment,
+both visible Tesla T4 devices, CUDA 12.8, Torch 2.10.0, and the resolved package
+fingerprint. It then failed before model loading because invoking the runner by
+file path placed only `scripts/` on `sys.path`, so `app` could not be imported.
+The entry point now runs the same script as module
+`scripts.run_internal_retrieval_ablation` from the extracted code root.
