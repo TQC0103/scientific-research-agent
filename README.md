@@ -19,6 +19,8 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - validated QASPER/SciFact adapters and deterministic external metrics
 - portable QASPER lexical/dense/hybrid runner with guarded test-set access
 - ten-case internal development suite with an advisory structured LLM judge
+- controlled verifier evaluator for sufficiency, passage selection, bounded
+  rewrite recovery, and final abstention behavior
 
 ## Quick start (Windows PowerShell)
 
@@ -182,6 +184,26 @@ balancing. CombSUM reached Recall@5 `0.8333`, Precision@5 `0.2444`, and MRR
 `0.6204`; per-paper balancing did not improve coverage. Because CombSUM traded
 away the masked-LM hit and the suite is development-only, production remains on
 the existing RRF path pending independent validation.
+
+Run the controlled Task 6 verifier diagnostic with the production prompt and
+response parser using:
+
+```powershell
+python scripts/run_verifier_benchmark.py `
+  --definition evaluation/suites/v0_5/verifier_development.json `
+  --source-suite evaluation/suites/v0_5/development_10.json `
+  --output-dir data/evaluations/runs/verifier-v0-5
+```
+
+The Transformers runner requires CUDA and is intended for Kaggle Control Plane;
+`scripts/prepare_verifier_kaggle_job.py` creates the narrow ignored job source.
+The completed R2 development run used the official FP16 `Qwen/Qwen3-4B`
+revision on a T4 and reached initial accuracy `0.8636`, false-positive rate
+`0.0000`, false-negative rate `0.3000`, rewrite recovery `0.7000`, and final
+abstention accuracy `1.0000`. Bounded-flow accuracy was `0.7273`. These 22
+controlled snapshots are repo-authored development diagnostics, not held-out
+accuracy; the local Ollama model is a quantized runtime of the same family, not
+a bit-identical inference target.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

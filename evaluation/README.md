@@ -14,6 +14,9 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
   not held-out evidence.
 - `suites/v0_5/development_10_sources.json`: source URLs, PDF hashes, and page
   counts used while checking the committed quotes and page anchors.
+- `suites/v0_5/verifier_development.json`: 22 controlled initial/recovery
+  evidence snapshots derived from the development suite; this is a prompt and
+  flow diagnostic, not an independently labeled benchmark.
 - `app/evaluation/`: executable loader, semantic validator, public-dataset
   adapters, deterministic metrics, and a portable QASPER runner.
 - `scripts/download_external_benchmarks.py`: checksum-pinned QASPER v0.3 and
@@ -22,6 +25,8 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
   for the completed external QASPER R11 development ablation.
 - `kaggle/internal_judge_v0_5/`: isolated T4 template for advisory review of the
   ten internal cases.
+- `kaggle/verifier_v0_5/`: isolated T4 template for the production verifier
+  prompt/parser benchmark.
 
 The former empty `questions.json` and `ground_truth.json` placeholders were
 removed so there is one canonical data shape.
@@ -223,6 +228,46 @@ and held-out partitions. BEIR-style NDCG/MAP are also deferred until the
 evidence-group annotations can be represented as defensible chunk-level qrels;
 inventing relevance labels from overlapping chunks would make those metrics
 misleading.
+
+## Controlled verifier evaluation
+
+`app/evaluation/verifier.py` materializes controlled evidence snapshots from
+the exact gold quotes in `development_10.json`, then exercises the same prompt,
+JSON parser, and fail-closed repairs used by `app/models/verifier.py`. Every
+case has an initial snapshot and a recovery snapshot. Recovery is executed once
+only when the initial decision is insufficient, matching the bounded production
+behavior without constructing an open-ended agent loop.
+
+The report separates initial sufficiency accuracy and false-positive/negative
+rates from supported-passage micro precision/recall, rewrite proposal and
+execution rates, recoverable-case success, final abstention accuracy, parsing
+failures, latency, and model calls. `flow_accuracy` additionally requires the
+correct initial rejection before counting a recovery; an unsafe initial approval
+cannot be relabeled as successful recovery.
+
+Prepare the isolated job with:
+
+```powershell
+python scripts/prepare_verifier_kaggle_job.py
+```
+
+The package runs a two-case structured-output smoke before the 22-case suite,
+uses deterministic left-padded generation, pins the official
+`Qwen/Qwen3-4B` revision, verifies both visible T4s with a real CUDA operation,
+and places inference on device 0. The production Ollama tag is a quantized build
+of the same model family, so this run tests prompt behavior but is not bit-exact
+production-runtime reproduction.
+
+Kaggle R2 completed all 22 cases with zero parse failures. Initial accuracy was
+`0.8636`, false-positive rate `0.0000`, false-negative rate `0.3000`, supported
+passage precision/recall `0.6750/1.0000`, rewrite recovery `0.7000`, final
+abstention accuracy `1.0000`, and bounded-flow accuracy `0.7273`. The six flow
+failures were all comparison cases: three already-complete positive snapshots
+were rejected, and three comparison recoveries stayed rejected. The passage
+precision error is also systematic: the model often listed a topical passage as
+supporting while its own reason correctly said that passage lacked the requested
+fact. These are development findings to guide later verifier changes, not
+held-out quality claims.
 
 ## Advisory LLM judge
 

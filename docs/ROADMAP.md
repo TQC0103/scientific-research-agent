@@ -24,8 +24,10 @@ Continue in this order:
 1. Independently review the remaining eight answer cases before freezing a
    benchmark snapshot. The two abstention cases were human-adjudicated on
    2026-08-27; the advisory LLM lint pass does not replace review.
-2. Evaluate verifier sufficiency, false positives/negatives, supported-passage
-   selection, and the separate retrieval-rewrite recovery loop.
+2. Independently validate or expand the new 22-snapshot verifier development
+   diagnostic. Task 6's runner is implemented: its first T4 result found zero
+   false positives but a 30% false-negative rate on positive comparison scopes,
+   70% rewrite recovery, and 67.5% supported-passage precision.
 3. Remove unsafe citation fallback behavior, then add claim-level models,
    verification, and claim/citation metrics.
 4. Build the SciFact runner once claim verification exists; do not conflate its

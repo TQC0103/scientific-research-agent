@@ -785,3 +785,53 @@ masked-LM hit. Per-paper RRF remained at Recall@5 `0.7222` and reduced MRR from
 `0.5000` to `0.4944`; the multi-paper case still covered only one of two papers,
 although the quota changed which paper was covered. The result is a useful
 trade-off diagnosis, not evidence to promote a new production default.
+
+## 2026-08-27 — Controlled verifier evaluator
+
+Task 6 now evaluates the production evidence-verifier prompt and response parser
+independently from retrieval and synthesis. A new versioned development
+definition resolves evidence IDs to the exact quotes in the ten-case suite and
+materializes 22 controlled snapshots: ten initially sufficient, twelve initially
+insufficient, ten recoverable after one bounded rewrite/retrieval step, and two
+final abstentions. The report keeps initial false positives/negatives, passage
+selection, rewrite proposal/execution/recovery, final abstention, bounded-flow
+accuracy, parse failures, model calls, generation batches, and latency separate.
+An unsafe initial approval cannot count as successful recovery.
+
+The production prompt construction and JSON post-validation were extracted into
+reusable functions without changing the Ollama invocation path. The Kaggle
+runner uses the official pinned `Qwen/Qwen3-4B` revision with deterministic,
+left-padded FP16 generation and thinking disabled. This matches the base model
+family and size of `qwen3:4b-instruct`, but not its Ollama quantization/runtime;
+the report is therefore a prompt-behavior diagnostic rather than bit-exact
+production reproduction. A two-case parse smoke runs before the full suite.
+
+R1 (`job_99fc2c6356194ab59c86604a9db34816`, batch
+`batch_dff065e9d35a43a18257a01b29d59204`) failed after 69 seconds before model
+loading because the narrow archive omitted `app/evaluation/external.py`, a
+runtime import of `metrics.py`. The packager whitelist and archive-content test
+were updated in commit `6ab0811`; no blind retry was used.
+
+R2 (`job_351b62add7d4442aa171cfc2c027930c`, batch
+`batch_82582ddfecac4aee8317d88ef4e65136`) completed in 262 seconds through account
+`acct_91aab80993c247d4bb787a59c7d43fef`. Kaggle exposed two Tesla T4 devices with
+capability 7.5; inference was intentionally placed on device 0. The isolated
+runtime recorded Python 3.12.13, CUDA 12.8, Torch 2.10.0+cu128, Transformers
+4.56.2, Pydantic 2.12.3, Wrapt 1.17.3, and dependency fingerprint
+`bb0b44716e046e850e9639aaff124c475d5940d9347b86ed4216e57a9cbde520`.
+
+All 22 cases returned valid structured output. Initial accuracy was `0.8636`,
+false-positive rate `0.0000`, false-negative rate `0.3000`, supported-passage
+precision/recall `0.6750/1.0000`, rewrite recovery `0.7000`, final abstention
+accuracy `1.0000`, and bounded-flow accuracy `0.7273`. The full suite made 37
+model calls in 19 generation batches and took 116.95 seconds after model load.
+All six flow failures were comparison cases: three complete positive snapshots
+were rejected, and three comparison recoveries stayed rejected. Passage
+selection also exposed a separate semantic error: in 13 stages the model listed
+a topical passage as supporting even while its reason correctly said that the
+requested fact was absent. Production behavior remains unchanged; this result
+is the evidence for the next citation/claim-grounding work, not a reason to tune
+and rescore on the same development snapshots.
+
+Ruff passed and all 79 pytest tests passed locally. Model execution ran only on
+Kaggle; generated reports remain under ignored `data/evaluations/`.

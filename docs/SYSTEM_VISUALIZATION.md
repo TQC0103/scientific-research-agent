@@ -291,6 +291,15 @@ flowchart TD
     ABLATION --> ABLATIONREPORT["Ignored JSON summary + Markdown comparison"]
     ABLATION -.-> ABLATIONGPU["Pinned isolated T4 package via Control Plane"]
 
+    CASES --> VDEFINITION["Controlled initial + recovery evidence snapshots"]
+    VDEFINITION --> VPROMPT["Production verifier prompt + parser"]
+    VPROMPT --> VMODEL["Pinned Qwen3-4B deterministic T4 batches"]
+    VMODEL --> VINITIAL["Initial sufficiency + supported passages"]
+    VINITIAL -->|"insufficient; once only"| VRECOVERY["Material rewrite + recovery snapshot"]
+    VINITIAL --> VMETRICS["FP/FN + selection + flow metrics"]
+    VRECOVERY --> VMETRICS
+    VMETRICS --> VOUTPUTS["Ignored JSON + Markdown verifier report"]
+
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
     JUDGEMODEL --> JUDGEJSON["Validated verdict + five scores + findings"]
@@ -339,6 +348,12 @@ per-paper rank/quota variants, always under one total K. Per-paper diagnostics
 approximate the production graph's paper isolation but do not reproduce its
 sequential verifier loop. They remain evaluation branches and cannot silently
 change the production retriever.
+The controlled verifier branch resolves committed evidence IDs to exact gold
+quotes and uses the production prompt/parser without invoking retrieval or
+synthesis. Its recovery edge is bounded to one execution, and initial decision,
+passage-selection, recovery, abstention, parsing, latency, and call-count metrics
+remain separate. The suite and outputs are development artifacts and do not
+cross the publication gate.
 External datasets remain in their native format, preventing repo-authored schema
 adaptation from silently changing official answer, evidence, or claim labels.
 The no-model mode is a retrieval smoke only and is never presented as an answer

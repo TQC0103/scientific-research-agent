@@ -6,11 +6,12 @@ Last updated: 2026-08-27
 
 - Version: `0.4.0`
 - Branch: `main`
-- Baseline commit before this implementation: `34ceb54`
+- Task 6 implementation commits: `174d1c3`, `6ab0811`
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
-- Verification: JSON Schema 1.1.0, four fixtures, and the ten-case development
-  suite validated; Ruff passed and all 72 pytest tests passed. Native QASPER
+- Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
+  suite, and the 22-case controlled verifier definition validated; Ruff passed
+  and all 79 pytest tests passed. Native QASPER
   loaded all 5,049 questions and native
   SciFact loaded all 300 labeled dev claims. No local model benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -56,6 +57,10 @@ Last updated: 2026-08-27
   PDFs, chunks, questions and total K: BM25, pinned Qwen3 dense, global RRF,
   min-max CombSUM, and per-paper variants of both fusion methods; outputs remain
   JSON/Markdown artifacts and production RRF is unchanged
+- Controlled verifier benchmark using the production prompt/parser, 22
+  initial/recovery snapshots, fail-closed parsing, sufficiency FP/FN metrics,
+  supported-passage metrics, bounded rewrite recovery, final abstention, model
+  call/latency accounting, and an isolated pinned Qwen3-4B T4 package
 
 ## Latest evaluation
 
@@ -109,12 +114,27 @@ encoding and GLUE/MultiNLI but lost masked-LM. Per-paper RRF stayed at Recall@5
 `0.7222` and MRR `0.4944`; for the comparison case it swapped the covered paper
 instead of covering both. This trade-off does not justify a production change.
 
+The Task 6 verifier R2 run completed 22 controlled development cases with the
+official FP16 `Qwen/Qwen3-4B` revision on Kaggle. Initial accuracy was `0.8636`,
+false-positive rate `0.0000`, false-negative rate `0.3000`, supported-passage
+precision/recall `0.6750/1.0000`, rewrite recovery `0.7000`, final abstention
+accuracy `1.0000`, and bounded-flow accuracy `0.7273`, with zero parse failures.
+All six flow failures involved comparisons: three complete positive snapshots
+were rejected and three recoveries remained rejected. This is a repo-authored
+development diagnostic, not held-out accuracy, and the FP16 Transformers runtime
+is not bit-identical to the quantized production Ollama tag.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
   tables (notably pages 6 and 8 of the Transformer paper).
 - The 4B verifier required prompt calibration and schema consistency repair;
-  broader labeled evaluation is still needed.
+  the controlled Task 6 run now shows a 30% initial false-negative rate on
+  positive cases, concentrated entirely in comparison scopes.
+- Supported-passage precision was only 67.5% because the model often selected a
+  topical distractor even while explaining that it did not answer the question.
+  Passage-selection semantics need correction before claim verification relies
+  on those indices.
 - Repeated local verifier calls are slow on the 4 GB laptop GPU.
 - Comparison intent without explicit paper IDs currently uses a bilingual
   keyword heuristic; it is not yet a general query planner.
@@ -160,9 +180,10 @@ instead of covering both. This trade-off does not justify a production change.
 
 1. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
-2. Build Task 6's verifier evaluator for sufficiency, false-positive/negative,
-   abstention, and rewrite-recovery behavior.
-3. Add citation safety and claim-level verification, then use native SciFact for
+2. Fix citation safety, beginning with removal of automatic `[1]` fallback and
+   explicit claim-to-evidence citation metrics.
+3. Design claim-level verification without treating the current verifier's
+   selected-passage indices as fully reliable, then use native SciFact for
    claim-label/rationale evaluation.
 4. Add end-to-end regression comparison without committing runtime outputs.
 5. Fix section boundaries and table-associated metadata.
