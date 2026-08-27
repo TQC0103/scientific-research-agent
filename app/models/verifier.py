@@ -3,8 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.models.llm import get_llm
-
 
 class EvidenceVerification(BaseModel):
     sufficient: bool
@@ -12,6 +10,13 @@ class EvidenceVerification(BaseModel):
     missing_information: list[str] = Field(default_factory=list)
     suggested_query: str | None = None
     supported_evidence: list[int] = Field(default_factory=list)
+
+
+def get_llm(**kwargs: Any) -> Any:
+    """Load the local Ollama adapter only on the production invocation path."""
+    from app.models.llm import get_llm as factory
+
+    return factory(**kwargs)
 
 
 def _extract_json(content: Any) -> dict:
@@ -29,27 +34,19 @@ def _extract_json(content: Any) -> dict:
     raise ValueError("Verifier did not return a JSON object.")
 
 
-def verify_evidence(
+def build_verifier_prompt(
     question: str,
     evidence: list[dict],
     current_query: str | None = None,
     scope_instruction: str | None = None,
-) -> EvidenceVerification:
-    """Use the local reasoning model to decide whether passages answer the question."""
-    if not evidence:
-        return EvidenceVerification(
-            sufficient=False,
-            reason="No evidence was retrieved.",
-            missing_information=["Relevant passages that directly address the question."],
-            suggested_query=question,
-        )
-
+) -> str:
+    """Build the production verifier prompt without invoking a model."""
     excerpts = []
     for number, item in enumerate(evidence, start=1):
         location = f"page {item['page']}, {item['section']}" if item.get("page") else "Abstract"
         excerpts.append(f"[{number}] {item['versioned_id']} — {location}\n{item['text']}")
 
-    prompt = f"""You are an evidence sufficiency verifier, not an answer writer.
+    return f"""You are an evidence sufficiency verifier, not an answer writer.
 Decide whether an answer writer can satisfy the verification scope for the user's exact
 question using only the supplied passages. For a paper-specific scope in a multi-paper
 question, judge only whether that paper supplies its own side; do not require the complete
@@ -114,22 +111,54 @@ question. If sufficient is false, suggested_query must be a materially different
 keyword-focused search (use likely terminology, section/table names, entities, and metrics),
 not a restatement of the current retrieval query.
 """
-    try:
-        payload = _extract_json(get_llm(temperature=0, num_predict=400).invoke(prompt).content)
-        result = EvidenceVerification.model_validate(payload)
-    except Exception as exc:
-        raise ValueError(f"Invalid verifier response: {exc}") from exc
 
-    valid = sorted({number for number in result.supported_evidence if 1 <= number <= len(evidence)})
+
+def parse_verifier_response(
+    content: Any,
+    *,
+    evidence_count: int,
+    fallback_query: str,
+) -> EvidenceVerification:
+    """Validate and apply the production verifier's fail-closed repairs."""
+    payload = _extract_json(content)
+    result = EvidenceVerification.model_validate(payload)
+    valid = sorted(
+        {number for number in result.supported_evidence if 1 <= number <= evidence_count}
+    )
     result.supported_evidence = valid
     if not result.sufficient and not result.missing_information and valid:
-        # Repair a contradictory boolean when the structured explanation says
-        # nothing is missing and identifies supporting passages.
         result.sufficient = True
         result.suggested_query = None
     if result.sufficient and not valid:
         result.sufficient = False
         result.reason = "Verifier marked evidence sufficient but identified no supporting passage."
         result.missing_information = ["A directly supporting passage."]
-        result.suggested_query = result.suggested_query or question
+        result.suggested_query = result.suggested_query or fallback_query
+    return result
+
+
+def verify_evidence(
+    question: str,
+    evidence: list[dict],
+    current_query: str | None = None,
+    scope_instruction: str | None = None,
+) -> EvidenceVerification:
+    """Use the local reasoning model to decide whether passages answer the question."""
+    if not evidence:
+        return EvidenceVerification(
+            sufficient=False,
+            reason="No evidence was retrieved.",
+            missing_information=["Relevant passages that directly address the question."],
+            suggested_query=question,
+        )
+
+    prompt = build_verifier_prompt(question, evidence, current_query, scope_instruction)
+    try:
+        result = parse_verifier_response(
+            get_llm(temperature=0, num_predict=400).invoke(prompt).content,
+            evidence_count=len(evidence),
+            fallback_query=question,
+        )
+    except Exception as exc:
+        raise ValueError(f"Invalid verifier response: {exc}") from exc
     return result

@@ -1,0 +1,14 @@
+{
+  "id": "replace-me/scientific-agent-verifier-v0-5",
+  "title": "Scientific Agent verifier v0.5",
+  "code_file": "main.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}
