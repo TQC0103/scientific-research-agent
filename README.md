@@ -245,8 +245,27 @@ Task 9 citation metrics. Task 8 now implements
 each attached label against verifier-approved evidence, then the Task 7 parser
 rejects altered answers, altered evidence counts, invented source text, missing
 links, and inconsistent verdicts. The function is standalone and is not yet a
-LangGraph node; tests use synthetic model responses, so no live-model quality
-claim is made.
+LangGraph node. A seven-case synthetic development diagnostic now exercises
+direct support, partial support, wrong/missing citations, organizational text,
+compound claims, and mixed citation quality through the production prompt and
+parser. It is deliberately not held-out or independently reviewed accuracy.
+
+Run the batch only on a CUDA host (normally through Kaggle Control Plane):
+
+```powershell
+python scripts/run_claim_verifier_benchmark.py `
+  --suite evaluation/suites/v0_5/claim_verifier_development.json `
+  --output-dir data/evaluations/runs/claim-verifier-v0-5 `
+  --smoke-cases 1
+```
+
+`scripts/prepare_claim_verifier_kaggle_job.py` builds the narrow ignored Kaggle
+source from `evaluation/kaggle/claim_verifier_v0_5/`. Runtime reports remain
+ignored and must not be committed. The first corrected T4 diagnostic reached
+schema validity `0.8571`, exact source/citation extraction `0.7143`, claim
+verdict accuracy `0.7500`, and evidence-relationship accuracy `0.8571` over
+seven synthetic cases. Treat these as failure-discovery numbers, not model
+quality claims.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

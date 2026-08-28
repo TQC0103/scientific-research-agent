@@ -935,3 +935,45 @@ contract behavior rather than claim-verification accuracy. A controlled labeled
 benchmark is required before Task 10 graph integration.
 
 Ruff passed and all 107 pytest tests passed.
+
+## 2026-08-28 — Live claim-verifier development diagnostic
+
+A seven-case synthetic development suite now runs the production Task 8 prompt
+and parser against direct support, partial support, wrong and missing citations,
+organizational text, compound claims, and a mixed supporting/unrelated citation.
+The evaluator reports schema validity, exact source/citation extraction,
+claim-verdict accuracy, evidence-relationship accuracy, fail-closed citation
+metrics, latency, calls, per-case diagnostics, and raw model responses. The
+suite is explicitly development-only and is neither held out nor independently
+reviewed.
+
+The first Kaggle package (`job_f3e033aa5ed14f4baf46f4d005ad15b8`)
+failed before inference because the narrow archive included
+`app/evaluation/__init__.py` but omitted its `loader.py` dependency. The package
+was repaired and gained an isolated-archive import test. R2 completed and
+revealed that extraction exact-match incorrectly included freely normalized
+`claim_text`, making punctuation-only normalization differences score as total
+extraction failures. The final evaluator compares the auditable exact
+`source_text`, citation requirement, and visible labels instead; parse failures
+also enter citation denominators as fail-closed unsupported predictions.
+
+R3 (`job_533efbb0812d44f1b69390e2a2bc07f6`) completed on Kaggle kernel version 3
+with two visible Tesla T4 devices preflighted and inference pinned to device 0.
+The isolated runtime used Python 3.12.13, Torch 2.10.0+cu128, Transformers
+4.56.2, Pydantic 2.12.3, and the pinned `Qwen/Qwen3-4B` revision. Seven model
+calls ran in four batches with 77.12 seconds of measured inference latency; the
+whole Control Plane job took 275 seconds.
+
+Schema validity was `0.8571`, extraction exact-case rate `0.7143`, full exact-
+case rate `0.5714`, claim-verdict accuracy `0.7500`, and evidence-relationship
+accuracy `0.8571`. Citation precision/completeness/unsupported/invalid rates
+were `0.5714/0.8571/0.4286/0.0000`. Four cases matched exactly. The partial
+numeric case was extracted correctly but Qwen called the unreported magnitude
+`unsupported` rather than the gold `partial`. The missing-citation case failed
+closed because Qwen invented label 1 even though no `[1]` appeared in the exact
+answer substring. The compound case's claims and verdicts were correct but its
+second exact source span omitted terminal punctuation. These failures argue for
+independent annotation guidance and bounded fail-closed graph routing, not prompt
+tuning against seven synthetic examples.
+
+Ruff passed and all 114 pytest tests passed.

@@ -1,0 +1,105 @@
+{
+  "contract_version": "1.0.0",
+  "suite_id": "claim-verifier-v0-5-development",
+  "dataset_version": "0.1.0",
+  "benchmark_status": "development",
+  "description": "Synthetic controlled cases for schema compliance, atomic claim extraction, citation attachment, and evidence relationship diagnostics. Not independently reviewed or held out.",
+  "cases": [
+    {
+      "case_id": "supported_numeric",
+      "question": "What accuracy did the system achieve?",
+      "answer": "The system achieved 91.2% accuracy [1].",
+      "evidence": [{"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 4, "section": "Results", "text": "On the held-out test set, our system achieved an accuracy of 91.2%."}],
+      "challenge": "Direct numeric entailment.",
+      "expected": {
+        "contract_version": "1.0.0", "answer": "The system achieved 91.2% accuracy [1].", "evidence_count": 1,
+        "claims": [{"claim_id": "claim_1", "claim_text": "The system achieved 91.2% accuracy.", "source_text": "The system achieved 91.2% accuracy [1].", "requires_citation": true, "citation_labels": [1]}],
+        "assessments": [{"claim_id": "claim_1", "verdict": "supported", "cited_evidence": [{"citation_label": 1, "relationship": "entails", "reason": "The passage reports the same test accuracy."}], "reason": "The cited passage fully supports the claim."}]
+      }
+    },
+    {
+      "case_id": "partial_numeric",
+      "question": "How much did the method improve accuracy?",
+      "answer": "The method improved accuracy by 10 percentage points [1].",
+      "evidence": [{"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 5, "section": "Results", "text": "The proposed method improved accuracy over the baseline, but the improvement magnitude was not reported."}],
+      "challenge": "Evidence supports direction but not magnitude.",
+      "expected": {
+        "contract_version": "1.0.0", "answer": "The method improved accuracy by 10 percentage points [1].", "evidence_count": 1,
+        "claims": [{"claim_id": "claim_1", "claim_text": "The method improved accuracy by 10 percentage points.", "source_text": "The method improved accuracy by 10 percentage points [1].", "requires_citation": true, "citation_labels": [1]}],
+        "assessments": [{"claim_id": "claim_1", "verdict": "partial", "cited_evidence": [{"citation_label": 1, "relationship": "partial", "reason": "The passage supports an improvement but gives no ten-point magnitude."}], "reason": "Only the direction of change is established."}]
+      }
+    },
+    {
+      "case_id": "wrong_citation",
+      "question": "What optimizer was used?",
+      "answer": "The model was trained with Adam [1].",
+      "evidence": [{"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 2, "section": "Data", "text": "The training corpus contains 50,000 documents collected from public archives."}],
+      "challenge": "Valid citation label attached to unrelated evidence.",
+      "expected": {
+        "contract_version": "1.0.0", "answer": "The model was trained with Adam [1].", "evidence_count": 1,
+        "claims": [{"claim_id": "claim_1", "claim_text": "The model was trained with Adam.", "source_text": "The model was trained with Adam [1].", "requires_citation": true, "citation_labels": [1]}],
+        "assessments": [{"claim_id": "claim_1", "verdict": "unsupported", "cited_evidence": [{"citation_label": 1, "relationship": "does_not_support", "reason": "The passage describes dataset size, not the optimizer."}], "reason": "The attached citation is unrelated to the claim."}]
+      }
+    },
+    {
+      "case_id": "missing_citation",
+      "question": "What optimizer was used?",
+      "answer": "The model was trained with Adam.",
+      "evidence": [{"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 3, "section": "Training", "text": "We optimize all model parameters with Adam using a learning rate of 0.0001."}],
+      "challenge": "Supported factual assertion omits its citation.",
+      "expected": {
+        "contract_version": "1.0.0", "answer": "The model was trained with Adam.", "evidence_count": 1,
+        "claims": [{"claim_id": "claim_1", "claim_text": "The model was trained with Adam.", "source_text": "The model was trained with Adam.", "requires_citation": true, "citation_labels": []}],
+        "assessments": [{"claim_id": "claim_1", "verdict": "unsupported", "cited_evidence": [], "reason": "A citation-required claim has no attached citation."}]
+      }
+    },
+    {
+      "case_id": "organizational_text",
+      "question": "Summarize the findings.",
+      "answer": "The following sentence summarizes the main finding.",
+      "evidence": [{"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 1, "section": "Abstract", "text": "The paper evaluates a retrieval system on three scientific question answering datasets."}],
+      "challenge": "Purely organizational text does not require citation.",
+      "expected": {
+        "contract_version": "1.0.0", "answer": "The following sentence summarizes the main finding.", "evidence_count": 1,
+        "claims": [{"claim_id": "claim_1", "claim_text": "The sentence is an organizational transition.", "source_text": "The following sentence summarizes the main finding.", "requires_citation": false, "citation_labels": []}],
+        "assessments": [{"claim_id": "claim_1", "verdict": "not_required", "cited_evidence": [], "reason": "The text organizes the answer and makes no scientific assertion."}]
+      }
+    },
+    {
+      "case_id": "compound_claims",
+      "question": "Describe the model and its result.",
+      "answer": "The model uses twelve layers [1] and reaches 88% accuracy [2].",
+      "evidence": [
+        {"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 3, "section": "Architecture", "text": "Our encoder consists of twelve stacked transformer layers."},
+        {"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 6, "section": "Results", "text": "The twelve-layer model obtains 88% accuracy on the evaluation set."}
+      ],
+      "challenge": "One sentence contains two independently cited atomic claims.",
+      "expected": {
+        "contract_version": "1.0.0", "answer": "The model uses twelve layers [1] and reaches 88% accuracy [2].", "evidence_count": 2,
+        "claims": [
+          {"claim_id": "claim_1", "claim_text": "The model uses twelve layers.", "source_text": "The model uses twelve layers [1]", "requires_citation": true, "citation_labels": [1]},
+          {"claim_id": "claim_2", "claim_text": "The model reaches 88% accuracy.", "source_text": "reaches 88% accuracy [2].", "requires_citation": true, "citation_labels": [2]}
+        ],
+        "assessments": [
+          {"claim_id": "claim_1", "verdict": "supported", "cited_evidence": [{"citation_label": 1, "relationship": "entails", "reason": "The architecture passage states that the encoder has twelve layers."}], "reason": "The first passage supports the architecture claim."},
+          {"claim_id": "claim_2", "verdict": "supported", "cited_evidence": [{"citation_label": 2, "relationship": "entails", "reason": "The results passage reports 88% accuracy."}], "reason": "The second passage supports the result claim."}
+        ]
+      }
+    },
+    {
+      "case_id": "mixed_citations",
+      "question": "What score did the model obtain?",
+      "answer": "The model obtained an F1 score of 0.84 [1][2].",
+      "evidence": [
+        {"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 7, "section": "Results", "text": "Our best model obtains an F1 score of 0.84 on the test split."},
+        {"arxiv_id": "synthetic", "versioned_id": "synthetic-v1", "page": 2, "section": "Dataset", "text": "The dataset contains examples from four scientific disciplines."}
+      ],
+      "challenge": "One supporting and one unrelated citation are attached to one claim.",
+      "expected": {
+        "contract_version": "1.0.0", "answer": "The model obtained an F1 score of 0.84 [1][2].", "evidence_count": 2,
+        "claims": [{"claim_id": "claim_1", "claim_text": "The model obtained an F1 score of 0.84.", "source_text": "The model obtained an F1 score of 0.84 [1][2].", "requires_citation": true, "citation_labels": [1, 2]}],
+        "assessments": [{"claim_id": "claim_1", "verdict": "supported", "cited_evidence": [{"citation_label": 1, "relationship": "entails", "reason": "The first passage reports the exact F1 score."}, {"citation_label": 2, "relationship": "does_not_support", "reason": "The second passage describes dataset composition only."}], "reason": "At least one attached citation fully supports the claim, while the other does not."}]
+      }
+    }
+  ]
+}

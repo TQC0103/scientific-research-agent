@@ -326,6 +326,10 @@ flowchart TD
     CLAIMSCHEMA --> CLAIMMODEL["Task 8 one-call extraction + verification — implemented"]
     CLAIMMODEL --> CLAIMBUNDLE2["Strict validated claim bundle"]
     CLAIMBUNDLE2 --> CLAIMBRIDGE
+    CLAIMMODEL --> CLAIMBENCH["7-case synthetic development benchmark"]
+    CLAIMBENCH --> CLAIMMETRICS["Schema + extraction + verdict + relationship metrics"]
+    CLAIMMETRICS --> CLAIMGPU["Pinned isolated T4 package via Control Plane"]
+    CLAIMMETRICS --> CLAIMOUTPUTS["Ignored JSON + Markdown report"]
     CLAIMMODEL -.-> CLAIMGRAPH["Task 10 graph integration — planned"]
 
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
@@ -385,8 +389,12 @@ cross the publication gate.
 The Task 7 claim contract preserves the exact answer substring behind each
 normalized atomic claim, visible citations, evidence relationships, and a
 derived verdict. Task 8 now supplies a standalone one-call extraction and
-verification implementation, but its graph edge remains planned. Validated
-bundles adapt to the citation-safety branch through stable evidence IDs. Unknown predicted IDs are
+verification implementation, but its graph edge remains planned. Its controlled
+development branch sends the same production prompts through one pinned model,
+parses every response with the production validator, and separately reports
+schema validity, exact extraction, claim verdicts, evidence relationships, and
+citation diagnostics. The seven synthetic cases are not a publication set.
+Validated bundles adapt to the citation-safety branch through stable evidence IDs. Unknown predicted IDs are
 measured, unknown gold support IDs are rejected, and empty metric denominators
 remain null. The committed inputs are fixtures for contract validation rather
 than model quality results.

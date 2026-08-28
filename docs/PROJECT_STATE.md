@@ -14,7 +14,7 @@ Last updated: 2026-08-28
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
   claim-verification contract and synthetic claim-verifier outputs validated;
-  Ruff passed and all 107 pytest tests passed. Native QASPER loaded all 5,049
+  Ruff passed and all 114 pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -76,6 +76,10 @@ Last updated: 2026-08-28
 - Task 8 standalone claim verifier with one bounded extraction/verification
   prompt over approved passages, immutable answer/evidence-count guards,
   Sources-block removal, strict Task 7 parsing, and fail-closed errors
+- Seven-case Task 8 synthetic development benchmark using the production
+  prompt/parser, structural extraction/verdict/relationship metrics, fail-closed
+  citation accounting, raw-response diagnostics, and a narrow pinned Qwen3-4B
+  Kaggle T4 package
 
 ## Latest evaluation
 
@@ -157,7 +161,19 @@ prompt, invocation, parser, and Task 7 validators. It additionally verifies
 fenced JSON handling, prompt evidence numbering, immutable answer/evidence
 inputs, deterministic Sources-block removal, malformed-verdict rejection, and
 no model load for empty input. These are implementation tests, not live Qwen
-accuracy; no LLM or GPU run occurred.
+accuracy. A separate live development diagnostic is recorded below; neither
+suite is held-out or independently reviewed.
+
+The corrected Task 8 R3 diagnostic ran seven synthetic cases through pinned
+FP16 `Qwen/Qwen3-4B` on Kaggle. Schema validity was `0.8571`, exact source-span/
+citation extraction `0.7143`, exact-case agreement `0.5714`, claim-verdict
+accuracy `0.7500`, and evidence-relationship accuracy `0.8571`. Fail-closed
+citation metrics were precision `0.5714`, completeness `0.8571`, unsupported
+claim rate `0.4286`, and invalid-citation rate `0.0000`. The three non-exact
+cases exposed distinct boundaries: partial versus unsupported labeling, a
+hallucinated citation label on an uncited answer that strict parsing rejected,
+and a harmless source-span punctuation difference on a compound sentence. The
+seven repo-authored synthetic cases are diagnostic only.
 
 ## Known issues
 
@@ -182,8 +198,15 @@ accuracy; no LLM or GPU run occurred.
   but cannot determine whether a paraphrase is truly atomic or a passage
   semantically entails it.
 - Task 8 currently asks one 4B model call to perform both extraction and
-  verification. Its exact-substring compliance, claim coverage, and entailment
-  accuracy have not yet been measured on independently checked outputs.
+  verification. The synthetic live diagnostic is useful for failure discovery,
+  but exact-substring compliance, claim coverage, and entailment accuracy have
+  not been measured on independently checked outputs.
+- The Task 8 R3 run shows that a structurally constrained model can still invent
+  a citation label absent from `source_text`; strict validation caught it, but
+  graph integration must treat that parse failure as unsupported/abstain.
+- Exact source-span scoring is sensitive to punctuation boundaries in compound
+  sentences, and the partial-versus-unsupported distinction needs independent
+  annotation guidance before it becomes a regression threshold.
 - arXiv `last_revised` search is bounded and not an exhaustive corpus harvest.
 - SciFact evaluates scientific claim labels and rationales; the current verifier
   only judges evidence sufficiency, so using SciFact as its score would be invalid.
@@ -224,8 +247,8 @@ accuracy; no LLM or GPU run occurred.
 
 1. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
-2. Build and run a controlled Task 8 claim benchmark with independently checked
-   claim splits/labels, using Kaggle for the 4B batch if needed.
+2. Independently review and expand the seven Task 8 development cases, then
+   calibrate the partial-versus-unsupported boundary before freezing results.
 3. Evaluate claim labels/rationales with native SciFact, then integrate Task 10's
    bounded claim repair or abstention after synthesis.
 4. Add end-to-end regression comparison without committing runtime outputs.
