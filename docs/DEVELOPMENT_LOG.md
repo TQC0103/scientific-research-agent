@@ -2,6 +2,10 @@
 
 This log records what was built, why decisions were made, failures discovered
 during real runs, and the evidence used to choose the next step.
+Entries are chronological snapshots and are not rewritten when later work
+supersedes them. Use `PROJECT_STATE.md` and `SYSTEM_VISUALIZATION.md` for the
+current implementation; for example, older entries calling claim verification
+standalone or planned predate the Task 10 integration recorded at the end.
 
 ## 2026-08-27 — Post-R4 verification
 
@@ -1047,3 +1051,23 @@ onto the production-only repair path restored the isolated archive without
 widening the benchmark bundle. Ruff passed and all 131 pytest tests passed. No
 LLM or GPU benchmark was run; these tests establish routing and safety behavior,
 not claim-verification accuracy.
+
+## 2026-08-29 — Current-state documentation audit
+
+All maintained documentation was checked against the production graph, current
+evaluation artifacts, completed Kaggle runs, and package version. Stale text that
+still described claim verification or SciFact as planned was replaced with the
+implemented Task 10 and SciFact paths. README now gives a linear production-flow
+walkthrough; Project State distinguishes pre-Task10 live results from current
+unit-tested behavior and records the exact implementation commits; the evaluation
+contract documents Task 10 routing; and the architecture diagrams distinguish
+implemented edges from the explicitly planned Task 11 observer.
+
+Task 11 is now documented as the immediate implementation priority. Its intended
+extension rule is explicit: call the compiled production graph, preserve new raw
+trace fields automatically, and require deliberate metric registration before a
+new capability receives a score. This keeps later features visible without
+pretending the runner can infer their evaluation semantics.
+
+Markdown code fences are balanced, Ruff passed, and all 131 pytest tests passed.
+This documentation-only audit did not run an LLM, GPU workload, or new evaluation.

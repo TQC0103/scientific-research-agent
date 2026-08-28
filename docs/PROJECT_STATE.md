@@ -5,10 +5,12 @@ Last updated: 2026-08-29
 ## Current baseline
 
 - Version: `0.4.0`
+- Release status: v0.5 evaluation/grounding work is in progress on `main`;
+  `v0.5.0` is not tagged yet.
 - Branch: `main`
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
-  `1dc5f9d`; Task 7 commit: `0e77634`; Tasks 8 and 10 are implemented in the
-  current working baseline.
+  `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
+  SciFact commit: `7959e07`; Task 10 commit: `70e762d`.
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
@@ -73,7 +75,7 @@ Last updated: 2026-08-29
   numeric citations, per-evidence entails/partial/does-not-support relations,
   derived claim verdicts, strict cross-reference validation, generated JSON
   Schema, Task 9 metric adaptation, and six structural fixture shapes
-- Task 8 standalone claim verifier with one bounded extraction/verification
+- Task 8 structured claim-verifier callable with one bounded extraction/verification
   prompt over approved passages, immutable answer/evidence-count guards,
   Sources-block removal, strict Task 7 parsing, and fail-closed errors
 - Task 10 production graph integration after citation-safe synthesis: structured
@@ -90,18 +92,39 @@ Last updated: 2026-08-29
   sentence F1/exact match, joint label+rationale accuracy, raw responses, and a
   checksum-pinned isolated Kaggle runner
 
+## Current production request path
+
+1. Discover exact papers or local/remote candidates and establish `any` versus
+   required `all` paper coverage.
+2. Reuse current indexes or lazily download, validate, parse, chunk, embed, and
+   index selected revisions; fall back to labeled abstract evidence on failure.
+3. Run hybrid retrieval separately per paper and let the evidence verifier retry
+   with at most two focused query rewrites per paper.
+4. If coverage remains insufficient, return paper-specific gaps without synthesis.
+5. Otherwise synthesize only from approved passages, validate every numeric label,
+   and construct source metadata from trusted records.
+6. Verify atomic claims. Return when supported; revise partial/mixed content once
+   and verify again; otherwise abstain. No branch can revise more than once.
+
+This flow is shared by CLI and Gradio. CLI `--trace` currently prints discovery,
+paper selection, coverage, and retrieval attempts, but not the new claim bundle
+or revision diagnostics.
+
 ## Latest evaluation
 
-On six fixed questions for `1706.03762v7`, the final workflow made the expected
-decision in 6/6 cases: four evidence-backed answers and two correct abstentions.
+Before Task 10 integration, six fixed questions for `1706.03762v7` made the
+expected decision in 6/6 cases: four evidence-backed answers and two correct abstentions.
 The positional-encoding case required one retrieval rewrite. This is a small
-calibration set and is not a general accuracy estimate.
+calibration set and is not a general accuracy estimate. It does not exercise the
+new post-synthesis claim-verification or repair nodes.
 
-Multi-paper smoke used `1706.03762v7` and `1810.04805v2`. A self-attention
-comparison passed with evidence and citations from both papers. A broader
+The pre-Task10 multi-paper smoke used `1706.03762v7` and `1810.04805v2`. A
+self-attention comparison passed with evidence and citations from both papers. A broader
 architecture-and-training-objective comparison correctly stopped after the
 Transformer side exhausted three verifier calls without direct loss/objective
 evidence; the BERT side was independently sufficient after one call.
+Its graph regression has since been updated to pass through a mocked supported
+claim bundle, but no equivalent live Task 10 model run has been recorded yet.
 
 A two-question QASPER dev lexical/no-model smoke reached retrieval Recall@5
 `0.75`, MRR `0.6667`, and evidence F1 `0.3095`. Its answer F1 `0.0` is expected
@@ -230,6 +253,9 @@ end-to-end LangGraph accuracy.
   factual claim abstains immediately. It does not yet identify user-designated
   key claims separately or distinguish contradiction from missing evidence in
   its final user-facing abstention reason.
+- CLI `--trace` and Gradio expose the final answer but do not yet render Task 10
+  claim assessments, revision history, or claim-verifier errors. The state exists
+  for Task 11 and future UI diagnostics.
 - Exact source-span scoring is sensitive to punctuation boundaries in compound
   sentences, and the partial-versus-unsupported distinction needs independent
   annotation guidance before it becomes a regression threshold.
@@ -276,11 +302,14 @@ end-to-end LangGraph accuracy.
 
 ## Next priorities
 
-1. Independently review the remaining eight answer cases before freezing any
+1. Implement Task 11's versioned end-to-end runner over the production graph,
+   with raw per-case traces, modular known metrics, failure reasons, latency/model
+   calls, and regression comparison. New trace fields should survive by default;
+   new metric meaning must be added explicitly.
+2. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
-2. Independently review and expand the seven Task 8 development cases, then
+3. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-3. Run Task 10 on reviewed cases and calibrate repair versus immediate
+4. Run Task 10 on reviewed cases and calibrate repair versus immediate
    abstention, including distinct incomplete-evidence and contradiction reasons.
-4. Add Task 11 end-to-end regression comparison without committing runtime outputs.
 5. Fix section boundaries and table-associated metadata.

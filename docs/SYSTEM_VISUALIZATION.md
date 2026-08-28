@@ -346,6 +346,9 @@ flowchart TD
     CLAIMMETRICS --> CLAIMGPU["Pinned isolated T4 package via Control Plane"]
     CLAIMMETRICS --> CLAIMOUTPUTS["Ignored JSON + Markdown report"]
     CLAIMMODEL --> CLAIMGRAPH["Task 10 bounded verify / repair / abstain graph"]
+    CASES -.-> E2E["Task 11 end-to-end graph runner — planned"]
+    CLAIMGRAPH -.-> E2E
+    E2E -.-> E2EOUTPUTS["Versioned traces, aggregate report, baseline comparison — planned"]
 
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
@@ -374,8 +377,7 @@ flowchart TD
     R11["Archived QASPER R11 source snapshot"] --> R11ENV["Embedded app + pinned isolated T4 runtime"]
     R11ENV --> R11RUN["Lexical / dense / hybrid + generation"]
     R11RUN --> R11RESULT["Recorded dev metrics; runtime outputs not committed"]
-    SCIFACT -.-> FUTURE["Claim-verifier runner — planned"]
-    FUTURE -.-> OUTPUTS
+    SPACKAGE --> OUTPUTS
 ```
 
 Committed suites are source artifacts, while generated model responses, metric
@@ -406,9 +408,9 @@ remain separate. The suite and outputs are development artifacts and do not
 cross the publication gate.
 The Task 7 claim contract preserves the exact answer substring behind each
 normalized atomic claim, visible citations, evidence relationships, and a
-derived verdict. Task 8 now supplies a standalone one-call extraction and
-verification implementation, but its graph edge remains planned. Its controlled
-development branch sends the same production prompts through one pinned model,
+derived verdict. Task 8 supplies the one-call extraction and verification
+implementation used by Task 10's bounded production graph. Its controlled
+development branch sends the same verification prompts through one pinned model,
 parses every response with the production validator, and separately reports
 schema validity, exact extraction, claim verdicts, evidence relationships, and
 citation diagnostics. The seven synthetic cases are not a publication set.
@@ -426,6 +428,13 @@ is an explicit CLI decision rather than the default development path. The R11
 directory is a historical, immutable source snapshot; future evaluator changes
 remain in `app/evaluation/` and the packaging script rather than being made in
 the archived runner.
+
+Task 11 end-to-end reporting is not implemented yet. Its planned boundary is a
+versioned observer of the compiled production graph: per-case raw traces retain
+new fields, while metric modules explicitly opt into fields they understand.
+This lets later graph changes appear in diagnostics without silently inventing a
+score for a new capability. The planned runner must write ignored JSONL/JSON/
+Markdown artifacts and compare against an explicit versioned baseline.
 
 ## Maintenance rule
 

@@ -3,6 +3,10 @@
 Local-first V1 for searching arXiv, lazily downloading papers, section-aware PDF
 chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama.
 
+The packaged project version is currently `0.4.0`. The evaluation and grounding
+work described as v0.5 is implemented incrementally on `main`, but `v0.5.0` has
+not been tagged yet.
+
 ## What is ready
 
 - arXiv search with year/category filters and SQLite metadata persistence
@@ -57,6 +61,39 @@ without a valid label, or with any label outside the verifier-approved evidence
 set, is discarded and replaced by an explicit citation-grounding failure. Valid
 labels are still resolved to trusted version, title, page, and section metadata
 by code rather than by the model.
+
+After citation-safe synthesis, the production graph performs atomic claim
+verification against those same approved passages. Answers whose factual claims
+are all supported return immediately. Partial claims, or a mix of supported and
+unsupported claims, may be revised once using only approved evidence and are then
+verified again. Wholly unsupported answers, malformed verifier output, citation
+failures, repair failures, and unresolved claims after that one revision all
+produce an explicit abstention. This is a hard graph bound, not an open-ended
+agent loop.
+
+## Current production flow
+
+```text
+question
+  -> discover papers
+  -> index/download as needed
+  -> hybrid retrieve per paper
+  -> evidence sufficiency check (up to 2 query rewrites per paper)
+  -> synthesize from approved passages only
+  -> validate citation labels and restore trusted source metadata
+  -> verify atomic claims
+       -> all supported: return answer
+       -> partial or mixed: revise once, then verify again
+       -> unsupported, invalid, or still failing: abstain
+```
+
+The evaluation commands below are deliberately separate diagnostics today.
+Task 11 is the next implementation step: one versioned end-to-end runner that
+calls this production graph directly and aggregates retrieval, evidence-verifier,
+synthesis, citation, claim-grounding, latency, and failure-path data. New graph
+behavior will therefore flow into its raw trace automatically; genuinely new
+capabilities will still need an explicit metric rather than being assigned a
+misleading score automatically.
 
 Repeated `--paper-id` options activate required coverage for every supplied
 paper. Comparison-style questions without explicit IDs require the first two

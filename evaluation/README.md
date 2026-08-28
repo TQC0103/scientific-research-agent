@@ -25,6 +25,8 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
 - `suites/v0_5/claim_verification_fixtures.json`: one traceable answer split
   into supported, partial, unsupported, wrong-citation, citation-not-required,
   and missing-citation claim shapes.
+- `suites/v0_5/claim_verifier_development.json`: seven synthetic structured
+  claim-verifier cases used for failure discovery, not publishable accuracy.
 - `app/evaluation/`: executable loader, semantic validator, public-dataset
   adapters, deterministic metrics, and a portable QASPER runner.
 - `scripts/download_external_benchmarks.py`: checksum-pinned QASPER v0.3 and
@@ -35,6 +37,10 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
   ten internal cases.
 - `kaggle/verifier_v0_5/`: isolated T4 template for the production verifier
   prompt/parser benchmark.
+- `kaggle/claim_verifier_v0_5/`: isolated T4 template for the Task 8 structured
+  claim-verifier diagnostic.
+- `kaggle/scifact_v0_5/`: isolated T4 template for the native-label SciFact
+  oracle-document diagnostic.
 
 The former empty `questions.json` and `ground_truth.json` placeholders were
 removed so there is one canonical data shape.
@@ -154,9 +160,9 @@ conditions without overloading the main question type.
 
 `app/evaluation/citations.py` scores explicit atomic claim records against stable
 evidence IDs. It deliberately does not split prose or decide entailment; those
-are later claim-verifier responsibilities. Each record states whether a claim
-requires citation, the evidence IDs it cites, the evidence available to the
-answer, and the independently assigned IDs that support it.
+are handled separately by the production claim verifier. Each record states
+whether a claim requires citation, the evidence IDs it cites, the evidence
+available to the answer, and the independently assigned IDs that support it.
 
 The four aggregate rates are:
 
@@ -229,8 +235,8 @@ benchmark. `app/models/claim_verifier.py` now implements one bounded structured
 extraction-and-verification call. It removes the deterministic Sources block,
 numbers only the supplied verifier-approved passages, includes the exact Task 7
 schema, and rejects responses that change the answer or evidence count before
-schema validation. It remains standalone: no LangGraph edge, repair policy, or
-claim benchmark is implied by the fixture.
+schema validation. The fixture itself remains standalone, while the callable is
+now used by the Task 10 production graph and by a separate synthetic benchmark.
 
 ### Task 8 verifier boundary
 
@@ -253,8 +259,27 @@ Synthetic tests cover fully supported, partially supported, unsupported,
 valid-but-wrong citation, missing citation, and citation-not-required claims,
 plus fenced JSON, altered inputs, malformed verdicts, empty inputs, exact prompt
 scope, and Sources-block removal. They validate control flow and contracts only.
-A live Qwen benchmark on independently checked claim labels is still required
-before graph integration.
+A seven-case live Qwen development diagnostic has also run, but its synthetic
+labels are not independently reviewed and do not establish production accuracy.
+
+### Task 10 production routing
+
+After synthesis has passed deterministic citation validation, LangGraph calls
+`verify_answer_claims()` with the answer and only verifier-approved passages.
+The validated aggregate verdicts drive a fixed policy:
+
+- all citation-required claims supported (or only `not_required` text): return;
+- at least one partial claim, or supported and unsupported claims mixed: repair
+  once using approved evidence, reconstruct trusted Sources metadata, and verify
+  again;
+- no supported factual claim, invalid verifier output, unsafe repaired citations,
+  repair failure, or any unresolved post-repair claim: abstain.
+
+The graph state records approved evidence, claim-verifier attempt count, validated
+bundle, status/error, revision count, and revision history. The maximum revision
+count is one. Existing deterministic citation metrics and the Task 8 benchmark
+remain separate diagnostics; Task 11 will aggregate them through a versioned
+end-to-end report without changing their native contracts.
 
 ## Retrieval matching contract
 
