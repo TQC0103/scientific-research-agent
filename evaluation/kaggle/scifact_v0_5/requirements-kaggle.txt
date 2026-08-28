@@ -1,0 +1,7 @@
+accelerate==1.13.0
+huggingface-hub==0.36.2
+pydantic==2.12.3
+safetensors==0.8.0
+tokenizers==0.22.2
+transformers==4.56.2
+wrapt==1.17.3

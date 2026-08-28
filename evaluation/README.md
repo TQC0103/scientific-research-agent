@@ -93,8 +93,16 @@ failed environment preflight cannot consume the full benchmark loop.
 QASPER's native multiple references are retained, and its answer/evidence
 metrics take the best score across annotator references, matching the released
 evaluator. SciFact's native document and rationale sentence IDs are retained.
-SciFact is a target for the future claim verifier; it must not be presented as
-an evaluation of the current binary evidence-sufficiency verifier.
+The oracle-document runner supplies cited abstracts and measures native
+three-way classification plus rationale selection. It must not be presented as
+retrieval, LangGraph, binary evidence-sufficiency, or Task 8 `partial` accuracy.
+Labeling boundaries are documented in `CLAIM_LABELING_GUIDE.md`.
+
+The Qwen3-4B R3 dev diagnostic processed all 300 claims. Label accuracy/macro
+F1 was `0.7233/0.7070`, rationale sentence F1 was `0.7438`, and joint exact
+label+rationale accuracy was `0.5266`. One raw output remained structurally
+invalid after making the non-metric reason optional. These development numbers
+must retain the `oracle_documents` qualifier.
 
 ## Provenance and publication gate
 

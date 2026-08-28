@@ -344,7 +344,10 @@ flowchart TD
     GUARD --> GENERATOR["No-model smoke or Transformers generation"]
     GENERATOR --> BATCH["Batched pipeline inference + bounded OOM batch fallback"]
     BATCH --> METRICS["Official-style answer/evidence F1 + Recall@K/MRR"]
-    SCIFACT --> METRICS2["Label and sufficiency metrics"]
+    SCIFACT --> SDOCS["Supplied cited abstracts — oracle-document mode"]
+    SDOCS --> SMODEL["Pinned Qwen3-4B native 3-way classifier"]
+    SMODEL --> METRICS2["Label macro F1 + rationale + joint metrics"]
+    METRICS2 --> SPACKAGE["Isolated T4 package + ignored report"]
     DOWNLOAD --> RUNTIME["Ignored data/evaluations/external/"]
 
     RUNNER --> OUTPUTS["Ignored predictions JSONL + metrics JSON"]

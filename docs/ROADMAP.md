@@ -37,8 +37,11 @@ Continue in this order:
    Atomic claim, source-span, evidence-link, and derived-verdict models plus a
    synchronized JSON Schema exist. One bounded Qwen call performs extraction
    and entailment; development results are diagnostics, not publishable accuracy.
-4. Build the SciFact runner once claim verification exists; do not conflate its
-   claim labels with the current evidence-sufficiency verifier.
+4. Analyze and preserve the implemented SciFact oracle-document runner. It uses
+   native three-way labels and rationale sets and remains separate from the
+   evidence-sufficiency verifier, retrieval, and Task 8 `partial` relationship.
+   The 300-case dev R3 checkpoint is complete; CONTRADICT is the weakest class
+   and joint label+rationale exact match is `0.5266`.
 5. Integrate bounded answer revision/abstention into LangGraph.
 6. Add end-to-end reporting and regression comparison without committing runtime
    evaluation outputs.

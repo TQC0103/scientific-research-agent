@@ -124,6 +124,8 @@ def test_scifact_adapter_resolves_gold_rationale_sentences(tmp_path: Path) -> No
     )
     case = load_scifact(corpus, claims, source_split="dev")[0]
     assert case.label == "SUPPORT"
+    assert case.documents[0].doc_id == 10
+    assert case.documents[0].abstract[1] == "Direct supporting sentence."
     assert case.rationales[0].sentences == ["Direct supporting sentence."]
 
 

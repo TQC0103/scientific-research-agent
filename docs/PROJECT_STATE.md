@@ -14,7 +14,7 @@ Last updated: 2026-08-28
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
   claim-verification contract and synthetic claim-verifier outputs validated;
-  Ruff passed and all 114 pytest tests passed. Native QASPER loaded all 5,049
+  Ruff passed and all 122 pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -80,6 +80,11 @@ Last updated: 2026-08-28
   prompt/parser, structural extraction/verdict/relationship metrics, fail-closed
   citation accounting, raw-response diagnostics, and a narrow pinned Qwen3-4B
   Kaggle T4 package
+- Native-label SciFact oracle-document evaluator over the 300-case public dev
+  split, with cited abstract preservation, strict structured output, fail-closed
+  parsing, three-way macro F1, binary support diagnostics, best-gold rationale
+  sentence F1/exact match, joint label+rationale accuracy, raw responses, and a
+  checksum-pinned isolated Kaggle runner
 
 ## Latest evaluation
 
@@ -175,6 +180,17 @@ hallucinated citation label on an uncited answer that strict parsing rejected,
 and a harmless source-span punctuation difference on a compound sentence. The
 seven repo-authored synthetic cases are diagnostic only.
 
+The external SciFact R3 run processed all 300 public dev claims with their
+cited abstracts supplied to pinned FP16 `Qwen/Qwen3-4B`. Native three-way label
+accuracy was `0.7233` and macro F1 `0.7070`; per-label F1 was `0.8016` SUPPORT,
+`0.7090` NOT_ENOUGH_INFO, and `0.6104` CONTRADICT. Rationale sentence F1 was
+`0.7438`, exact rationale match `0.6330`, and joint label+rationale exact match
+`0.5266`. Binary SUPPORT detection accuracy was `0.8300`, with false-positive/
+false-negative rates `0.1705/0.1694`. Re-parsing the same saved outputs after
+making the non-metric reason optional left one genuinely malformed response.
+This is an external dev oracle-document diagnostic, not retrieval, Task 8, or
+end-to-end LangGraph accuracy.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -208,8 +224,13 @@ seven repo-authored synthetic cases are diagnostic only.
   sentences, and the partial-versus-unsupported distinction needs independent
   annotation guidance before it becomes a regression threshold.
 - arXiv `last_revised` search is bounded and not an exhaustive corpus harvest.
-- SciFact evaluates scientific claim labels and rationales; the current verifier
-  only judges evidence sufficiency, so using SciFact as its score would be invalid.
+- SciFact's runner evaluates native three-way claim labels and rationale
+  selection with cited documents supplied. Its result is not a score for
+  retrieval, the binary evidence verifier, Task 8 `partial`, or LangGraph.
+- SciFact R3 over-predicted CONTRADICT for 26/112 NOT_ENOUGH_INFO claims and
+  achieved only `0.6104` CONTRADICT F1. Graph repair must distinguish direct
+  contradiction from merely incomplete evidence rather than reuse one negative
+  relationship blindly.
 - External QASPER R11 still retrieves only about half of annotated evidence at
   K=5. Generation took roughly 7,332 seconds and the complete job roughly 8,013
   seconds on a Kaggle T4.
@@ -249,7 +270,7 @@ seven repo-authored synthetic cases are diagnostic only.
    benchmark snapshot.
 2. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-3. Evaluate claim labels/rationales with native SciFact, then integrate Task 10's
-   bounded claim repair or abstention after synthesis.
+3. Integrate Task 10's bounded claim repair or abstention after synthesis,
+   preserving distinct incomplete-evidence and contradiction reasons.
 4. Add end-to-end regression comparison without committing runtime outputs.
 5. Fix section boundaries and table-associated metadata.

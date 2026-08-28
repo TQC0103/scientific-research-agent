@@ -977,3 +977,52 @@ independent annotation guidance and bounded fail-closed graph routing, not promp
 tuning against seven synthetic examples.
 
 Ruff passed and all 114 pytest tests passed.
+
+## 2026-08-29 — Native-label SciFact oracle-document benchmark
+
+The external SciFact adapter now preserves every cited document title and
+abstract in addition to native SUPPORT, CONTRADICT, and NOT_ENOUGH_INFO labels
+and gold rationale sets. A separate evaluator supplies those cited abstracts to
+Qwen, validates document/sentence references, reports native three-way and
+binary SUPPORT metrics, scores predicted rationale sentences against the best
+released rationale set, and keeps label+rationale joint exact match separate.
+This is explicitly oracle-document mode: retrieval, Task 8 `partial`, the
+evidence-sufficiency verifier, and LangGraph are outside its scope.
+
+`evaluation/CLAIM_LABELING_GUIDE.md` now fixes the internal relationship
+boundary. `partial` requires a meaningful strict subset of the same atomic claim
+without contradiction; `does_not_support` covers contradiction, unrelatedness,
+or no material support, with the reason distinguishing them. SciFact retains its
+native semantics and is not converted into those two values.
+
+R1 (`job_c58c2ce4cc7143e9846561c396bc121e`) proved the dataset checksum,
+isolated environment, T4 preflight, and model load, but a single invalid smoke
+response stopped the run. R2 (`job_502a5eadb91e4c93a414148af5bedfb4`)
+exposed the real protocol fault: Qwen copied the full JSON Schema before its
+prediction and exhausted the output budget. The final compact output contract
+removed the embedded schema and taught the extractor to ignore unrelated JSON
+objects without changing label instructions.
+
+R3 (`job_90f93272bf7943179cccfaee474975b2`) completed 300 dev claims in 75
+batches. Two Tesla T4 devices were visible and preflighted; inference stayed on
+device 0. Measured generation latency was 840.91 seconds and the complete
+Control Plane job took 1,036 seconds. The pinned runtime used Python 3.12.13,
+Torch 2.10.0+cu128, Transformers 4.56.2, and the exact Qwen3-4B revision used by
+the Task 6/8 diagnostics.
+
+Label accuracy was `0.7233` and macro F1 `0.7070`. Per-label F1 was `0.8016`
+SUPPORT, `0.7090` NOT_ENOUGH_INFO, and `0.6104` CONTRADICT. Rationale sentence
+F1 was `0.7438`, rationale exact match `0.6330`, and joint label+rationale exact
+match `0.5266`. SUPPORT detection accuracy was `0.8300` with FP/FN rates
+`0.1705/0.1694`. The model mislabeled 26/112 NOT_ENOUGH_INFO claims as
+CONTRADICT, showing that missing evidence and direct refutation remain a weak
+boundary.
+
+The first report counted 73 parse failures because 72 valid metric-complete
+outputs omitted the diagnostic `reason`. Making that field optional and
+re-parsing the exact saved outputs reduced failures to one without changing any
+quality metric or invoking the model again. The remaining malformed output used
+a `doc_id:index` expression where an integer sentence index was required and
+therefore correctly failed closed.
+
+Ruff passed and all 122 pytest tests passed.

@@ -35,12 +35,19 @@ class SciFactRationale(ExternalModel):
     sentences: list[str] = Field(min_length=1)
 
 
+class SciFactDocument(ExternalModel):
+    doc_id: int
+    title: str
+    abstract: list[str] = Field(min_length=1)
+
+
 class SciFactCase(ExternalModel):
     claim_id: int
     claim: str
     source_split: str
     label: Literal["SUPPORT", "CONTRADICT", "NOT_ENOUGH_INFO"]
     cited_doc_ids: list[int]
+    documents: list[SciFactDocument]
     rationales: list[SciFactRationale]
 
 
@@ -184,13 +191,32 @@ def load_scifact(
                 f"SciFact claim {claim.get('id')} has conflicting gold labels."
             )
         case_label = next(iter(labels)) if labels else "NOT_ENOUGH_INFO"
+        cited_doc_ids = [int(item) for item in claim.get("cited_doc_ids", [])]
+        documents = []
+        for doc_id in cited_doc_ids:
+            document = corpus.get(doc_id)
+            if document is None:
+                raise ExternalDatasetError(f"SciFact cited document {doc_id} is missing.")
+            abstract = document.get("abstract")
+            if not isinstance(abstract, list) or not abstract or not all(
+                isinstance(item, str) for item in abstract
+            ):
+                raise ExternalDatasetError(f"SciFact document {doc_id} has invalid abstract.")
+            documents.append(
+                SciFactDocument(
+                    doc_id=doc_id,
+                    title=str(document.get("title") or doc_id),
+                    abstract=abstract,
+                )
+            )
         cases.append(
             SciFactCase(
                 claim_id=int(claim["id"]),
                 claim=str(claim["claim"]),
                 source_split=source_split,
                 label=case_label,
-                cited_doc_ids=[int(item) for item in claim.get("cited_doc_ids", [])],
+                cited_doc_ids=cited_doc_ids,
+                documents=documents,
                 rationales=rationales,
             )
         )

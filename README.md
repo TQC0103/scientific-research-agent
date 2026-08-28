@@ -128,6 +128,34 @@ retrieval, but it is not a strong absolute-quality result and the answer scores
 are not apples-to-apples because only the hybrid configuration used a model.
 Generated predictions and Kaggle runtime artifacts remain uncommitted.
 
+SciFact evaluation remains separate from QASPER and the internal verifier. The
+runner receives SciFact's cited abstracts, preserves native
+`SUPPORT`/`CONTRADICT`/`NOT_ENOUGH_INFO` labels, and measures three-way label
+accuracy plus rationale-sentence selection. It is an oracle-document diagnostic:
+it does not measure retrieval or the LangGraph flow.
+
+```powershell
+python scripts/run_scifact.py `
+  --corpus data/evaluations/external/scifact/data/corpus.jsonl `
+  --claims data/evaluations/external/scifact/data/claims_dev.jsonl `
+  --source-split dev `
+  --output-dir data/evaluations/runs/scifact-v0-5 `
+  --smoke-cases 3
+```
+
+This command requires CUDA. Use `scripts/prepare_scifact_kaggle_job.py` to build
+the narrow ignored Control Plane package. The package downloads and verifies the
+pinned public archive at runtime and never embeds external data or credentials.
+Task 8's `partial` relationship is intentionally not converted into a SciFact
+label; see `evaluation/CLAIM_LABELING_GUIDE.md`.
+
+The completed 300-case dev R3 run reached label accuracy `0.7233`, macro F1
+`0.7070`, rationale sentence F1 `0.7438`, and joint label+rationale exact match
+`0.5266`. SUPPORT F1 was `0.8016`, NOT_ENOUGH_INFO F1 `0.7090`, and CONTRADICT
+F1 `0.6104`. Re-parsing the exact saved outputs with the corrected optional
+diagnostic reason left one malformed response. These are external dev
+oracle-document results, not held-out, retrieval, or end-to-end scores.
+
 The internal suite's LLM judge checks question clarity, evidence entailment,
 answer alignment, citation specificity, and challenge design. It does not edit
 the gold data, count as a human reviewer, prove document-wide absence, or make
