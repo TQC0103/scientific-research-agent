@@ -65,18 +65,30 @@ flowchart TD
     CHECK -->|"coverage policy satisfied"| SYNTH["synthesize answer"]
     CHECK -->|"paper insufficient + rewrite available"| RETRIEVE
     CHECK -->|"required paper not processed"| INDEX
-    CHECK -->|"a required paper exhausts retries"| ABSTAIN["paper-specific coverage gaps"]
+    CHECK -->|"a required paper exhausts retries"| SYNTH
 
-    SYNTH --> END(["END"])
-    ABSTAIN --> END
+    SYNTH --> ENOUGH{"Evidence sufficient?"}
+    ENOUGH -->|"no"| COVERAGE_GAP["paper-specific coverage gaps"]
+    ENOUGH -->|"yes"| CITES{"Citation-safe answer?"}
+    CITES -->|"no"| CLAIM_ABSTAIN["claim-grounding abstention"]
+    CITES -->|"yes"| CLAIMS["verify_claims"]
+    CLAIMS -->|"all factual claims supported"| END(["END"])
+    CLAIMS -->|"partial or mixed; revision count = 0"| REVISE["revise once from approved evidence"]
+    CLAIMS -->|"unsupported / invalid / already revised"| CLAIM_ABSTAIN
+    REVISE -->|"valid citation-safe revision"| CLAIMS
+    REVISE -->|"failure"| CLAIM_ABSTAIN
+    COVERAGE_GAP --> END
+    CLAIM_ABSTAIN --> END
 
-    LIMITS["Limits: 2 query rewrites; 2 auto-indexed papers; 6 tool loops"] -.-> CHECK
+    LIMITS["Limits: 2 query rewrites; 2 auto-indexed papers; 6 tool loops; 1 claim revision"] -.-> CHECK
 ```
 
 The state carries the original question, coverage mode, required paper IDs,
 selected/failed papers, and per-paper maps for retrieval queries, accumulated
-chunks, verifier results, and attempt counters. Aggregate fields remain for CLI
-trace and final routing.
+chunks, verifier results, and attempt counters. It also preserves approved
+evidence, citation validity, the structured claim bundle, claim-verifier calls,
+one revision count/history, and fail-closed errors. Aggregate fields remain for
+CLI trace and final routing.
 
 ## 3. Discovery and catalog module
 
@@ -208,23 +220,26 @@ flowchart TD
     INSUFFICIENT["Verifier says insufficient"] --> ABSTAIN["Reason + missing information"]
     ABSTAIN --> FINAL
 
-    DIRECT["Standalone input: answer + verifier-approved passages"] --> CLAIMPROMPT["One bounded atomic extraction + verification prompt"]
+    FINAL --> CLAIMPROMPT["One bounded atomic extraction + verification prompt"]
     CLAIMPROMPT --> CLAIMQWEN["Qwen3 4B structured JSON"]
     CLAIMQWEN --> CLAIMGUARD["Lock answer/evidence count + Task 7 validation"]
     CLAIMGUARD --> CLAIMBUNDLE["Ordered claims + evidence links + derived verdicts"]
-    CLAIMBUNDLE -.-> FUTUREGRAPH["Task 10 LangGraph integration — planned"]
+    CLAIMBUNDLE -->|"all supported"| VERIFIED_FINAL["Return answer"]
+    CLAIMBUNDLE -->|"partial or mixed; no prior revision"| REPAIR["One evidence-only revision"]
+    REPAIR --> SOURCES["Restore trusted Sources block"]
+    SOURCES --> CLAIMPROMPT
+    CLAIMBUNDLE -->|"unsupported, invalid, or post-repair failure"| CLAIMFAIL["Explicit claim-grounding abstention"]
 ```
 
 The model never authors bibliographic metadata. Abstract fallback citations are
 labeled `Abstract`; full-text citations use stored page and section metadata.
 Code never invents a citation when the model omits one. Missing citations and
 labels outside the verifier-approved passage list fail closed before any Sources
-block is rendered. Numeric-label validation alone does not establish entailment;
-the standalone claim-verifier branch performs that separate judgment.
-The claim verifier is callable but not part of the production graph. It strips
-the deterministic Sources block, receives only verifier-approved passages, and
-fails closed on altered inputs or invalid structured output. Its one-pass
-extraction/verification quality has unit coverage but no live-model benchmark.
+block is rendered. The production graph then strips that deterministic block,
+checks atomic claims against only approved passages, and permits at most one
+repair. The repair model cannot author source metadata; code restores it from
+trusted passage records before re-verification. Invalid structured output,
+wholly unsupported answers, and unresolved post-repair claims abstain.
 
 ## 8. Persistence module
 
@@ -265,7 +280,7 @@ flowchart TD
     EMBEDDING --> QUERY_EMBED["Query vector generation"]
     REASONING --> VERIFY["Evidence verification"]
     REASONING --> ANSWER["Evidence-grounded synthesis"]
-    REASONING --> CLAIMS["Standalone atomic claim verification"]
+    REASONING --> CLAIMS["Atomic claim verification + one answer repair"]
 
     DOCTOR["doctor command"] --> CONFIG
     DOCTOR --> OLLAMA
@@ -330,7 +345,7 @@ flowchart TD
     CLAIMBENCH --> CLAIMMETRICS["Schema + extraction + verdict + relationship metrics"]
     CLAIMMETRICS --> CLAIMGPU["Pinned isolated T4 package via Control Plane"]
     CLAIMMETRICS --> CLAIMOUTPUTS["Ignored JSON + Markdown report"]
-    CLAIMMODEL -.-> CLAIMGRAPH["Task 10 graph integration — planned"]
+    CLAIMMODEL --> CLAIMGRAPH["Task 10 bounded verify / repair / abstain graph"]
 
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]

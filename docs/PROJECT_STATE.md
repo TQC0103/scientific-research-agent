@@ -1,20 +1,20 @@
 # Project state
 
-Last updated: 2026-08-28
+Last updated: 2026-08-29
 
 ## Current baseline
 
 - Version: `0.4.0`
 - Branch: `main`
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
-  `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 is implemented in the current
-  working baseline.
+  `1dc5f9d`; Task 7 commit: `0e77634`; Tasks 8 and 10 are implemented in the
+  current working baseline.
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
   claim-verification contract and synthetic claim-verifier outputs validated;
-  Ruff passed and all 122 pytest tests passed. Native QASPER loaded all 5,049
+  Ruff passed and all 131 pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -76,6 +76,10 @@ Last updated: 2026-08-28
 - Task 8 standalone claim verifier with one bounded extraction/verification
   prompt over approved passages, immutable answer/evidence-count guards,
   Sources-block removal, strict Task 7 parsing, and fail-closed errors
+- Task 10 production graph integration after citation-safe synthesis: structured
+  claim verification, deterministic supported/repairable/unsupported routing,
+  exactly one evidence-only repair, re-verification, and fail-closed abstention;
+  graph state preserves attempts, revision count, history, and validation errors
 - Seven-case Task 8 synthetic development benchmark using the production
   prompt/parser, structural extraction/verdict/relationship metrics, fail-closed
   citation accounting, raw-response diagnostics, and a narrow pinned Qwen3-4B
@@ -205,11 +209,12 @@ end-to-end LangGraph accuracy.
 - Repeated local verifier calls are slow on the 4 GB laptop GPU.
 - Comparison intent without explicit paper IDs currently uses a bilingual
   keyword heuristic; it is not yet a general query planner.
-- Per-paper coverage reduces evidence leakage, but a separate final
-  claim-by-claim cross-paper answer verifier is not implemented.
+- Per-paper coverage reduces evidence leakage, and Task 10 now checks the final
+  answer claim by claim. Its accuracy still depends on the same 4B model that
+  performs both claim extraction and entailment judgment.
 - Numeric citation validation proves only that a label maps to an approved
-  passage. It cannot yet prove that each nearby generated claim is entailed by
-  that passage; Task 8 claim extraction and verification remain necessary.
+  passage; semantic support is now checked separately and fails closed, but has
+  not yet been validated on an independently reviewed end-to-end suite.
 - The Task 7 contract proves structural traceability and verdict consistency,
   but cannot determine whether a paraphrase is truly atomic or a passage
   semantically entails it.
@@ -218,8 +223,13 @@ end-to-end LangGraph accuracy.
   but exact-substring compliance, claim coverage, and entailment accuracy have
   not been measured on independently checked outputs.
 - The Task 8 R3 run shows that a structurally constrained model can still invent
-  a citation label absent from `source_text`; strict validation caught it, but
-  graph integration must treat that parse failure as unsupported/abstain.
+  a citation label absent from `source_text`; Task 10 now treats that parse
+  failure as an abstention.
+- Task 10 uses a conservative repair policy: partial claims and mixed supported/
+  unsupported answers may be revised once, while an answer with no supported
+  factual claim abstains immediately. It does not yet identify user-designated
+  key claims separately or distinguish contradiction from missing evidence in
+  its final user-facing abstention reason.
 - Exact source-span scoring is sensitive to punctuation boundaries in compound
   sentences, and the partial-versus-unsupported distinction needs independent
   annotation guidance before it becomes a regression threshold.
@@ -270,7 +280,7 @@ end-to-end LangGraph accuracy.
    benchmark snapshot.
 2. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-3. Integrate Task 10's bounded claim repair or abstention after synthesis,
-   preserving distinct incomplete-evidence and contradiction reasons.
-4. Add end-to-end regression comparison without committing runtime outputs.
+3. Run Task 10 on reviewed cases and calibrate repair versus immediate
+   abstention, including distinct incomplete-evidence and contradiction reasons.
+4. Add Task 11 end-to-end regression comparison without committing runtime outputs.
 5. Fix section boundaries and table-associated metadata.

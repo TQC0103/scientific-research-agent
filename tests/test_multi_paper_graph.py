@@ -1,4 +1,11 @@
 from app.agent import graph
+from app.models.claims import (
+    CLAIM_VERIFICATION_CONTRACT_VERSION,
+    AtomicClaim,
+    ClaimAssessment,
+    ClaimEvidenceLink,
+    ClaimVerificationBundle,
+)
 from app.models.verifier import EvidenceVerification
 
 
@@ -44,10 +51,52 @@ def test_full_graph_requires_and_synthesizes_both_explicit_papers(monkeypatch) -
 
     def fake_answer(question, evidence, papers):
         assert {item["arxiv_id"] for item in evidence} == set(paper_ids)
-        return "Grounded comparison."
+        return (
+            "Grounded comparison [1][2].\n\nSources:\n"
+            "[1] arXiv:2401.00001v1 — page 2, Method\n"
+            "[2] arXiv:2401.00002v1 — page 2, Method"
+        )
+
+    def fake_claim_verification(answer, evidence, question):
+        assert len(evidence) == 2
+        body = answer.split("\n\nSources:\n", 1)[0]
+        return ClaimVerificationBundle(
+            contract_version=CLAIM_VERIFICATION_CONTRACT_VERSION,
+            answer=body,
+            evidence_count=2,
+            claims=[
+                AtomicClaim(
+                    claim_id="claim_1",
+                    claim_text="Grounded comparison.",
+                    source_text=body,
+                    requires_citation=True,
+                    citation_labels=[1, 2],
+                )
+            ],
+            assessments=[
+                ClaimAssessment(
+                    claim_id="claim_1",
+                    verdict="supported",
+                    cited_evidence=[
+                        ClaimEvidenceLink(
+                            citation_label=1,
+                            relationship="entails",
+                            reason="The first paper supports its side.",
+                        ),
+                        ClaimEvidenceLink(
+                            citation_label=2,
+                            relationship="entails",
+                            reason="The second paper supports its side.",
+                        ),
+                    ],
+                    reason="Both comparison sides are supported.",
+                )
+            ],
+        )
 
     monkeypatch.setattr(graph, "verify_evidence", fake_verify)
     monkeypatch.setattr(graph, "answer_from_evidence", fake_answer)
+    monkeypatch.setattr(graph, "verify_answer_claims", fake_claim_verification)
 
     result = graph.build_graph().invoke(
         {"user_query": "Compare the methods", "paper_ids": paper_ids}
@@ -57,4 +106,7 @@ def test_full_graph_requires_and_synthesizes_both_explicit_papers(monkeypatch) -
     assert result["selected_papers"] == paper_ids
     assert result["evidence_sufficient"] is True
     assert verifier_calls == paper_ids
-    assert result["answer"] == "Grounded comparison."
+    assert result["answer"].startswith("Grounded comparison [1][2].")
+    assert result["claim_verification_status"] == "verified"
+    assert result["claim_verification_attempt_count"] == 1
+    assert result["claim_revision_count"] == 0

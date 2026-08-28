@@ -24,7 +24,8 @@ chunking, FAISS retrieval, and citation-grounded answers with LangGraph + Ollama
 - fail-closed citation labels plus deterministic claim-to-evidence safety metrics
 - versioned atomic-claim verification contract with strict cross-reference and
   verdict invariants
-- standalone structured claim extractor/verifier over verifier-approved passages
+- bounded post-synthesis claim verification with one repair attempt and
+  fail-closed abstention
 
 ## Quick start (Windows PowerShell)
 
@@ -253,9 +254,9 @@ python scripts/evaluate_citations.py `
 
 The included five cases are contract fixtures, so their scores test metric
 behavior and must not be reported as model quality. Real answer evaluation will
-consume the same contract after claim extraction and verification are added.
+consume the same contract through the implemented claim-verification graph path.
 
-Task 7 defines that next boundary in `app/models/claims.py`. Each atomic claim
+Task 7 defines that contract in `app/models/claims.py`. Each atomic claim
 keeps both a normalized `claim_text` and exact `source_text` from the answer,
 its visible numeric citation labels, whether citation is required, one
 assessment per cited passage, and a derived `supported`, `partial`,
@@ -268,12 +269,15 @@ python scripts/export_claim_verification_schema.py `
 ```
 
 The committed fixture covers all verdict shapes and connects directly to the
-Task 9 citation metrics. Task 8 now implements
+Task 9 citation metrics. Task 8 implements
 `app/models/claim_verifier.py`: one bounded Qwen call extracts claims and checks
 each attached label against verifier-approved evidence, then the Task 7 parser
 rejects altered answers, altered evidence counts, invented source text, missing
-links, and inconsistent verdicts. The function is standalone and is not yet a
-LangGraph node. A seven-case synthetic development diagnostic now exercises
+links, and inconsistent verdicts. Task 10 now invokes it after citation-safe
+synthesis. Fully supported answers finish; partial or mixed answers receive one
+evidence-only revision and are checked again; wholly unsupported, malformed,
+uncited, or still-failing answers abstain. The revision count is stored in graph
+state and cannot exceed one. A seven-case synthetic development diagnostic exercises
 direct support, partial support, wrong/missing citations, organizational text,
 compound claims, and mixed citation quality through the production prompt and
 parser. It is deliberately not held-out or independently reviewed accuracy.

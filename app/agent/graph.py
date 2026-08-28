@@ -6,6 +6,8 @@ from app.agent.state import AgentState
 from app.config import settings
 from app.db.database import search_local
 from app.ingestion.indexing import index_paper
+from app.models.claim_verifier import repair_answer_claims, verify_answer_claims
+from app.models.claims import ClaimVerdict, ClaimVerificationBundle
 from app.models.llm import answer_from_evidence
 from app.models.verifier import verify_evidence
 from app.retrieval.vector_store import index_is_current, retrieve
@@ -14,6 +16,7 @@ from app.tools.paper_download import PaperDownloadError
 
 AUTO_INDEX_LIMIT = 2
 MIN_LOCAL_CANDIDATES = 3
+MAX_CLAIM_REVISIONS = 1
 MULTI_PAPER_PATTERN = re.compile(
     r"\b(compare|comparison|versus|vs\.?|differences?|similarities?|two papers?)\b"
     r"|so sánh|khác nhau|giống nhau|hai (bài|paper)",
@@ -109,6 +112,14 @@ def discover(state: AgentState) -> dict:
         "retrieved_chunks_by_paper": {},
         "evidence_sufficient": False,
         "evidence_verifications": {},
+        "verified_evidence": [],
+        "synthesis_citation_valid": False,
+        "claim_verification": {},
+        "claim_verification_status": "not_run",
+        "claim_verification_error": None,
+        "claim_verification_attempt_count": 0,
+        "claim_revision_count": 0,
+        "claim_revision_history": [],
         "papers_to_retrieve": [],
         "discovery_source": source,
     }
@@ -340,6 +351,7 @@ def synthesize(state: AgentState) -> dict:
     by_paper = state.get("retrieved_chunks_by_paper") or _group_evidence(
         state.get("retrieved_chunks", [])
     )
+    verified_evidence = []
     if not state.get("evidence_sufficient"):
         answer = "Insufficient evidence to answer without guessing."
         details = []
@@ -366,7 +378,6 @@ def synthesize(state: AgentState) -> dict:
             details or ["No paper had sufficient verified evidence."]
         )
     else:
-        verified_evidence = []
         for paper_id in state.get("selected_papers", []):
             verification = verifications.get(paper_id, {})
             if not verification.get("sufficient"):
@@ -380,7 +391,133 @@ def synthesize(state: AgentState) -> dict:
         answer = answer_from_evidence(state["user_query"], verified_evidence, papers)
     if state.get("tool_errors"):
         answer += "\n\nRetrieval notes:\n- " + "\n- ".join(state["tool_errors"])
-    return {"answer": answer}
+    citation_valid = bool(
+        state.get("evidence_sufficient")
+        and verified_evidence
+        and "\n\nSources:\n" in answer
+    )
+    return {
+        "answer": answer,
+        "verified_evidence": verified_evidence,
+        "synthesis_citation_valid": citation_valid,
+        "claim_verification": {},
+        "claim_verification_status": "not_run",
+        "claim_verification_error": None,
+        "claim_verification_attempt_count": 0,
+        "claim_revision_count": 0,
+        "claim_revision_history": [answer] if state.get("evidence_sufficient") else [],
+    }
+
+
+def route_after_synthesis(state: AgentState) -> str:
+    if not state.get("evidence_sufficient"):
+        return "end"
+    return "verify_claims" if state.get("synthesis_citation_valid") else "abstain"
+
+
+def _claim_verification_status(bundle: ClaimVerificationBundle) -> str:
+    verdicts = [
+        assessment.verdict
+        for assessment in bundle.assessments
+        if assessment.verdict != ClaimVerdict.NOT_REQUIRED
+    ]
+    if not verdicts or all(verdict == ClaimVerdict.SUPPORTED for verdict in verdicts):
+        return "verified"
+    if ClaimVerdict.PARTIAL in verdicts:
+        return "repairable"
+    if ClaimVerdict.SUPPORTED in verdicts and ClaimVerdict.UNSUPPORTED in verdicts:
+        return "repairable"
+    return "unsupported"
+
+
+def verify_claims(state: AgentState) -> dict:
+    attempts = state.get("claim_verification_attempt_count", 0) + 1
+    try:
+        bundle = verify_answer_claims(
+            state["answer"],
+            state.get("verified_evidence", []),
+            state["user_query"],
+        )
+    except (ValueError, OSError) as exc:
+        return {
+            "claim_verification": {},
+            "claim_verification_status": "invalid",
+            "claim_verification_error": str(exc),
+            "claim_verification_attempt_count": attempts,
+        }
+    return {
+        "claim_verification": bundle.model_dump(mode="json"),
+        "claim_verification_status": _claim_verification_status(bundle),
+        "claim_verification_error": None,
+        "claim_verification_attempt_count": attempts,
+    }
+
+
+def route_after_claim_verification(state: AgentState) -> str:
+    status = state.get("claim_verification_status")
+    if status == "verified":
+        return "end"
+    if (
+        status == "repairable"
+        and state.get("claim_revision_count", 0) < MAX_CLAIM_REVISIONS
+    ):
+        return "revise"
+    return "abstain"
+
+
+def revise_answer(state: AgentState) -> dict:
+    revisions = state.get("claim_revision_count", 0) + 1
+    history = list(state.get("claim_revision_history", []))
+    papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
+    try:
+        verification = ClaimVerificationBundle.model_validate(
+            state.get("claim_verification", {})
+        )
+        answer = repair_answer_claims(
+            state["user_query"],
+            state["answer"],
+            state.get("verified_evidence", []),
+            papers,
+            verification,
+        )
+        history.append(answer)
+        return {
+            "answer": answer,
+            "synthesis_citation_valid": "\n\nSources:\n" in answer,
+            "claim_revision_count": revisions,
+            "claim_revision_history": history,
+            "claim_verification_status": "not_run",
+            "claim_verification_error": None,
+        }
+    except (ValueError, OSError) as exc:
+        return {
+            "claim_revision_count": revisions,
+            "claim_revision_history": history,
+            "claim_verification_status": "invalid",
+            "claim_verification_error": str(exc),
+        }
+
+
+def route_after_revision(state: AgentState) -> str:
+    if (
+        state.get("claim_verification_status") == "invalid"
+        or not state.get("synthesis_citation_valid")
+    ):
+        return "abstain"
+    return "verify_claims"
+
+
+def abstain_on_claims(state: AgentState) -> dict:
+    answer = (
+        "Unable to provide a fully citation-grounded answer: claim-level verification "
+        "could not establish every substantive claim from the approved evidence."
+    )
+    if state.get("claim_revision_count", 0):
+        answer += " One bounded revision was attempted."
+    return {
+        "answer": answer,
+        "claim_verification_status": "abstained",
+    }
 
 
 def build_graph():
@@ -390,6 +527,9 @@ def build_graph():
     graph.add_node("retrieve", retrieve_evidence)
     graph.add_node("check", check_evidence)
     graph.add_node("synthesize", synthesize)
+    graph.add_node("verify_claims", verify_claims)
+    graph.add_node("revise", revise_answer)
+    graph.add_node("abstain", abstain_on_claims)
     graph.add_edge(START, "discover")
     graph.add_edge("discover", "index_next")
     graph.add_edge("index_next", "retrieve")
@@ -399,7 +539,22 @@ def build_graph():
         route_after_check,
         {"retrieve": "retrieve", "index_next": "index_next", "synthesize": "synthesize"},
     )
-    graph.add_edge("synthesize", END)
+    graph.add_conditional_edges(
+        "synthesize",
+        route_after_synthesis,
+        {"verify_claims": "verify_claims", "abstain": "abstain", "end": END},
+    )
+    graph.add_conditional_edges(
+        "verify_claims",
+        route_after_claim_verification,
+        {"revise": "revise", "abstain": "abstain", "end": END},
+    )
+    graph.add_conditional_edges(
+        "revise",
+        route_after_revision,
+        {"verify_claims": "verify_claims", "abstain": "abstain"},
+    )
+    graph.add_edge("abstain", END)
     return graph.compile()
 
 

@@ -1026,3 +1026,24 @@ a `doc_id:index` expression where an integer sentence index was required and
 therefore correctly failed closed.
 
 Ruff passed and all 122 pytest tests passed.
+
+## 2026-08-29 — Bounded claim verification in the production graph
+
+Task 10 connects the validated Task 8 claim verifier after citation-safe answer
+synthesis. A supported bundle ends normally. A bundle containing a partial claim,
+or a mix of supported and unsupported claims, receives exactly one evidence-only
+revision; trusted source metadata is then reconstructed by code and the revised
+answer is verified again. An answer with no supported factual claim, invalid
+structured output, missing/invalid citations, repair failure, or any unresolved
+post-repair claim fails closed to an explicit abstention. The graph records
+approved evidence, verifier attempts, the structured bundle, one revision count
+and history, and errors. There is no agent loop and the maximum revision count is
+a code constant set to one.
+
+The first full regression exposed an isolation boundary: importing the new
+repair formatter at module load time made the narrow Task 8 Kaggle archive depend
+on `app.models.llm`, which it intentionally does not package. Moving that import
+onto the production-only repair path restored the isolated archive without
+widening the benchmark bundle. Ruff passed and all 131 pytest tests passed. No
+LLM or GPU benchmark was run; these tests establish routing and safety behavior,
+not claim-verification accuracy.

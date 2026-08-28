@@ -157,3 +157,60 @@ def test_empty_answer_or_evidence_never_calls_model(monkeypatch) -> None:
         claim_verifier.verify_answer_claims("  ", _evidence())
     with pytest.raises(ValueError, match="verifier-approved evidence"):
         claim_verifier.verify_answer_claims("Claim [1].", [])
+
+
+def test_claim_repair_uses_only_failed_claims_and_restores_trusted_sources(
+    monkeypatch,
+) -> None:
+    payload = _payload()
+    bundle = claim_verifier.ClaimVerificationBundle.model_validate(payload)
+    captured = {}
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> SimpleNamespace:
+            captured["prompt"] = prompt
+            return SimpleNamespace(content="The measured result was 91% [1].")
+
+    def factory(**kwargs):
+        captured["kwargs"] = kwargs
+        return FakeModel()
+
+    monkeypatch.setattr(claim_verifier, "get_llm", factory)
+    papers = {"1706.03762": {"title": "Attention Is All You Need"}}
+
+    answer = claim_verifier.repair_answer_claims(
+        "What did the paper report?",
+        payload["answer"],
+        _evidence(),
+        papers,
+        bundle,
+    )
+
+    assert answer.startswith("The measured result was 91% [1].\n\nSources:\n")
+    assert "arXiv:1706.03762v7" in answer
+    assert "claim_1 (supported)" not in captured["prompt"]
+    assert "claim_2 (partial)" in captured["prompt"]
+    assert "claim_3 (unsupported)" in captured["prompt"]
+    assert captured["kwargs"] == {"temperature": 0, "num_predict": 1200}
+
+
+def test_claim_repair_without_citation_fails_citation_safety(monkeypatch) -> None:
+    payload = _payload()
+    bundle = claim_verifier.ClaimVerificationBundle.model_validate(payload)
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> SimpleNamespace:
+            return SimpleNamespace(content="A revised but uncited factual answer.")
+
+    monkeypatch.setattr(claim_verifier, "get_llm", lambda **kwargs: FakeModel())
+
+    answer = claim_verifier.repair_answer_claims(
+        "Question?",
+        payload["answer"],
+        _evidence(),
+        {"1706.03762": {"title": "Paper"}},
+        bundle,
+    )
+
+    assert "citation" in answer.casefold()
+    assert "\n\nSources:\n" not in answer

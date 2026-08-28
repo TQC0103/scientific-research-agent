@@ -29,7 +29,7 @@ Continue in this order:
    false positives but a 30% false-negative rate on positive comparison scopes,
    70% rewrite recovery, and 67.5% supported-passage precision.
 3. Review and expand the implemented seven-case Task 8 synthetic development
-   diagnostic into independently checked atomic claims before graph integration.
+   diagnostic into independently checked atomic claims before setting thresholds.
    The production prompt/parser, deterministic structural metrics, CUDA runner,
    and isolated T4 package now exist. Citation safety is fail-closed:
    automatic `[1]` fallback is removed, invalid labels discard synthesis, and
@@ -42,8 +42,10 @@ Continue in this order:
    evidence-sufficiency verifier, retrieval, and Task 8 `partial` relationship.
    The 300-case dev R3 checkpoint is complete; CONTRADICT is the weakest class
    and joint label+rationale exact match is `0.5266`.
-5. Integrate bounded answer revision/abstention into LangGraph.
-6. Add end-to-end reporting and regression comparison without committing runtime
+5. Validate the implemented Task 10 graph path on reviewed cases. Production now
+   performs claim verification after synthesis, permits one repair, and otherwise
+   abstains; no live-model quality claim is made from unit tests.
+6. Add Task 11 end-to-end reporting and regression comparison without committing runtime
    evaluation outputs.
 7. Correct section-boundary metadata around tables and mid-page headings.
 8. Benchmark 1.7B/4B/8B on identical evidence and traces, preferring Kaggle GPU

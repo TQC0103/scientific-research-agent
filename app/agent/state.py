@@ -21,6 +21,14 @@ class AgentState(TypedDict, total=False):
     required_paper_count: int
     coverage_mode: str
     answer: str
+    verified_evidence: list[dict]
+    synthesis_citation_valid: bool
+    claim_verification: dict
+    claim_verification_status: str
+    claim_verification_error: str | None
+    claim_verification_attempt_count: int
+    claim_revision_count: int
+    claim_revision_history: list[str]
     iteration_count: int
     discovery_source: str
     failed_papers: list[str]

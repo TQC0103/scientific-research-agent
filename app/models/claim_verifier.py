@@ -136,3 +136,77 @@ def verify_answer_claims(
         )
     except Exception as exc:
         raise ValueError(f"Invalid claim-verifier response: {exc}") from exc
+
+
+def build_claim_repair_prompt(
+    question: str,
+    answer: str,
+    evidence: list[dict[str, Any]],
+    verification: ClaimVerificationBundle,
+) -> str:
+    """Build one bounded answer-repair prompt from validated claim failures."""
+    body = answer_body(answer)
+    if not body or not evidence:
+        raise ValueError("Claim repair requires an answer and approved evidence.")
+    assessments = {item.claim_id: item for item in verification.assessments}
+    issues = []
+    for claim in verification.claims:
+        assessment = assessments[claim.claim_id]
+        if assessment.verdict.value in {"supported", "not_required"}:
+            continue
+        issues.append(
+            f"- {claim.claim_id} ({assessment.verdict.value}): {assessment.reason}"
+        )
+    if not issues:
+        raise ValueError("Claim repair requires at least one partial or unsupported claim.")
+    excerpts = []
+    for number, item in enumerate(evidence, start=1):
+        source_id = item.get("versioned_id") or item.get("arxiv_id") or "unknown"
+        location = (
+            f"page {item['page']}, {item.get('section') or 'Unknown section'}"
+            if item.get("page")
+            else "Abstract"
+        )
+        excerpts.append(f"[{number}] {source_id} — {location}\n{item.get('text', '')}")
+    return f"""Revise a scientific answer once using only the approved evidence below.
+
+Keep already supported content. Narrow, correct, or remove every listed partial or unsupported
+claim. Do not introduce a new factual claim unless the supplied evidence directly supports it.
+Every substantive scientific claim must end with the matching numeric citation label. Preserve
+the label numbering shown below. If evidence cannot support a requested detail, state only that
+the approved evidence does not establish it; do not guess. Return only the revised concise answer
+without a bibliography, Sources block, Markdown fence, or commentary.
+
+Question:
+{question}
+
+Current answer:
+{body}
+
+Claim-level issues:
+{chr(10).join(issues)}
+
+Approved evidence:
+{chr(10).join(excerpts)}
+"""
+
+
+def repair_answer_claims(
+    question: str,
+    answer: str,
+    evidence: list[dict[str, Any]],
+    papers: dict[str, dict[str, Any]],
+    verification: ClaimVerificationBundle,
+) -> str:
+    """Perform one repair call and restore trusted deterministic source metadata."""
+    from app.models.llm import format_verified_sources
+
+    prompt = build_claim_repair_prompt(question, answer, evidence, verification)
+    try:
+        response = get_llm(temperature=0, num_predict=1200).invoke(prompt)
+        revised = str(response.content).split("\nSources:", 1)[0].strip()
+        if not revised:
+            raise ValueError("Claim repair returned an empty answer.")
+        return format_verified_sources(revised, evidence, papers)
+    except Exception as exc:
+        raise ValueError(f"Invalid claim-repair response: {exc}") from exc
