@@ -368,9 +368,28 @@ Comparison requires the same suite fingerprint, ordered case IDs, dataset
 version, and config label. It reports directional deltas but enforces no quality
 threshold. Runtime outputs and baselines remain ignored. The full run invokes
 the configured production models and indexing path, so execute it through the
-Kaggle Control Plane/GPU workflow once its Task 12 package is prepared, not as a
-heavy laptop job. The implemented runner currently has deterministic mocked-graph
-coverage; no live Task 11 quality result has been recorded yet.
+Kaggle Control Plane/GPU workflow, not as a heavy laptop job. Build the narrow,
+ignored Kaggle source with:
+
+```powershell
+python -m scripts.prepare_end_to_end_kaggle_job
+```
+
+The committed template lives in `evaluation/kaggle/end_to_end_v0_5/`. It creates
+an isolated system-site-aware runtime without replacing Kaggle Torch, pins the
+Qwen3-4B and Qwen3-Embedding revisions, requires two visible Tesla T4 devices,
+runs one smoke case before the full suite, and keeps only reports under
+`/kaggle/working`.
+
+The first clean live checkpoint was Kaggle R4 on 2026-08-29. All ten cases and
+the report schema completed with no execution or tool errors. Decision accuracy
+was `0.4000`, answer-case accuracy `0.5000`, abstention accuracy `0.0000`,
+Recall@5 `0.6667`, MRR `0.5556`, and claim-verifier failure rate `0.4000`.
+These are development diagnostics, not a saved regression baseline: both
+negative questions were incorrectly answered, and four positive answers failed
+closed on invalid claim-verifier structure. The apparently perfect supported-
+claim and citation-completeness rates apply only to successfully parsed final
+claim bundles and must not be read as overall grounding accuracy.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

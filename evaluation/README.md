@@ -45,6 +45,9 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
   claim-verifier diagnostic.
 - `kaggle/scifact_v0_5/`: isolated T4 template for the native-label SciFact
   oracle-document diagnostic.
+- `kaggle/end_to_end_v0_5/`: isolated dual-T4 template that replaces only the
+  Ollama transports with pinned Hugging Face adapters while executing the
+  production LangGraph, one-case smoke, and full ten-case Task 11 suite.
 
 The former empty `questions.json` and `ground_truth.json` placeholders were
 removed so there is one canonical data shape.
@@ -321,8 +324,26 @@ python scripts/export_end_to_end_schema.py `
   --output evaluation/schema/end-to-end-report.schema.json
 ```
 
-The runner has mocked production-graph and node-stream regression coverage. No
-live Task 11 suite result or regression baseline has been saved yet.
+Build the narrow ignored source with
+`python -m scripts.prepare_end_to_end_kaggle_job`. The package embeds only the
+production modules, suite, and public source manifest needed by the graph. It
+uses Qwen3-4B FP16 on T4 device 0 and the pinned Qwen3 embedding model on device
+1, with left padding, deterministic generation, SDPA, CUDA cache cleanup, exact
+arXiv revision checks, and a smoke gate before the full run.
+
+Kaggle R4 (`job_77d8f29fa5074e858e826793ad4d7540`) completed the report contract
+for all ten cases with zero execution and tool errors. Its development metrics
+were decision accuracy `0.4000`, answer-case accuracy `0.5000`, abstention
+accuracy `0.0000`, answer F1 `0.2158`, Recall@5 `0.6667`, MRR `0.5556`, and
+claim-verifier failure rate `0.4000`. The run made 32 graph-counted LLM calls;
+the adapter observed 35 physical calls including smoke, two document-embedding
+calls, and 11 query-embedding calls. Runtime outputs remain ignored.
+
+R4 is deliberately not copied into a regression-baseline directory. Both
+negative cases were false positives, four answer cases abstained after invalid
+claim-verifier output, and the suite is development-only. The reported `1.0000`
+supported-claim and citation-completeness rates are conditional on claim bundles
+that parsed successfully; they do not override the `0.4000` decision accuracy.
 
 ## Retrieval matching contract
 

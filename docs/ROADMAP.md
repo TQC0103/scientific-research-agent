@@ -26,10 +26,12 @@ QASPER R11 development checkpoint are preserved. R11 supports retaining hybrid
 retrieval but does not replace an independently reviewed internal benchmark.
 Continue in this order:
 
-1. Prepare a Kaggle Control Plane execution package for the implemented Task 11
-   runner, then run the ten-case development suite through an equivalent pinned
-   production runtime. Inspect failures before saving the first v0.5 development
-   baseline. Do not set regression thresholds or tag `v0.5.0` from unit tests.
+1. Use the completed Task 11 Kaggle R4 trace to fix two observed safety failures:
+   verifier approval of evidence that does not establish a document-wide absent
+   fact, and claim-verifier outputs whose exact source/citation fields fail the
+   strict contract. Re-run the same pinned ten cases before saving any baseline.
+   R4 decision accuracy is `0.4000`, abstention accuracy is `0.0000`, and the
+   claim-verifier failure rate is `0.4000`; do not tag `v0.5.0` from this run.
 2. Add embedding-call instrumentation and abstention-reason classification only
    when production exposes reliable observations; do not estimate them.
 3. Independently review the remaining eight answer cases before freezing a

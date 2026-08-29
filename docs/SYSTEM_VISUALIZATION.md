@@ -352,6 +352,10 @@ flowchart TD
     E2E --> NODETRACE["Ordered LangGraph node updates + final state"]
     NODETRACE --> E2EMETRICS["Registered decision / retrieval / claim / latency metrics"]
     E2EMETRICS --> E2EOUTPUTS["Ignored full/aggregate JSON + per-case JSONL + Markdown"]
+    E2E --> E2EPACKAGE["Narrow dual-T4 Kaggle package"]
+    E2EPACKAGE --> E2ESMOKE["1-case production-graph smoke gate"]
+    E2ESMOKE --> E2EFULL["10-case live development run"]
+    E2EFULL --> E2EOUTPUTS
     E2EBASELINE["Prior exact-suite metrics.json"] --> E2ECOMPARE["Directional deltas; no threshold"]
     E2EMETRICS --> E2ECOMPARE
     E2ECOMPARE --> E2EOUTPUTS
@@ -441,8 +445,15 @@ the final state; per-case traces therefore retain new nodes and fields. Metric
 meaning remains explicit through a direction registry. Exact suite fingerprint,
 ordered cases, dataset version, and config must match before baseline comparison.
 Comparison is informational and has no hard-coded pass threshold. Outputs remain
-ignored JSONL/JSON/Markdown runtime artifacts. Embedding-call instrumentation and
-the first live development baseline remain future work.
+ignored JSONL/JSON/Markdown runtime artifacts. The Kaggle adapter keeps the
+compiled graph and swaps only the Ollama transports: deterministic Qwen3-4B FP16
+runs on T4 device 0 while the pinned SentenceTransformer runs on device 1. A
+one-case smoke must finish without execution failure before the full ten cases
+start. R4 completed this path without runtime/tool errors, but its two negative
+cases were false positives and four claim-verifier outputs failed the strict
+contract, so no regression baseline was frozen. Production embedding-call
+instrumentation and the first acceptable live development baseline remain future
+work.
 
 ## Maintenance rule
 

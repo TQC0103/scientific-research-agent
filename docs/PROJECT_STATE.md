@@ -10,13 +10,14 @@ Last updated: 2026-08-29
 - Branch: `main`
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
-  SciFact commit: `7959e07`; Task 10 commit: `70e762d`.
+  SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
+  `4b8aaa1`.
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 139
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 142
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -88,6 +89,10 @@ Last updated: 2026-08-29
   traces, exact-suite identity, registered metrics, case-level failure isolation,
   runtime provenance, ignored JSONL/JSON/Markdown output, and informational
   baseline comparison without hard-coded thresholds
+- Narrow Task 11 Kaggle package with embedded production sources, pinned model
+  revisions and dependency manifest, dual-T4 CUDA preflight, exact arXiv source
+  checks, deterministic left-padded generation, one-case smoke gate, and ignored
+  result collection
 - Seven-case Task 8 synthetic development benchmark using the production
   prompt/parser, structural extraction/verdict/relationship metrics, fail-closed
   citation accounting, raw-response diagnostics, and a narrow pinned Qwen3-4B
@@ -229,6 +234,20 @@ making the non-metric reason optional left one genuinely malformed response.
 This is an external dev oracle-document diagnostic, not retrieval, Task 8, or
 end-to-end LangGraph accuracy.
 
+Task 11 Kaggle R4 ran the exact ten-case development suite through the compiled
+production LangGraph with pinned FP16 Qwen3-4B and Qwen3-Embedding adapters on
+separate Tesla T4 devices. One smoke case completed before the full run. The
+full report validated all ten cases with zero execution and tool errors;
+decision accuracy was `0.4000`, answer-case accuracy `0.5000`, abstention
+accuracy `0.0000`, answer F1 `0.2158`, Recall@5 `0.6667`, Precision@5 `0.2000`,
+MRR `0.5556`, and claim-verifier failure rate `0.4000`. Full-suite graph
+accounting recorded 32 LLM calls and 781.7 seconds; adapter accounting including
+smoke recorded 35 physical LLM calls, two document-embedding calls, and 11
+query-embedding calls. No baseline was frozen because both negative cases were
+incorrectly answered and four positive cases failed closed on invalid claim
+structure. This is the first live Task 11 development checkpoint, not a release
+or held-out quality result.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -267,9 +286,15 @@ end-to-end LangGraph accuracy.
 - CLI `--trace` and Gradio expose the final answer but do not yet render Task 10
   claim assessments, revision history, or claim-verifier errors. The state exists
   for Task 11 and future UI diagnostics.
-- Task 11 has deterministic mocked-graph coverage but no live suite result yet.
-  The committed runner uses configured production dependencies; the heavy first
-  run must use a prepared Kaggle Control Plane environment rather than the laptop.
+- Task 11 R4 exposed a critical negative-question false-positive boundary. The
+  verifier accepted training duration/compute as an electrical-energy answer and
+  accepted unrelated translation metrics for an ImageNet question; both then
+  passed claim verification. Document-wide absence cannot be inferred from a few
+  passages, and topical evidence must not satisfy a mismatched requested metric.
+- Four of eight positive cases failed closed because Qwen3 claim output changed
+  exact source text or emitted citation labels inconsistent with that substring.
+  Strict parsing is working as intended, but schema recovery or a more reliable
+  structured-output strategy is needed before freezing a baseline.
 - End-to-end `answer_f1` is lexical overlap with the committed reference, not a
   semantic or LLM-judge score. Claim support rates are verifier judgments, not
   independently annotated entailment accuracy.
@@ -324,10 +349,11 @@ end-to-end LangGraph accuracy.
 
 ## Next priorities
 
-1. Package and run Task 11 through Kaggle Control Plane on the ten development
-   cases, inspect the trace/failures, and only then save a v0.5 development
-   baseline. Do not tag or set thresholds yet.
-2. Instrument embedding calls only at the production retriever boundary.
+1. Fix the two R4 false-positive classes and the four strict claim-output
+   failures, then rerun the identical pinned Task 11 suite. Do not save a
+   baseline, set thresholds, or tag while abstention accuracy remains `0.0000`.
+2. Instrument embedding calls at the production retriever boundary; the Kaggle
+   adapter can count them, but the general Task 11 report still leaves them null.
 3. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
 4. Independently review and expand the seven Task 8 development cases, then

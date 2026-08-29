@@ -1103,3 +1103,62 @@ case failure isolation, output reload/rendering, schema drift, and baseline
 guards. Ruff passed and all 139 pytest tests passed. The CLI help smoke succeeded
 and Markdown fences remain balanced. No LLM, GPU, or live Task 11 benchmark ran;
 the first heavy development run requires a Kaggle Control Plane execution package.
+
+## 2026-08-29 — Live Task 11 Kaggle package and first end-to-end checkpoint
+
+Task 11 now has a narrow Kaggle package built by
+`scripts/prepare_end_to_end_kaggle_job.py` from the committed
+`evaluation/kaggle/end_to_end_v0_5/` template. The bundle embeds only the
+production graph/evaluation modules, pinned ten-case suite, and public source
+manifest. Its isolated runtime inherits Kaggle's Torch rather than replacing it,
+pins all added dependencies and both Hugging Face model revisions, verifies two
+Tesla T4 capability-7.5 devices with a CUDA operation, uses deterministic
+left-padded generation with thinking disabled, and requires a one-case smoke to
+finish without execution failure before starting all ten cases. Exact arXiv
+revision and PDF checksum boundaries remain in force; runtime reports remain
+ignored.
+
+R1 (`job_4e57be30c1d6474e8df3583e4850f050`) failed before model loading because
+the no-dependencies install omitted `langchain-protocol`. R2
+(`job_e17b02fb79a54438ab4147999ba124e6`) then exposed a missing internal archive
+edge from `app.evaluation.metrics` to `app.evaluation.external`. Both failures
+were recovered from Control Plane diagnostics and stopped before the smoke/full
+benchmark. The package now pins the missing dependency closure and has an
+isolated archive-import test so missing internal evaluation modules fail locally.
+
+R3 (`job_a4b4cce4bc4941fe98fccf6c35da0493`) was the first complete diagnostic.
+It validated ten report cases with no top-level execution failures, but the LLM
+and embedding models shared device 0; two late verifier calls hit CUDA OOM and
+appeared as fail-closed tool errors. That run was not treated as a checkpoint.
+The runtime was corrected to keep Qwen3-4B on device 0, move the Qwen3 embedding
+model to device 1, force SDPA, and clear the CUDA allocator after every
+generation. This changed only the remote transport/resource adapter, not the
+production graph or evaluation semantics.
+
+R4 (`job_77d8f29fa5074e858e826793ad4d7540`) completed on account
+`acct_d321057bf0954d048b448711e0efed7f` with zero execution and tool errors. The
+schema-valid full report scored decision accuracy `0.4000`, answer-case accuracy
+`0.5000`, abstention accuracy `0.0000`, answer F1 `0.2158`, Recall@5 `0.6667`,
+Precision@5 `0.2000`, MRR `0.5556`, required-paper coverage `0.6667`, and
+claim-verifier failure rate `0.4000`. The full suite recorded 32 graph-counted
+LLM calls and 781.7 seconds. Adapter accounting including smoke recorded 35
+physical LLM calls, two document-embedding calls, and 11 query-embedding calls.
+Remote execution ran from approximately 11:54:56 to 12:10:41 UTC; Control Plane
+later downloaded all 12 output files despite intermittent Kaggle CLI status/log
+timeouts.
+
+The checkpoint is intentionally not a regression baseline. Both human-confirmed
+negative cases were answered: training duration/compute was incorrectly promoted
+to an electrical-energy answer, and translation BLEU evidence was accepted for
+an ImageNet request. Four positive cases abstained because the claim model changed
+an exact source substring or returned citation labels inconsistent with that
+substring; strict parsing correctly failed closed. The aggregate `1.0000`
+supported-claim and citation-completeness rates are conditional on successfully
+parsed final bundles and therefore do not imply overall grounding success. The
+next work is to correct these false-positive and structured-output failure modes,
+then rerun the exact suite before saving any baseline or setting thresholds.
+
+Final local verification passed Ruff and all 142 pytest tests. No model workload
+ran on the laptop; all live inference described above ran through Kaggle Control
+Plane. The downloaded reports, logs, ZIP files, and generated job directories
+remain under ignored `data/evaluations/`.
