@@ -15,8 +15,9 @@ Last updated: 2026-08-29
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
-  claim-verification contract and synthetic claim-verifier outputs validated;
-  Ruff passed and all 131 pytest tests passed. Native QASPER loaded all 5,049
+  claim-verification contract, synthetic claim-verifier outputs, and Task 11
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 139
+  pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
   The earlier Ollama doctor and Gradio import checks remain the latest runtime
@@ -82,6 +83,11 @@ Last updated: 2026-08-29
   claim verification, deterministic supported/repairable/unsupported routing,
   exactly one evidence-only repair, re-verification, and fail-closed abstention;
   graph state preserves attempts, revision count, history, and validation errors
+- Task 11 end-to-end evaluator and `python -m evaluation.run` command over the
+  production node-update stream, with versioned schema, automatic node/final-state
+  traces, exact-suite identity, registered metrics, case-level failure isolation,
+  runtime provenance, ignored JSONL/JSON/Markdown output, and informational
+  baseline comparison without hard-coded thresholds
 - Seven-case Task 8 synthetic development benchmark using the production
   prompt/parser, structural extraction/verdict/relationship metrics, fail-closed
   citation accounting, raw-response diagnostics, and a narrow pinned Qwen3-4B
@@ -110,10 +116,15 @@ This flow is shared by CLI and Gradio. CLI `--trace` currently prints discovery,
 paper selection, coverage, and retrieval attempts, but not the new claim bundle
 or revision diagnostics.
 
+The evaluation runner observes the same compiled graph through LangGraph's update
+stream. Its richer per-case artifact contains every node update and the complete
+serializable final state; this does not change the user-facing CLI/UI trace.
+
 ## Latest evaluation
 
 Before Task 10 integration, six fixed questions for `1706.03762v7` made the
-expected decision in 6/6 cases: four evidence-backed answers and two correct abstentions.
+expected decision in 6/6 cases: four evidence-backed answers and two correct
+abstentions.
 The positional-encoding case required one retrieval rewrite. This is a small
 calibration set and is not a general accuracy estimate. It does not exercise the
 new post-synthesis claim-verification or repair nodes.
@@ -256,6 +267,17 @@ end-to-end LangGraph accuracy.
 - CLI `--trace` and Gradio expose the final answer but do not yet render Task 10
   claim assessments, revision history, or claim-verifier errors. The state exists
   for Task 11 and future UI diagnostics.
+- Task 11 has deterministic mocked-graph coverage but no live suite result yet.
+  The committed runner uses configured production dependencies; the heavy first
+  run must use a prepared Kaggle Control Plane environment rather than the laptop.
+- End-to-end `answer_f1` is lexical overlap with the committed reference, not a
+  semantic or LLM-judge score. Claim support rates are verifier judgments, not
+  independently annotated entailment accuracy.
+- LLM-node calls are counted from graph attempts, but embedding calls remain
+  `null` because the retriever does not expose a reliable counter yet.
+- Baseline comparison requires exact suite identity and reports any directional
+  delta; it is informational and intentionally has no regression threshold until
+  real baseline variance is observed.
 - Exact source-span scoring is sensitive to punctuation boundaries in compound
   sentences, and the partial-versus-unsupported distinction needs independent
   annotation guidance before it becomes a regression threshold.
@@ -302,14 +324,14 @@ end-to-end LangGraph accuracy.
 
 ## Next priorities
 
-1. Implement Task 11's versioned end-to-end runner over the production graph,
-   with raw per-case traces, modular known metrics, failure reasons, latency/model
-   calls, and regression comparison. New trace fields should survive by default;
-   new metric meaning must be added explicitly.
-2. Independently review the remaining eight answer cases before freezing any
+1. Package and run Task 11 through Kaggle Control Plane on the ten development
+   cases, inspect the trace/failures, and only then save a v0.5 development
+   baseline. Do not tag or set thresholds yet.
+2. Instrument embedding calls only at the production retriever boundary.
+3. Independently review the remaining eight answer cases before freezing any
    benchmark snapshot.
-3. Independently review and expand the seven Task 8 development cases, then
+4. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-4. Run Task 10 on reviewed cases and calibrate repair versus immediate
+5. Run Task 10 on reviewed cases and calibrate repair versus immediate
    abstention, including distinct incomplete-evidence and contradiction reasons.
-5. Fix section boundaries and table-associated metadata.
+6. Fix section boundaries and table-associated metadata.

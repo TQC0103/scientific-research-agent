@@ -9,6 +9,8 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
   currently schema version `1.1.0`.
 - `schema/claim-verification.schema.json`: generated JSON Schema for the Task 7
   atomic-claim and evidence-assessment contract, version `1.0.0`.
+- `schema/end-to-end-report.schema.json`: generated Task 11 report contract,
+  version `1.0.0`, covering aggregate, per-case traces, and baseline deltas.
 - `suites/v0_5/schema_fixtures.json`: four illustrative cases; these are schema
   fixtures, not a reported benchmark.
 - `suites/v0_5/development_10.json`: eight answer and two abstention cases over
@@ -28,7 +30,9 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
 - `suites/v0_5/claim_verifier_development.json`: seven synthetic structured
   claim-verifier cases used for failure discovery, not publishable accuracy.
 - `app/evaluation/`: executable loader, semantic validator, public-dataset
-  adapters, deterministic metrics, and a portable QASPER runner.
+  adapters, deterministic metrics, end-to-end evaluator, and portable runners.
+- `evaluation/run.py`: `python -m evaluation.run` entrypoint over the compiled
+  production graph.
 - `scripts/download_external_benchmarks.py`: checksum-pinned QASPER v0.3 and
   SciFact downloader. Downloads remain under ignored `data/evaluations/`.
 - `kaggle/qasper_v0_5_r11/`: immutable source snapshot and provenance record
@@ -278,8 +282,47 @@ The validated aggregate verdicts drive a fixed policy:
 The graph state records approved evidence, claim-verifier attempt count, validated
 bundle, status/error, revision count, and revision history. The maximum revision
 count is one. Existing deterministic citation metrics and the Task 8 benchmark
-remain separate diagnostics; Task 11 will aggregate them through a versioned
+remain separate diagnostics; Task 11 now observes their production state through a versioned
 end-to-end report without changing their native contracts.
+
+## End-to-end report contract
+
+Task 11 is implemented in `app/evaluation/end_to_end.py` and invoked through
+`python -m evaluation.run`. The production adapter consumes LangGraph's ordered
+`updates` stream, reconstructs final state, and stores both representations. A
+new node therefore appears in `node_trace`, and a new state field remains under
+`trace`, without changing the report schema.
+
+Automatic visibility is not automatic scoring. Aggregate metrics are drawn from
+an explicit direction registry. Currently registered families cover final answer/
+abstention decisions, lexical reference-answer F1, annotation-relative retrieval,
+verifier-assigned claim verdicts, visible citation completeness, revision success,
+failures, and latency. Verifier-supported claim rate is the production model's
+judgment, not independently adjudicated entailment accuracy. Embedding calls and
+abstention-reason accuracy are not fabricated when the graph does not expose the
+required observations.
+
+Every aggregate pins report contract version, suite/dataset identity, SHA-256 of
+the validated suite payload, ordered case IDs, config label, Git commit/dirty
+state, Python/platform, configured model tags, and graph limits. Baseline
+comparison rejects any suite fingerprint, case order/count, dataset version, or
+config mismatch. It compares only registered numeric metrics, applies their
+declared higher/lower direction, and reports deltas without hard-coded gates.
+
+Per-case execution is fail-closed but isolated: an exception becomes an explicit
+execution failure and cannot count as a correct abstention, while remaining cases
+still run and the report is written. Generated `report.json`, `metrics.json`,
+`per_case.jsonl`, and `report.md` belong under ignored `data/evaluations/`.
+`report.json` validates directly against the committed schema. Regenerate the committed
+schema after intentional contract changes with:
+
+```powershell
+python scripts/export_end_to_end_schema.py `
+  --output evaluation/schema/end-to-end-report.schema.json
+```
+
+The runner has mocked production-graph and node-stream regression coverage. No
+live Task 11 suite result or regression baseline has been saved yet.
 
 ## Retrieval matching contract
 

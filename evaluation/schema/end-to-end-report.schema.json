@@ -1,0 +1,700 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TQC0103/scientific-research-agent/evaluation/schema/end-to-end-report.schema.json",
+  "$defs": {
+    "BaselineComparison": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_run_id": {
+          "title": "Baseline Run Id",
+          "type": "string"
+        },
+        "compared_metric_count": {
+          "title": "Compared Metric Count",
+          "type": "integer"
+        },
+        "improved_count": {
+          "title": "Improved Count",
+          "type": "integer"
+        },
+        "regressed_count": {
+          "title": "Regressed Count",
+          "type": "integer"
+        },
+        "unchanged_count": {
+          "title": "Unchanged Count",
+          "type": "integer"
+        },
+        "deltas": {
+          "items": {
+            "$ref": "#/$defs/BaselineMetricDelta"
+          },
+          "title": "Deltas",
+          "type": "array"
+        }
+      },
+      "required": [
+        "baseline_run_id",
+        "compared_metric_count",
+        "improved_count",
+        "regressed_count",
+        "unchanged_count",
+        "deltas"
+      ],
+      "title": "BaselineComparison",
+      "type": "object"
+    },
+    "BaselineMetricDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "direction": {
+          "$ref": "#/$defs/MetricDirection"
+        },
+        "baseline": {
+          "title": "Baseline",
+          "type": "number"
+        },
+        "current": {
+          "title": "Current",
+          "type": "number"
+        },
+        "delta": {
+          "title": "Delta",
+          "type": "number"
+        },
+        "outcome": {
+          "title": "Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "direction",
+        "baseline",
+        "current",
+        "delta",
+        "outcome"
+      ],
+      "title": "BaselineMetricDelta",
+      "type": "object"
+    },
+    "EndToEndAggregate": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "default": "1.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "suite_id": {
+          "title": "Suite Id",
+          "type": "string"
+        },
+        "dataset_version": {
+          "title": "Dataset Version",
+          "type": "string"
+        },
+        "suite_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Suite Fingerprint",
+          "type": "string"
+        },
+        "case_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "benchmark_status": {
+          "title": "Benchmark Status",
+          "type": "string"
+        },
+        "config_name": {
+          "minLength": 1,
+          "title": "Config Name",
+          "type": "string"
+        },
+        "retrieval_k_per_paper": {
+          "title": "Retrieval K Per Paper",
+          "type": "integer"
+        },
+        "quote_token_recall_threshold": {
+          "title": "Quote Token Recall Threshold",
+          "type": "number"
+        },
+        "case_count": {
+          "title": "Case Count",
+          "type": "integer"
+        },
+        "completed_cases": {
+          "title": "Completed Cases",
+          "type": "integer"
+        },
+        "execution_failures": {
+          "title": "Execution Failures",
+          "type": "integer"
+        },
+        "runtime": {
+          "$ref": "#/$defs/RuntimeMetadata"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Metrics",
+          "type": "object"
+        },
+        "metric_directions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/MetricDirection"
+          },
+          "title": "Metric Directions",
+          "type": "object"
+        },
+        "baseline_comparison": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaselineComparison"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "run_id",
+        "generated_at",
+        "suite_id",
+        "dataset_version",
+        "suite_fingerprint",
+        "case_ids",
+        "benchmark_status",
+        "config_name",
+        "retrieval_k_per_paper",
+        "quote_token_recall_threshold",
+        "case_count",
+        "completed_cases",
+        "execution_failures",
+        "runtime",
+        "metrics",
+        "metric_directions"
+      ],
+      "title": "EndToEndAggregate",
+      "type": "object"
+    },
+    "EndToEndCaseResult": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "expected_decision": {
+          "title": "Expected Decision",
+          "type": "string"
+        },
+        "expected_abstention_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected Abstention Reason"
+        },
+        "predicted_decision": {
+          "title": "Predicted Decision",
+          "type": "string"
+        },
+        "decision_correct": {
+          "title": "Decision Correct",
+          "type": "boolean"
+        },
+        "answer": {
+          "title": "Answer",
+          "type": "string"
+        },
+        "answer_f1": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Answer F1"
+        },
+        "evidence_sufficient": {
+          "title": "Evidence Sufficient",
+          "type": "boolean"
+        },
+        "synthesis_citation_valid": {
+          "title": "Synthesis Citation Valid",
+          "type": "boolean"
+        },
+        "claim_verification_status": {
+          "title": "Claim Verification Status",
+          "type": "string"
+        },
+        "claim_verification_attempt_count": {
+          "minimum": 0,
+          "title": "Claim Verification Attempt Count",
+          "type": "integer"
+        },
+        "claim_revision_count": {
+          "minimum": 0,
+          "title": "Claim Revision Count",
+          "type": "integer"
+        },
+        "claim_metrics": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Claim Metrics",
+          "type": "object"
+        },
+        "retrieval": {
+          "$ref": "#/$defs/RetrievalCaseMetrics"
+        },
+        "llm_calls": {
+          "$ref": "#/$defs/LlmCallCounts"
+        },
+        "embedding_calls": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embedding Calls"
+        },
+        "latency_seconds": {
+          "minimum": 0,
+          "title": "Latency Seconds",
+          "type": "number"
+        },
+        "failure_reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Failure Reasons",
+          "type": "array"
+        },
+        "execution_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Execution Error"
+        },
+        "node_trace": {
+          "items": {
+            "$ref": "#/$defs/GraphNodeEvent"
+          },
+          "title": "Node Trace",
+          "type": "array"
+        },
+        "trace": {
+          "additionalProperties": true,
+          "title": "Trace",
+          "type": "object"
+        }
+      },
+      "required": [
+        "case_id",
+        "question",
+        "expected_decision",
+        "expected_abstention_reason",
+        "predicted_decision",
+        "decision_correct",
+        "answer",
+        "answer_f1",
+        "evidence_sufficient",
+        "synthesis_citation_valid",
+        "claim_verification_status",
+        "claim_verification_attempt_count",
+        "claim_revision_count",
+        "claim_metrics",
+        "retrieval",
+        "llm_calls",
+        "latency_seconds",
+        "failure_reasons",
+        "execution_error",
+        "node_trace",
+        "trace"
+      ],
+      "title": "EndToEndCaseResult",
+      "type": "object"
+    },
+    "GraphNodeEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "node": {
+          "minLength": 1,
+          "title": "Node",
+          "type": "string"
+        },
+        "update": {
+          "additionalProperties": true,
+          "title": "Update",
+          "type": "object"
+        }
+      },
+      "required": [
+        "sequence",
+        "node",
+        "update"
+      ],
+      "title": "GraphNodeEvent",
+      "type": "object"
+    },
+    "LlmCallCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_verifier": {
+          "minimum": 0,
+          "title": "Evidence Verifier",
+          "type": "integer"
+        },
+        "synthesis": {
+          "minimum": 0,
+          "title": "Synthesis",
+          "type": "integer"
+        },
+        "claim_verifier": {
+          "minimum": 0,
+          "title": "Claim Verifier",
+          "type": "integer"
+        },
+        "claim_repair": {
+          "minimum": 0,
+          "title": "Claim Repair",
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "evidence_verifier",
+        "synthesis",
+        "claim_verifier",
+        "claim_repair",
+        "total"
+      ],
+      "title": "LlmCallCounts",
+      "type": "object"
+    },
+    "MetricDirection": {
+      "enum": [
+        "higher",
+        "lower"
+      ],
+      "title": "MetricDirection",
+      "type": "string"
+    },
+    "RetrievalCaseMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "eligible": {
+          "title": "Eligible",
+          "type": "boolean"
+        },
+        "top_k": {
+          "title": "Top K",
+          "type": "integer"
+        },
+        "retrieved_count": {
+          "title": "Retrieved Count",
+          "type": "integer"
+        },
+        "gold_evidence_count": {
+          "title": "Gold Evidence Count",
+          "type": "integer"
+        },
+        "gold_group_count": {
+          "title": "Gold Group Count",
+          "type": "integer"
+        },
+        "matched_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Matched Evidence Ids",
+          "type": "array"
+        },
+        "matched_evidence_group_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Matched Evidence Group Ids",
+          "type": "array"
+        },
+        "first_match_rank": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "First Match Rank"
+        },
+        "recall_at_k": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Recall At K"
+        },
+        "precision_at_k": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Precision At K"
+        },
+        "reciprocal_rank": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reciprocal Rank"
+        },
+        "gold_evidence_coverage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Gold Evidence Coverage"
+        },
+        "required_paper_coverage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Required Paper Coverage"
+        },
+        "macro_paper_recall": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Macro Paper Recall"
+        },
+        "missing_required_paper_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Required Paper Ids",
+          "type": "array"
+        },
+        "unmatched_evidence_group_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unmatched Evidence Group Ids",
+          "type": "array"
+        },
+        "diagnostics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Diagnostics",
+          "type": "array"
+        }
+      },
+      "required": [
+        "case_id",
+        "eligible",
+        "top_k",
+        "retrieved_count",
+        "gold_evidence_count",
+        "gold_group_count",
+        "matched_evidence_ids",
+        "matched_evidence_group_ids",
+        "first_match_rank",
+        "recall_at_k",
+        "precision_at_k",
+        "reciprocal_rank",
+        "gold_evidence_coverage",
+        "required_paper_coverage",
+        "macro_paper_recall",
+        "missing_required_paper_ids",
+        "unmatched_evidence_group_ids",
+        "diagnostics"
+      ],
+      "title": "RetrievalCaseMetrics",
+      "type": "object"
+    },
+    "RuntimeMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "python": {
+          "title": "Python",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "git_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Git Commit"
+        },
+        "git_dirty": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Git Dirty"
+        },
+        "ollama_model": {
+          "title": "Ollama Model",
+          "type": "string"
+        },
+        "embedding_model": {
+          "title": "Embedding Model",
+          "type": "string"
+        },
+        "max_retrieval_rewrites": {
+          "title": "Max Retrieval Rewrites",
+          "type": "integer"
+        },
+        "max_claim_revisions": {
+          "title": "Max Claim Revisions",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "python",
+        "platform",
+        "git_commit",
+        "git_dirty",
+        "ollama_model",
+        "embedding_model",
+        "max_retrieval_rewrites",
+        "max_claim_revisions"
+      ],
+      "title": "RuntimeMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "aggregate": {
+      "$ref": "#/$defs/EndToEndAggregate"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/EndToEndCaseResult"
+      },
+      "title": "Cases",
+      "type": "array"
+    }
+  },
+  "required": [
+    "aggregate",
+    "cases"
+  ],
+  "title": "EndToEndReport",
+  "type": "object"
+}

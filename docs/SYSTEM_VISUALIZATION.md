@@ -26,6 +26,7 @@ flowchart LR
     ANSWER <--> MODELS
 
     EVALUATION["Evaluation module"] <--> MODELS
+    EVALUATION -->|"end-to-end run"| AGENT
     EVALUATION --> STORAGE
 ```
 
@@ -346,9 +347,14 @@ flowchart TD
     CLAIMMETRICS --> CLAIMGPU["Pinned isolated T4 package via Control Plane"]
     CLAIMMETRICS --> CLAIMOUTPUTS["Ignored JSON + Markdown report"]
     CLAIMMODEL --> CLAIMGRAPH["Task 10 bounded verify / repair / abstain graph"]
-    CASES -.-> E2E["Task 11 end-to-end graph runner — planned"]
-    CLAIMGRAPH -.-> E2E
-    E2E -.-> E2EOUTPUTS["Versioned traces, aggregate report, baseline comparison — planned"]
+    CASES --> E2E["Task 11 end-to-end graph runner"]
+    CLAIMGRAPH --> E2E
+    E2E --> NODETRACE["Ordered LangGraph node updates + final state"]
+    NODETRACE --> E2EMETRICS["Registered decision / retrieval / claim / latency metrics"]
+    E2EMETRICS --> E2EOUTPUTS["Ignored full/aggregate JSON + per-case JSONL + Markdown"]
+    E2EBASELINE["Prior exact-suite metrics.json"] --> E2ECOMPARE["Directional deltas; no threshold"]
+    E2EMETRICS --> E2ECOMPARE
+    E2ECOMPARE --> E2EOUTPUTS
 
     CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
@@ -429,12 +435,14 @@ directory is a historical, immutable source snapshot; future evaluator changes
 remain in `app/evaluation/` and the packaging script rather than being made in
 the archived runner.
 
-Task 11 end-to-end reporting is not implemented yet. Its planned boundary is a
-versioned observer of the compiled production graph: per-case raw traces retain
-new fields, while metric modules explicitly opt into fields they understand.
-This lets later graph changes appear in diagnostics without silently inventing a
-score for a new capability. The planned runner must write ignored JSONL/JSON/
-Markdown artifacts and compare against an explicit versioned baseline.
+Task 11 end-to-end reporting is a versioned observer of the compiled production
+graph. The production adapter records each LangGraph node update and reconstructs
+the final state; per-case traces therefore retain new nodes and fields. Metric
+meaning remains explicit through a direction registry. Exact suite fingerprint,
+ordered cases, dataset version, and config must match before baseline comparison.
+Comparison is informational and has no hard-coded pass threshold. Outputs remain
+ignored JSONL/JSON/Markdown runtime artifacts. Embedding-call instrumentation and
+the first live development baseline remain future work.
 
 ## Maintenance rule
 

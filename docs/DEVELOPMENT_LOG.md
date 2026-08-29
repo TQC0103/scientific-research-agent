@@ -1071,3 +1071,35 @@ pretending the runner can infer their evaluation semantics.
 
 Markdown code fences are balanced, Ruff passed, and all 131 pytest tests passed.
 This documentation-only audit did not run an LLM, GPU workload, or new evaluation.
+
+## 2026-08-29 — Versioned end-to-end evaluation runner
+
+Task 11 adds `app/evaluation/end_to_end.py` and the requested
+`python -m evaluation.run` entrypoint. The production adapter consumes the
+compiled LangGraph `updates` stream, stores every ordered node update, rebuilds
+the final state, and writes both into each per-case JSONL record. This gives new
+nodes and state fields automatic trace visibility without automatically assigning
+them a metric.
+
+The aggregate contract is version `1.0.0` with a generated, drift-tested JSON
+Schema. It records the validated suite SHA-256, ordered case IDs, dataset and
+config identity, Git commit/dirty state, Python/platform, configured model tags,
+and graph limits. Registered metrics cover final decision accuracy, lexical
+answer F1, per-paper-K annotation-relative retrieval, verifier-assigned claim
+verdicts, visible citation completeness, revision success, failures, counted
+LLM-node calls, and latency. Embedding calls remain explicitly null because no
+reliable production counter exists.
+
+Case execution is isolated and fail-closed. A graph exception is recorded and
+cannot count as a correct abstention, but it does not erase other cases. Baseline
+comparison requires an identical suite fingerprint, case order/count, dataset
+version, and config. Only metrics with a registered higher/lower direction are
+compared, and the resulting deltas are informational: no threshold was invented
+before observing real variance.
+
+Eight new tests cover automatic future-node capture, unknown state preservation,
+answer/abstention aggregation, retrieval and claim metrics, repair call counts,
+case failure isolation, output reload/rendering, schema drift, and baseline
+guards. Ruff passed and all 139 pytest tests passed. The CLI help smoke succeeded
+and Markdown fences remain balanced. No LLM, GPU, or live Task 11 benchmark ran;
+the first heavy development run requires a Kaggle Control Plane execution package.

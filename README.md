@@ -30,6 +30,8 @@ not been tagged yet.
   verdict invariants
 - bounded post-synthesis claim verification with one repair attempt and
   fail-closed abstention
+- versioned end-to-end runner over production LangGraph with automatic node/state
+  traces, explicit metric registration, and exact-suite baseline comparison
 
 ## Quick start (Windows PowerShell)
 
@@ -87,13 +89,12 @@ question
        -> unsupported, invalid, or still failing: abstain
 ```
 
-The evaluation commands below are deliberately separate diagnostics today.
-Task 11 is the next implementation step: one versioned end-to-end runner that
-calls this production graph directly and aggregates retrieval, evidence-verifier,
-synthesis, citation, claim-grounding, latency, and failure-path data. New graph
-behavior will therefore flow into its raw trace automatically; genuinely new
-capabilities will still need an explicit metric rather than being assigned a
-misleading score automatically.
+The specialized evaluation commands below remain useful diagnostics. Task 11
+also provides one end-to-end runner over the compiled production graph. LangGraph
+node updates and the final state are stored for every case, so later nodes and
+fields appear automatically. Aggregate scores remain opt-in: genuinely new
+capabilities need an explicit metric definition instead of receiving a guessed
+score.
 
 Repeated `--paper-id` options activate required coverage for every supplied
 paper. Comparison-style questions without explicit IDs require the first two
@@ -335,6 +336,41 @@ schema validity `0.8571`, exact source/citation extraction `0.7143`, claim
 verdict accuracy `0.7500`, and evidence-relationship accuracy `0.8571` over
 seven synthetic cases. Treat these as failure-discovery numbers, not model
 quality claims.
+
+Run the complete internal suite through production LangGraph with:
+
+```powershell
+python -m evaluation.run `
+  --suite evaluation/suites/v0_5/development_10.json `
+  --config hybrid_verified `
+  --output-dir data/evaluations/runs/end-to-end-v0-5
+```
+
+`--config` is a stable run label; it does not silently switch production
+retrieval or model settings. Outputs are a schema-valid `report.json`, compact
+`metrics.json`, one rich `per_case.jsonl` row per case, and readable `report.md`.
+Each case includes
+ordered node updates, the serializable final graph state, retrieval diagnostics,
+final decision, claim status, repair count, counted LLM-node calls, latency, and
+failure reasons. Embedding calls are explicitly `null` until instrumented.
+
+Compare a later identical-suite/config run with a prior aggregate using:
+
+```powershell
+python -m evaluation.run `
+  --suite evaluation/suites/v0_5/development_10.json `
+  --config hybrid_verified `
+  --baseline data/evaluations/baselines/v0_5/metrics.json `
+  --output-dir data/evaluations/runs/end-to-end-v0-5-next
+```
+
+Comparison requires the same suite fingerprint, ordered case IDs, dataset
+version, and config label. It reports directional deltas but enforces no quality
+threshold. Runtime outputs and baselines remain ignored. The full run invokes
+the configured production models and indexing path, so execute it through the
+Kaggle Control Plane/GPU workflow once its Task 12 package is prepared, not as a
+heavy laptop job. The implemented runner currently has deterministic mocked-graph
+coverage; no live Task 11 quality result has been recorded yet.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.
