@@ -26,12 +26,13 @@ QASPER R11 development checkpoint are preserved. R11 supports retaining hybrid
 retrieval but does not replace an independently reviewed internal benchmark.
 Continue in this order:
 
-1. Use the completed Task 11 Kaggle R4 trace to fix two observed safety failures:
-   verifier approval of evidence that does not establish a document-wide absent
-   fact, and claim-verifier outputs whose exact source/citation fields fail the
-   strict contract. Re-run the same pinned ten cases before saving any baseline.
-   R4 decision accuracy is `0.4000`, abstention accuracy is `0.0000`, and the
-   claim-verifier failure rate is `0.4000`; do not tag `v0.5.0` from this run.
+1. Use the completed Task 11 R5 trace to replace free-form claim source-span and
+   citation-field copying with deterministic binding to answer spans. The one
+   structure-only model retry recovered none of R4's four malformed bundles.
+   Also bound verifier context so a third rewrite cannot exhaust T4 memory.
+   R5 reached decision accuracy `0.6000` and abstention accuracy `1.0000`, but
+   retained claim failure rate `0.4000` and one tool-error-assisted abstention;
+   do not freeze a baseline or tag `v0.5.0` from this run.
 2. Add embedding-call instrumentation and abstention-reason classification only
    when production exposes reliable observations; do not estimate them.
 3. Independently review the remaining eight answer cases before freezing a

@@ -1,4 +1,5 @@
 from app.agent import graph
+from app.models.claim_verifier import ClaimVerificationRun
 from app.models.claims import (
     CLAIM_VERIFICATION_CONTRACT_VERSION,
     AtomicClaim,
@@ -96,7 +97,15 @@ def test_full_graph_requires_and_synthesizes_both_explicit_papers(monkeypatch) -
 
     monkeypatch.setattr(graph, "verify_evidence", fake_verify)
     monkeypatch.setattr(graph, "answer_from_evidence", fake_answer)
-    monkeypatch.setattr(graph, "verify_answer_claims", fake_claim_verification)
+    monkeypatch.setattr(
+        graph,
+        "verify_answer_claims_bounded",
+        lambda *args: ClaimVerificationRun(
+            bundle=fake_claim_verification(*args),
+            model_calls=1,
+            output_repaired=False,
+        ),
+    )
 
     result = graph.build_graph().invoke(
         {"user_query": "Compare the methods", "paper_ids": paper_ids}

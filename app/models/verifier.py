@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -10,6 +11,35 @@ class EvidenceVerification(BaseModel):
     missing_information: list[str] = Field(default_factory=list)
     suggested_query: str | None = None
     supported_evidence: list[int] = Field(default_factory=list)
+
+
+SEMANTIC_ANCHOR_RULES = (
+    (
+        "an electrical-energy measurement",
+        re.compile(
+            r"\b(electrical energy|electricity|energy consumption|power consumption)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(electrical energy|electricity|energy consumption|power consumption|"
+            r"kwh|kilowatt(?:-hours?)?|joules?|watt(?:-hours?)?)\b",
+            re.IGNORECASE,
+        ),
+        "electrical energy consumption kWh joules power measurement",
+    ),
+    (
+        "the ImageNet benchmark",
+        re.compile(r"\bimagenet\b", re.IGNORECASE),
+        re.compile(r"\bimagenet\b", re.IGNORECASE),
+        "ImageNet evaluation results table",
+    ),
+    (
+        "a top-1 accuracy measurement",
+        re.compile(r"\btop[- ]?1\b.*\baccurac(?:y|ies)\b", re.IGNORECASE),
+        re.compile(r"\btop[- ]?1\b.*\baccurac(?:y|ies)\b", re.IGNORECASE),
+        "top-1 accuracy percent evaluation",
+    ),
+)
 
 
 def get_llm(**kwargs: Any) -> Any:
@@ -80,6 +110,12 @@ Calibration examples:
   method. Decision: sufficient=false for A, missing_information=["device A energy use"]. Every
   requested comparison dimension must be supported for that paper; coverage of one dimension
   cannot substitute for another.
+- Question: "How much electrical energy did training consume?" Evidence reports only training
+  duration, GPU count, FLOPs, or a generic training cost. Decision: sufficient=false. Compute,
+  elapsed time, and financial cost are not electrical energy and must never be converted into it.
+- Question: "What ImageNet top-1 accuracy is reported?" Evidence reports BLEU on WMT translation.
+  Decision: sufficient=false. Explaining that BLEU is a different metric does not supply the
+  requested benchmark result and does not prove document-wide absence.
 
 First identify exactly what the question requests without strengthening it. Then check whether
 each requested element can be stated as a faithful paraphrase of one or more passages. Mark
@@ -111,6 +147,43 @@ question. If sufficient is false, suggested_query must be a materially different
 keyword-focused search (use likely terminology, section/table names, entities, and metrics),
 not a restatement of the current retrieval query.
 """
+
+
+def apply_semantic_anchor_guard(
+    result: EvidenceVerification,
+    question: str,
+    evidence: list[dict],
+) -> EvidenceVerification:
+    """Reject known high-risk metric substitutions after model verification."""
+    if not result.sufficient:
+        return result
+    supported_text = "\n".join(
+        str(evidence[number - 1].get("text", ""))
+        for number in result.supported_evidence
+        if 1 <= number <= len(evidence)
+    )
+    missing = [
+        (description, query_terms)
+        for description, question_pattern, evidence_pattern, query_terms in SEMANTIC_ANCHOR_RULES
+        if question_pattern.search(question) and not evidence_pattern.search(supported_text)
+    ]
+    if not missing:
+        return result
+    descriptions = [description for description, _ in missing]
+    result.sufficient = False
+    result.reason = (
+        "The selected passages do not explicitly report the required semantic anchor(s): "
+        + "; ".join(descriptions)
+        + ". Related compute, duration, task, or metric evidence cannot substitute for them."
+    )
+    result.missing_information = list(
+        dict.fromkeys([*result.missing_information, *descriptions])
+    )
+    result.suggested_query = (
+        f"{question} explicit {' '.join(query_terms for _, query_terms in missing)}"
+    )
+    result.supported_evidence = []
+    return result
 
 
 def parse_verifier_response(
@@ -159,6 +232,7 @@ def verify_evidence(
             evidence_count=len(evidence),
             fallback_query=question,
         )
+        result = apply_semantic_anchor_guard(result, question, evidence)
     except Exception as exc:
         raise ValueError(f"Invalid verifier response: {exc}") from exc
     return result

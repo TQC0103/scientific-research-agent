@@ -97,6 +97,7 @@ class SentenceTransformerEmbeddings:
         from sentence_transformers import SentenceTransformer
 
         self.model = SentenceTransformer(model_name, revision=revision, device=device)
+        self.device = device
         self.batch_size = batch_size
         self.document_calls = 0
         self.query_calls = 0
@@ -216,7 +217,7 @@ def main() -> None:
         args.embedding_model,
         args.embedding_revision,
         batch_size=args.embedding_batch_size,
-        device="cuda:1",
+        device="cuda:1" if llm.torch.cuda.device_count() > 1 else "cpu",
     )
     graph = _install_adapters(llm, embeddings, expected)
 
@@ -228,6 +229,7 @@ def main() -> None:
         "llm_physical_calls": llm.calls,
         "embedding_document_calls": embeddings.document_calls,
         "embedding_query_calls": embeddings.query_calls,
+        "embedding_device": embeddings.device,
         "smoke_execution_failures": smoke.aggregate.execution_failures,
         "full_execution_failures": full.aggregate.execution_failures,
     }

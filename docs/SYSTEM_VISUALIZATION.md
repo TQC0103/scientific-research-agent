@@ -178,7 +178,8 @@ flowchart TD
     QWEN --> JSON["Per-paper JSON: sufficient, reason, missing, query, supported IDs"]
     JSON --> VALIDATE["Parse schema and validate passage IDs"]
     VALIDATE --> CONSISTENCY["Repair one defined boolean/list contradiction"]
-    CONSISTENCY --> DIMENSIONS{"Every requested dimension covered for this paper?"}
+    CONSISTENCY --> ANCHOR["Semantic anchor guard for requested metric / benchmark"]
+    ANCHOR --> DIMENSIONS{"Every requested dimension covered for this paper?"}
 
     DIMENSIONS -->|"yes"| PAPER_OK["Mark this paper covered"]
     DIMENSIONS -->|"no"| RETRIES{"This paper's rewrite budget remains?"}
@@ -202,6 +203,11 @@ enough scope; silence in a few passages is not accepted as proof. For a
 multi-paper question, each paper must cover every requested comparison
 dimension on its own side. Missing evidence about another paper is ignored
 during that paper's check, but missing dimensions within the paper are not.
+The post-parse semantic guard is deterministic and fail-closed for explicitly
+registered high-risk anchors: electrical-energy questions need an energy/power
+measurement anchor, and ImageNet/top-1 questions need those benchmark/metric
+anchors in a verifier-selected passage. This guard narrows a positive model
+decision; it never upgrades insufficient evidence.
 
 ## 7. Answer and citation module
 
@@ -221,10 +227,13 @@ flowchart TD
     INSUFFICIENT["Verifier says insufficient"] --> ABSTAIN["Reason + missing information"]
     ABSTAIN --> FINAL
 
-    FINAL --> CLAIMPROMPT["One bounded atomic extraction + verification prompt"]
+    FINAL --> CLAIMPROMPT["Atomic extraction + verification prompt"]
     CLAIMPROMPT --> CLAIMQWEN["Qwen3 4B structured JSON"]
-    CLAIMQWEN --> CLAIMGUARD["Lock answer/evidence count + Task 7 validation"]
-    CLAIMGUARD --> CLAIMBUNDLE["Ordered claims + evidence links + derived verdicts"]
+    CLAIMQWEN --> CLAIMGUARD{"Lock inputs + Task 7 validation"}
+    CLAIMGUARD -->|"valid"| CLAIMBUNDLE["Ordered claims + evidence links + derived verdicts"]
+    CLAIMGUARD -->|"invalid; no output retry yet"| FORMATRETRY["One structure-only retry; unchanged answer/evidence/schema"]
+    FORMATRETRY --> CLAIMQWEN
+    CLAIMGUARD -->|"invalid after retry"| CLAIMFAIL["Explicit claim-grounding abstention"]
     CLAIMBUNDLE -->|"all supported"| VERIFIED_FINAL["Return answer"]
     CLAIMBUNDLE -->|"partial or mixed; no prior revision"| REPAIR["One evidence-only revision"]
     REPAIR --> SOURCES["Restore trusted Sources block"]
@@ -238,9 +247,11 @@ Code never invents a citation when the model omits one. Missing citations and
 labels outside the verifier-approved passage list fail closed before any Sources
 block is rendered. The production graph then strips that deterministic block,
 checks atomic claims against only approved passages, and permits at most one
-repair. The repair model cannot author source metadata; code restores it from
-trusted passage records before re-verification. Invalid structured output,
-wholly unsupported answers, and unresolved post-repair claims abstain.
+answer repair. Separately, one malformed claim-verifier response may receive one
+structure-only retry against immutable inputs; a second invalid response
+abstains. The answer-repair model cannot author source metadata; code restores
+it from trusted passage records before re-verification. Wholly unsupported
+answers and unresolved post-repair claims also abstain.
 
 ## 8. Persistence module
 
@@ -346,13 +357,14 @@ flowchart TD
     CLAIMBENCH --> CLAIMMETRICS["Schema + extraction + verdict + relationship metrics"]
     CLAIMMETRICS --> CLAIMGPU["Pinned isolated T4 package via Control Plane"]
     CLAIMMETRICS --> CLAIMOUTPUTS["Ignored JSON + Markdown report"]
-    CLAIMMODEL --> CLAIMGRAPH["Task 10 bounded verify / repair / abstain graph"]
+    CLAIMMODEL --> CLAIMFORMAT["Production-only one-shot structure repair"]
+    CLAIMFORMAT --> CLAIMGRAPH["Task 10 bounded verify / repair / abstain graph"]
     CASES --> E2E["Task 11 end-to-end graph runner"]
     CLAIMGRAPH --> E2E
     E2E --> NODETRACE["Ordered LangGraph node updates + final state"]
     NODETRACE --> E2EMETRICS["Registered decision / retrieval / claim / latency metrics"]
     E2EMETRICS --> E2EOUTPUTS["Ignored full/aggregate JSON + per-case JSONL + Markdown"]
-    E2E --> E2EPACKAGE["Narrow dual-T4 Kaggle package"]
+    E2E --> E2EPACKAGE["Narrow T4 Kaggle package; dual-GPU or CPU-embedding fallback"]
     E2EPACKAGE --> E2ESMOKE["1-case production-graph smoke gate"]
     E2ESMOKE --> E2EFULL["10-case live development run"]
     E2EFULL --> E2EOUTPUTS
@@ -447,13 +459,17 @@ ordered cases, dataset version, and config must match before baseline comparison
 Comparison is informational and has no hard-coded pass threshold. Outputs remain
 ignored JSONL/JSON/Markdown runtime artifacts. The Kaggle adapter keeps the
 compiled graph and swaps only the Ollama transports: deterministic Qwen3-4B FP16
-runs on T4 device 0 while the pinned SentenceTransformer runs on device 1. A
+runs on T4 device 0 while the pinned SentenceTransformer runs on device 1 when
+available, otherwise on CPU. A
 one-case smoke must finish without execution failure before the full ten cases
 start. R4 completed this path without runtime/tool errors, but its two negative
 cases were false positives and four claim-verifier outputs failed the strict
-contract, so no regression baseline was frozen. Production embedding-call
-instrumentation and the first acceptable live development baseline remain future
-work.
+contract. R5 added semantic anchors and a one-shot structure repair: both
+negative cases abstained, but none of the four malformed claim bundles recovered
+and one final verifier call exhausted T4 memory. No regression baseline is
+frozen. Deterministic answer-span binding, bounded verifier context, production
+embedding-call instrumentation, and the first acceptable live development
+baseline remain future work.
 
 ## Maintenance rule
 

@@ -6,7 +6,11 @@ from app.agent.state import AgentState
 from app.config import settings
 from app.db.database import search_local
 from app.ingestion.indexing import index_paper
-from app.models.claim_verifier import repair_answer_claims, verify_answer_claims
+from app.models.claim_verifier import (
+    ClaimVerificationRunError,
+    repair_answer_claims,
+    verify_answer_claims_bounded,
+)
 from app.models.claims import ClaimVerdict, ClaimVerificationBundle
 from app.models.llm import answer_from_evidence
 from app.models.verifier import verify_evidence
@@ -431,14 +435,19 @@ def _claim_verification_status(bundle: ClaimVerificationBundle) -> str:
 
 
 def verify_claims(state: AgentState) -> dict:
-    attempts = state.get("claim_verification_attempt_count", 0) + 1
+    attempts = state.get("claim_verification_attempt_count", 0)
     try:
-        bundle = verify_answer_claims(
+        run = verify_answer_claims_bounded(
             state["answer"],
             state.get("verified_evidence", []),
             state["user_query"],
         )
+        attempts += run.model_calls
+        bundle = run.bundle
     except (ValueError, OSError) as exc:
+        attempts += (
+            exc.model_calls if isinstance(exc, ClaimVerificationRunError) else 1
+        )
         return {
             "claim_verification": {},
             "claim_verification_status": "invalid",

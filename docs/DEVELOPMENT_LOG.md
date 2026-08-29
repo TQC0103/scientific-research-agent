@@ -1162,3 +1162,46 @@ Final local verification passed Ruff and all 142 pytest tests. No model workload
 ran on the laptop; all live inference described above ran through Kaggle Control
 Plane. The downloaded reports, logs, ZIP files, and generated job directories
 remain under ignored `data/evaluations/`.
+
+## 2026-08-30 — Semantic anchors, bounded claim-output repair, and Task 11 R5
+
+R4 showed two distinct safety failures, so the evidence verifier now calibrates
+electrical-energy versus compute/time and ImageNet top-1 versus translation
+metrics. A deterministic post-parse guard can only downgrade a positive decision
+when verifier-selected passages lack the requested registered metric/benchmark
+anchor; it cannot upgrade insufficient evidence. Unit tests cover both rejected
+substitutions and a directly anchored positive case.
+
+Production claim verification now records physical model-call count and allows
+exactly one structure-only retry after strict parsing fails. The retry repeats
+the immutable answer, approved evidence, and contract and cannot initiate another
+answer revision. The standalone Task 8 benchmark remains one-shot so its metric
+meaning does not change. Graph tests cover successful recovery and fail-closed
+second failure. The Kaggle adapter was also made portable: generation uses T4
+device 0, embeddings use device 1 when present, and a single-T4 host moves
+embeddings to CPU.
+
+The immutable R5 bundle was submitted through Kaggle Control Plane as
+`job_bc2c4caca10e4b36ab3177b7058d2aac`; it completed on two Tesla T4 devices in
+1,298 wall-clock seconds. The schema-valid ten-case report had no top-level
+execution failures. Compared with R4, decision accuracy moved from `0.4000` to
+`0.6000` and abstention accuracy from `0.0000` to `1.0000`; answer-case accuracy
+remained `0.5000`, answer F1 `0.2158`, Recall@5 `0.6667`, MRR `0.5556`, and
+claim-verifier failure rate `0.4000`. Full graph accounting was 35 LLM calls and
+1,064.7 seconds; adapter accounting including smoke was 37 physical LLM calls,
+two document-embedding calls, and 14 query-embedding calls.
+
+The apparent abstention improvement needs qualification. ImageNet was a clean
+success: the semantic guard rejected the first mismatched positive decision and
+subsequent rewritten checks remained insufficient. The energy case produced two
+valid insufficient decisions but its third verifier call exhausted T4 memory;
+the graph correctly failed closed, leaving one tool-error case. All four R4
+claim-structure failures repeated after the allowed retry, usually because
+`source_text` omitted its visible label or was not an exact answer substring.
+The retry therefore added latency without live recovery. R5 is not frozen as a
+baseline. The next implementation should bind claim source spans/visible labels
+deterministically and bound accumulated verifier context before another live run.
+
+The downloaded ZIP, reports, and logs remain ignored under
+`data/evaluations/runs/end_to_end_v0_5_kaggle_r5/`.
+Final local verification passed Ruff and all 148 pytest tests.

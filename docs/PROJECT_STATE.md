@@ -17,7 +17,7 @@ Last updated: 2026-08-29
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 142
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 148
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -31,6 +31,9 @@ Last updated: 2026-08-29
 - Page/section-aware chunking and identity-checked per-paper FAISS indexes
 - Hybrid dense + lexical retrieval with reciprocal-rank fusion
 - Structured LLM evidence verifier, bounded query rewrite, and fail-closed stop
+- Deterministic post-verifier semantic-anchor guard for electrical-energy,
+  ImageNet, and top-1 metric requests; mismatched selected passages can only be
+  downgraded to insufficient evidence
 - Per-paper evidence/query/retry maps and required coverage for comparisons
 - Verified-passage-only synthesis, fail-closed numeric citation labels, and
   deterministic citation metadata; missing/invalid labels never receive an
@@ -83,14 +86,17 @@ Last updated: 2026-08-29
 - Task 10 production graph integration after citation-safe synthesis: structured
   claim verification, deterministic supported/repairable/unsupported routing,
   exactly one evidence-only repair, re-verification, and fail-closed abstention;
-  graph state preserves attempts, revision count, history, and validation errors
+  graph state preserves attempts, revision count, history, and validation errors.
+  Production claim verification also permits exactly one structure-only output
+  retry against immutable answer/evidence inputs and counts both physical calls
 - Task 11 end-to-end evaluator and `python -m evaluation.run` command over the
   production node-update stream, with versioned schema, automatic node/final-state
   traces, exact-suite identity, registered metrics, case-level failure isolation,
   runtime provenance, ignored JSONL/JSON/Markdown output, and informational
   baseline comparison without hard-coded thresholds
 - Narrow Task 11 Kaggle package with embedded production sources, pinned model
-  revisions and dependency manifest, dual-T4 CUDA preflight, exact arXiv source
+  revisions and dependency manifest, one-or-more-T4 CUDA preflight, dual-GPU or
+  CPU embedding placement, exact arXiv source
   checks, deterministic left-padded generation, one-case smoke gate, and ignored
   result collection
 - Seven-case Task 8 synthetic development benchmark using the production
@@ -109,13 +115,15 @@ Last updated: 2026-08-29
    required `all` paper coverage.
 2. Reuse current indexes or lazily download, validate, parse, chunk, embed, and
    index selected revisions; fall back to labeled abstract evidence on failure.
-3. Run hybrid retrieval separately per paper and let the evidence verifier retry
-   with at most two focused query rewrites per paper.
+3. Run hybrid retrieval separately per paper, apply deterministic semantic
+   anchors to positive verifier decisions, and retry with at most two focused
+   query rewrites per paper.
 4. If coverage remains insufficient, return paper-specific gaps without synthesis.
 5. Otherwise synthesize only from approved passages, validate every numeric label,
    and construct source metadata from trusted records.
-6. Verify atomic claims. Return when supported; revise partial/mixed content once
-   and verify again; otherwise abstain. No branch can revise more than once.
+6. Verify atomic claims. Retry malformed output structure once against immutable
+   inputs. Return when supported; revise partial/mixed content once and verify
+   again; otherwise abstain. Neither retry branch can exceed its fixed bound.
 
 This flow is shared by CLI and Gradio. CLI `--trace` currently prints discovery,
 paper selection, coverage, and retrieval attempts, but not the new claim bundle
@@ -248,6 +256,20 @@ incorrectly answered and four positive cases failed closed on invalid claim
 structure. This is the first live Task 11 development checkpoint, not a release
 or held-out quality result.
 
+Task 11 Kaggle R5 (`job_bc2c4caca10e4b36ab3177b7058d2aac`) re-ran the exact
+suite/model identity after semantic-anchor calibration and bounded claim-output
+repair. Decision accuracy increased to `0.6000`; answer-case accuracy stayed
+`0.5000`, abstention accuracy reached `1.0000`, answer F1 stayed `0.2158`,
+Recall@5/MRR stayed `0.6667/0.5556`, and claim-verifier failure rate stayed
+`0.4000`. The run recorded 35 graph LLM calls, 37 physical calls including
+smoke, 1,064.7 graph seconds, two document-embedding calls, and 14 query-
+embedding calls. The ImageNet case cleanly abstained after the semantic guard
+and rewritten retrieval. The energy case made two clean insufficient decisions,
+then its third verifier call hit CUDA OOM and failed closed. None of the four
+malformed claim bundles recovered after the structure-only retry. The report
+validated all ten cases with no top-level execution failures, but one case had a
+tool error; R5 is not a regression baseline.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -286,15 +308,15 @@ or held-out quality result.
 - CLI `--trace` and Gradio expose the final answer but do not yet render Task 10
   claim assessments, revision history, or claim-verifier errors. The state exists
   for Task 11 and future UI diagnostics.
-- Task 11 R4 exposed a critical negative-question false-positive boundary. The
-  verifier accepted training duration/compute as an electrical-energy answer and
-  accepted unrelated translation metrics for an ImageNet question; both then
-  passed claim verification. Document-wide absence cannot be inferred from a few
-  passages, and topical evidence must not satisfy a mismatched requested metric.
-- Four of eight positive cases failed closed because Qwen3 claim output changed
-  exact source text or emitted citation labels inconsistent with that substring.
-  Strict parsing is working as intended, but schema recovery or a more reliable
-  structured-output strategy is needed before freezing a baseline.
+- R5 corrected R4's two negative decisions, but only the ImageNet path completed
+  cleanly. The energy path ended in CUDA OOM after two valid insufficient-
+  evidence checks; a correct fail-closed decision with a tool error is not a
+  clean verifier-quality success.
+- Four of eight positive cases still fail closed because Qwen3 changes exact
+  source text or emits labels inconsistent with that substring. A second model
+  call repeated the same errors in all four cases, increasing latency without
+  recovery. Source spans and visible labels should be bound deterministically
+  by code rather than recopied as free-form model fields.
 - End-to-end `answer_f1` is lexical overlap with the committed reference, not a
   semantic or LLM-judge score. Claim support rates are verifier judgments, not
   independently annotated entailment accuracy.
@@ -349,9 +371,10 @@ or held-out quality result.
 
 ## Next priorities
 
-1. Fix the two R4 false-positive classes and the four strict claim-output
-   failures, then rerun the identical pinned Task 11 suite. Do not save a
-   baseline, set thresholds, or tag while abstention accuracy remains `0.0000`.
+1. Replace free-form claim `source_text`/visible-label copying with deterministic
+   answer-span binding, and bound accumulated verifier context so three retrieval
+   attempts fit T4 memory. Re-run the identical pinned Task 11 suite; do not save
+   a baseline, set thresholds, or tag while claim failures/tool errors remain.
 2. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
 3. Independently review the remaining eight answer cases before freezing any

@@ -57,7 +57,8 @@ def test_entrypoint_smokes_before_full_and_preserves_system_torch() -> None:
     assert 'self.tokenizer.padding_side = "left"' in runner
     assert "enable_thinking=False" in runner
     assert "do_sample=False" in runner
-    assert 'device="cuda:1"' in runner
+    assert 'device="cuda:1" if llm.torch.cuda.device_count() > 1 else "cpu"' in runner
+    assert '"embedding_device": "cuda:1" if len(devices) > 1 else "cpu"' in entrypoint
     assert 'attn_implementation="sdpa"' in runner
     assert "self.torch.cuda.empty_cache()" in runner
     assert "torch==" not in requirements

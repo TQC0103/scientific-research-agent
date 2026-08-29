@@ -45,7 +45,7 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
   claim-verifier diagnostic.
 - `kaggle/scifact_v0_5/`: isolated T4 template for the native-label SciFact
   oracle-document diagnostic.
-- `kaggle/end_to_end_v0_5/`: isolated dual-T4 template that replaces only the
+- `kaggle/end_to_end_v0_5/`: isolated T4 template that replaces only the
   Ollama transports with pinned Hugging Face adapters while executing the
   production LangGraph, one-case smoke, and full ten-case Task 11 suite.
 
@@ -238,8 +238,8 @@ python scripts/export_claim_verification_schema.py `
 ```
 
 The committed claim bundle is a structural fixture, not a model prediction or
-benchmark. `app/models/claim_verifier.py` now implements one bounded structured
-extraction-and-verification call. It removes the deterministic Sources block,
+benchmark. `app/models/claim_verifier.py` implements a bounded structured
+extraction-and-verification attempt. It removes the deterministic Sources block,
 numbers only the supplied verifier-approved passages, includes the exact Task 7
 schema, and rejects responses that change the answer or evidence count before
 schema validation. The fixture itself remains standalone, while the callable is
@@ -254,13 +254,16 @@ scientific, numeric, comparative, methodological, causal, or paper-specific
 assertion to remain citation-required even when the answer omitted a label.
 Purely organizational text alone may be `not_required`.
 
-Extraction and verification happen in one bounded call so the returned
+Extraction and verification happen in one bounded semantic attempt so the returned
 `source_text`, labels, and evidence relationships share one schema. This is a
 latency-conscious first implementation, not evidence that one-pass judgment is
-optimal. Model JSON is treated as untrusted: the parser checks immutable inputs,
+optimal. The production structure-only retry does not reconsider the semantic
+task. Model JSON is treated as untrusted: the parser checks immutable inputs,
 then the Task 7 validators derive verdicts and enforce all cross-references.
-Invalid output raises a fail-closed error; it is never repaired into a passing
-claim report.
+Invalid output raises a fail-closed error in the standalone Task 8 callable. The
+production wrapper may ask the same model to repair structure exactly once while
+repeating the unchanged answer, evidence, and schema; it cannot revise semantic
+content, and a second invalid response fails closed.
 
 Synthetic tests cover fully supported, partially supported, unsupported,
 valid-but-wrong citation, missing citation, and citation-not-required claims,
@@ -272,7 +275,8 @@ labels are not independently reviewed and do not establish production accuracy.
 ### Task 10 production routing
 
 After synthesis has passed deterministic citation validation, LangGraph calls
-`verify_answer_claims()` with the answer and only verifier-approved passages.
+the bounded production wrapper with the answer and only verifier-approved
+passages. One malformed response may receive one structure-only retry.
 The validated aggregate verdicts drive a fixed policy:
 
 - all citation-required claims supported (or only `not_required` text): return;
@@ -327,9 +331,10 @@ python scripts/export_end_to_end_schema.py `
 Build the narrow ignored source with
 `python -m scripts.prepare_end_to_end_kaggle_job`. The package embeds only the
 production modules, suite, and public source manifest needed by the graph. It
-uses Qwen3-4B FP16 on T4 device 0 and the pinned Qwen3 embedding model on device
-1, with left padding, deterministic generation, SDPA, CUDA cache cleanup, exact
-arXiv revision checks, and a smoke gate before the full run.
+uses Qwen3-4B FP16 on T4 device 0. When device 1 exists, the pinned Qwen3
+embedding model uses it; on a single-T4 host embeddings fall back to CPU. The
+adapter retains left padding, deterministic generation, SDPA, CUDA cache
+cleanup, exact arXiv revision checks, and a smoke gate before the full run.
 
 Kaggle R4 (`job_77d8f29fa5074e858e826793ad4d7540`) completed the report contract
 for all ten cases with zero execution and tool errors. Its development metrics
@@ -344,6 +349,16 @@ negative cases were false positives, four answer cases abstained after invalid
 claim-verifier output, and the suite is development-only. The reported `1.0000`
 supported-claim and citation-completeness rates are conditional on claim bundles
 that parsed successfully; they do not override the `0.4000` decision accuracy.
+
+R5 (`job_bc2c4caca10e4b36ab3177b7058d2aac`) used the same suite fingerprint,
+case order, model revisions, and dual-T4 placement. It reached decision accuracy
+`0.6000`, answer-case accuracy `0.5000`, abstention accuracy `1.0000`, Recall@5
+`0.6667`, MRR `0.5556`, and claim-verifier failure rate `0.4000`. All four
+malformed claim bundles still failed after the one allowed retry. The energy
+case abstained after two valid insufficient decisions followed by a third-call
+CUDA OOM, so its tool-error-assisted outcome is not a clean safety measurement.
+The ImageNet case was a clean guard/retrieval-rewrite abstention. R5 remains an
+ignored development artifact and is not frozen as a regression baseline.
 
 ## Retrieval matching contract
 

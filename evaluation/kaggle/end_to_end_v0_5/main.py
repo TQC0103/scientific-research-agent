@@ -69,14 +69,16 @@ if not torch.cuda.is_available():
 devices = [{"index": i, "name": torch.cuda.get_device_name(i),
             "capability": list(torch.cuda.get_device_capability(i))}
            for i in range(torch.cuda.device_count())]
-if len(devices) < 2 or any(item["capability"] != [7, 5] for item in devices):
-    raise RuntimeError(f"Expected two Tesla T4 capability 7.5 devices, received {devices}.")
+if not devices or any(item["capability"] != [7, 5] for item in devices):
+    raise RuntimeError(f"Expected only Tesla T4 capability 7.5 devices, received {devices}.")
 left = torch.ones((64, 64), device="cuda")
 right = left @ left
 torch.cuda.synchronize()
 print(json.dumps({"python": __import__("sys").version, "torch": torch.__version__,
  "cuda_runtime": torch.version.cuda, "cuda_device_count": torch.cuda.device_count(),
- "cuda_devices": devices, "inference_device_ids": [0, 1],
+ "cuda_devices": devices,
+ "inference_device_ids": [0, 1] if len(devices) > 1 else [0],
+ "embedding_device": "cuda:1" if len(devices) > 1 else "cpu",
  "cuda_preflight_sum": float(right.sum().item()),
  "transformers": transformers.__version__, "accelerate": accelerate.__version__,
  "sentence_transformers": sentence_transformers.__version__,

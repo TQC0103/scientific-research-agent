@@ -57,6 +57,10 @@ retrieved passages actually cover the question, identifies supported passages,
 and proposes a focused retrieval query when information is missing. Only verified
 passages reach answer synthesis. After two rewrites, unresolved questions return
 an explicit insufficient-evidence response instead of a guessed answer.
+For high-risk metric questions, a deterministic semantic-anchor guard also
+rejects a positive verifier decision when its selected passages do not mention
+the requested metric or benchmark (for example, training time is not electrical
+energy and WMT BLEU is not ImageNet top-1 accuracy).
 
 Synthesis no longer attaches `[1]` when the model omits citations. An answer
 without a valid label, or with any label outside the verifier-approved evidence
@@ -68,10 +72,11 @@ After citation-safe synthesis, the production graph performs atomic claim
 verification against those same approved passages. Answers whose factual claims
 are all supported return immediately. Partial claims, or a mix of supported and
 unsupported claims, may be revised once using only approved evidence and are then
-verified again. Wholly unsupported answers, malformed verifier output, citation
-failures, repair failures, and unresolved claims after that one revision all
-produce an explicit abstention. This is a hard graph bound, not an open-ended
-agent loop.
+verified again. A malformed claim-verifier response receives exactly one
+structure-only retry against the unchanged answer and evidence; a second invalid
+response fails closed. Wholly unsupported answers, citation failures, repair
+failures, and unresolved claims after that one revision all produce an explicit
+abstention. Both bounds are fixed, not open-ended agent loops.
 
 ## Current production flow
 
@@ -80,10 +85,11 @@ question
   -> discover papers
   -> index/download as needed
   -> hybrid retrieve per paper
-  -> evidence sufficiency check (up to 2 query rewrites per paper)
+  -> evidence sufficiency check + semantic metric anchors
+       (up to 2 query rewrites per paper)
   -> synthesize from approved passages only
   -> validate citation labels and restore trusted source metadata
-  -> verify atomic claims
+  -> verify atomic claims (at most 1 structure-only output retry per check)
        -> all supported: return answer
        -> partial or mixed: revise once, then verify again
        -> unsupported, invalid, or still failing: abstain
@@ -308,10 +314,12 @@ python scripts/export_claim_verification_schema.py `
 
 The committed fixture covers all verdict shapes and connects directly to the
 Task 9 citation metrics. Task 8 implements
-`app/models/claim_verifier.py`: one bounded Qwen call extracts claims and checks
+`app/models/claim_verifier.py`: a bounded Qwen attempt extracts claims and checks
 each attached label against verifier-approved evidence, then the Task 7 parser
 rejects altered answers, altered evidence counts, invented source text, missing
-links, and inconsistent verdicts. Task 10 now invokes it after citation-safe
+links, and inconsistent verdicts. The standalone Task 8 diagnostic remains
+one-shot; production may retry malformed structure exactly once without changing
+the answer or evidence. Task 10 invokes this path after citation-safe
 synthesis. Fully supported answers finish; partial or mixed answers receive one
 evidence-only revision and are checked again; wholly unsupported, malformed,
 uncited, or still-failing answers abstain. The revision count is stored in graph
@@ -377,9 +385,11 @@ python -m scripts.prepare_end_to_end_kaggle_job
 
 The committed template lives in `evaluation/kaggle/end_to_end_v0_5/`. It creates
 an isolated system-site-aware runtime without replacing Kaggle Torch, pins the
-Qwen3-4B and Qwen3-Embedding revisions, requires two visible Tesla T4 devices,
-runs one smoke case before the full suite, and keeps only reports under
-`/kaggle/working`.
+Qwen3-4B and Qwen3-Embedding revisions, runs one smoke case before the full
+suite, and keeps only reports under `/kaggle/working`. With two visible T4s it
+uses device 0 for generation and device 1 for embeddings; with one T4 it keeps
+generation on device 0 and moves embeddings to CPU instead of oversubscribing
+the inference GPU.
 
 The first clean live checkpoint was Kaggle R4 on 2026-08-29. All ten cases and
 the report schema completed with no execution or tool errors. Decision accuracy
@@ -390,6 +400,15 @@ negative questions were incorrectly answered, and four positive answers failed
 closed on invalid claim-verifier structure. The apparently perfect supported-
 claim and citation-completeness rates apply only to successfully parsed final
 claim bundles and must not be read as overall grounding accuracy.
+
+Kaggle R5 (`job_bc2c4caca10e4b36ab3177b7058d2aac`) re-ran the identical
+suite after adding semantic metric anchors and one structure-only claim-output
+retry. Decision accuracy rose to `0.6000` and both negative cases abstained;
+the ImageNet case exercised the anchor guard directly. This is still not a
+baseline: all four prior claim-structure failures remained after the retry, and
+the final energy verifier call hit CUDA OOM after two clean insufficient-evidence
+decisions. R5 therefore identifies the next fixes—deterministic answer-span
+binding and bounded verifier context—rather than establishing release quality.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

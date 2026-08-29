@@ -146,6 +146,49 @@ def test_invalid_model_bundle_fails_closed(monkeypatch) -> None:
         claim_verifier.verify_answer_claims(payload["answer"], _evidence())
 
 
+def test_bounded_verifier_repairs_invalid_source_and_citation_structure(monkeypatch) -> None:
+    valid = _payload()
+    invalid = json.loads(json.dumps(valid))
+    invalid["claims"][0]["source_text"] = "The model reached 91%."
+    responses = iter([json.dumps(invalid), json.dumps(valid)])
+    prompts = []
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> SimpleNamespace:
+            prompts.append(prompt)
+            return SimpleNamespace(content=next(responses))
+
+    monkeypatch.setattr(claim_verifier, "get_llm", lambda **kwargs: FakeModel())
+    run = claim_verifier.verify_answer_claims_bounded(valid["answer"], _evidence())
+
+    assert run.bundle.answer == valid["answer"]
+    assert run.model_calls == 2
+    assert run.output_repaired is True
+    assert "previous JSON response failed strict validation" in prompts[1]
+    assert "source_text must be an exact contiguous substring" in prompts[1]
+
+
+def test_bounded_verifier_fails_after_exactly_one_invalid_output_repair(monkeypatch) -> None:
+    payload = _payload()
+    invalid = json.loads(json.dumps(payload))
+    invalid["claims"][0]["source_text"] = "Not in the answer."
+    calls = 0
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> SimpleNamespace:
+            nonlocal calls
+            calls += 1
+            return SimpleNamespace(content=json.dumps(invalid))
+
+    monkeypatch.setattr(claim_verifier, "get_llm", lambda **kwargs: FakeModel())
+    with pytest.raises(claim_verifier.ClaimVerificationRunError) as captured:
+        claim_verifier.verify_answer_claims_bounded(payload["answer"], _evidence())
+
+    assert calls == 2
+    assert captured.value.model_calls == 2
+    assert "after one bounded output repair" in str(captured.value)
+
+
 def test_empty_answer_or_evidence_never_calls_model(monkeypatch) -> None:
     monkeypatch.setattr(
         claim_verifier,

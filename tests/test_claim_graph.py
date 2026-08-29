@@ -1,4 +1,5 @@
 from app.agent import graph
+from app.models.claim_verifier import ClaimVerificationRun
 from app.models.claims import (
     CLAIM_VERIFICATION_CONTRACT_VERSION,
     AtomicClaim,
@@ -78,7 +79,13 @@ def test_claim_status_distinguishes_verified_repairable_and_unsupported() -> Non
 
 def test_claim_verification_stores_validated_result(monkeypatch) -> None:
     bundle = _bundle("supported")
-    monkeypatch.setattr(graph, "verify_answer_claims", lambda *args: bundle)
+    monkeypatch.setattr(
+        graph,
+        "verify_answer_claims_bounded",
+        lambda *args: ClaimVerificationRun(
+            bundle=bundle, model_calls=1, output_repaired=False
+        ),
+    )
 
     result = graph.verify_claims(
         {
@@ -97,7 +104,7 @@ def test_claim_verification_failure_is_fail_closed(monkeypatch) -> None:
     def fail(*args):
         raise ValueError("invalid model output")
 
-    monkeypatch.setattr(graph, "verify_answer_claims", fail)
+    monkeypatch.setattr(graph, "verify_answer_claims_bounded", fail)
     result = graph.verify_claims(
         {"answer": "Fact [1].", "verified_evidence": [{}], "user_query": "Question?"}
     )
@@ -105,6 +112,22 @@ def test_claim_verification_failure_is_fail_closed(monkeypatch) -> None:
     assert result["claim_verification_status"] == "invalid"
     assert result["claim_verification_attempt_count"] == 1
     assert "invalid model output" in result["claim_verification_error"]
+
+
+def test_claim_verification_counts_bounded_output_repair(monkeypatch) -> None:
+    bundle = _bundle("supported")
+    monkeypatch.setattr(
+        graph,
+        "verify_answer_claims_bounded",
+        lambda *args: ClaimVerificationRun(
+            bundle=bundle, model_calls=2, output_repaired=True
+        ),
+    )
+    result = graph.verify_claims(
+        {"answer": "Fact 1 [1].", "verified_evidence": [{}], "user_query": "Question?"}
+    )
+    assert result["claim_verification_status"] == "verified"
+    assert result["claim_verification_attempt_count"] == 2
 
 
 def test_repair_route_allows_exactly_one_revision() -> None:

@@ -50,6 +50,70 @@ def test_verifier_repairs_contradictory_false_with_no_missing_information(monkey
     assert result.suggested_query is None
 
 
+@pytest.mark.parametrize(
+    ("question", "passage", "missing"),
+    [
+        (
+            "How much electrical energy did training consume?",
+            "Training took 3.5 days on eight GPUs and used 2.3e19 FLOPs.",
+            "electrical-energy",
+        ),
+        (
+            "What ImageNet top-1 accuracy is reported?",
+            "The model achieved 28.4 BLEU on WMT English-to-German.",
+            "ImageNet",
+        ),
+    ],
+)
+def test_semantic_anchor_guard_rejects_wrong_metric_substitution(
+    monkeypatch, question, passage, missing
+) -> None:
+    class FakeModel:
+        def invoke(self, prompt):
+            return type(
+                "Response",
+                (),
+                {
+                    "content": (
+                        '{"sufficient": true, "reason": "Related result", '
+                        '"missing_information": [], "suggested_query": null, '
+                        '"supported_evidence": [1]}'
+                    )
+                },
+            )()
+
+    monkeypatch.setattr(verifier, "get_llm", lambda **kwargs: FakeModel())
+    result = verifier.verify_evidence(question, [_chunk(0, passage)])
+    assert result.sufficient is False
+    assert result.supported_evidence == []
+    assert missing in result.reason
+    assert result.suggested_query != question
+
+
+def test_semantic_anchor_guard_accepts_explicit_requested_metric(monkeypatch) -> None:
+    class FakeModel:
+        def invoke(self, prompt):
+            return type(
+                "Response",
+                (),
+                {
+                    "content": (
+                        '{"sufficient": true, "reason": "Direct result", '
+                        '"missing_information": [], "suggested_query": null, '
+                        '"supported_evidence": [1]}'
+                    )
+                },
+            )()
+
+    monkeypatch.setattr(verifier, "get_llm", lambda **kwargs: FakeModel())
+    result = verifier.verify_evidence(
+        "What ImageNet top-1 accuracy is reported?",
+        [_chunk(0, "On ImageNet, the model reports top-1 accuracy of 81.2%.")],
+    )
+    assert result.sufficient is True
+    assert result.supported_evidence == [1]
+
+
 def test_check_rewrites_query_when_llm_verifier_finds_a_gap(monkeypatch) -> None:
     monkeypatch.setattr(
         graph,
