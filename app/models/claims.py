@@ -14,6 +14,16 @@ _CITATION_PATTERN = re.compile(r"\[(\d+)]")
 CitationLabel = Annotated[int, Field(ge=1)]
 
 
+def citation_labels_in_text(text: str) -> list[int]:
+    """Return unique visible numeric labels in first-appearance order."""
+    labels: list[int] = []
+    for match in _CITATION_PATTERN.finditer(text):
+        label = int(match.group(1))
+        if label not in labels:
+            labels.append(label)
+    return labels
+
+
 class ClaimModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -99,11 +109,7 @@ class ClaimVerificationBundle(ClaimModel):
             if claim.source_text not in self.answer:
                 raise ValueError(f"Claim {claim.claim_id} source_text is not in the answer.")
             source_positions.append(self.answer.find(claim.source_text))
-            source_labels = []
-            for match in _CITATION_PATTERN.finditer(claim.source_text):
-                label = int(match.group(1))
-                if label not in source_labels:
-                    source_labels.append(label)
+            source_labels = citation_labels_in_text(claim.source_text)
             if source_labels != claim.citation_labels:
                 raise ValueError(
                     f"Claim {claim.claim_id} citation_labels must match its source_text."
@@ -119,7 +125,7 @@ class ClaimVerificationBundle(ClaimModel):
                 raise ValueError(
                     f"Claim {claim.claim_id} must assess every cited label in source order."
                 )
-            expected = _expected_verdict(claim, assessment.cited_evidence)
+            expected = expected_claim_verdict(claim, assessment.cited_evidence)
             if assessment.verdict != expected:
                 raise ValueError(
                     f"Claim {claim.claim_id} verdict {assessment.verdict} conflicts with "
@@ -130,7 +136,7 @@ class ClaimVerificationBundle(ClaimModel):
         return self
 
 
-def _expected_verdict(
+def expected_claim_verdict(
     claim: AtomicClaim, evidence: list[ClaimEvidenceLink]
 ) -> ClaimVerdict:
     if not claim.requires_citation:

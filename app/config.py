@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,7 @@ class Settings(BaseSettings):
     ollama_embed_model: str = "qwen3-embedding:0.6b"
     max_tool_loops: int = 6
     max_retrieval_rewrites: int = 2
+    max_accumulated_passages_per_paper: int = Field(default=8, ge=1)
     arxiv_max_results: int = 10
     request_timeout_seconds: int = 120
     data_dir: Path = PROJECT_ROOT / "data"

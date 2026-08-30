@@ -659,6 +659,18 @@
           "title": "Max Retrieval Rewrites",
           "type": "integer"
         },
+        "max_accumulated_passages_per_paper": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Accumulated Passages Per Paper"
+        },
         "max_claim_revisions": {
           "title": "Max Claim Revisions",
           "type": "integer"

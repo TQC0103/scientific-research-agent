@@ -183,7 +183,7 @@ def _run_suite(suite_path: Path, output_dir: Path, graph: Any, *, limit: int = 0
     report = run_end_to_end(
         suite,
         lambda payload, config: _invoke(graph, payload, config),
-        config_name="hybrid_verified_qwen3_4b_fp16",
+        config_name="hybrid_verified_citation_scoped_v4_qwen3_4b_fp16",
     )
     write_end_to_end_outputs(report, output_dir)
     return report

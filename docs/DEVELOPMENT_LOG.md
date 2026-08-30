@@ -1205,3 +1205,71 @@ deterministically and bound accumulated verifier context before another live run
 The downloaded ZIP, reports, and logs remain ignored under
 `data/evaluations/runs/end_to_end_v0_5_kaggle_r5/`.
 Final local verification passed Ruff and all 148 pytest tests.
+
+## 2026-08-30 — Code-owned claim binding and clean Task 11 R9 checkpoint
+
+R5 isolated two independent production failures: accumulated verifier context
+could exhaust T4 memory on the third retrieval attempt, and the claim model was
+asked to reproduce answer text, citation labels, and other fields already owned
+by code. Accumulated passages are now configured through
+`MAX_ACCUMULATED_PASSAGES_PER_PAPER` with a positive default of eight. Task 11
+runtime metadata and its generated schema record that bound.
+
+Production claim verification now uses a narrower internal response rather than
+changing the standalone Task 8 contract. Code creates immutable answer spans;
+the model returns atomic claim text, a selected span ID, citation requirement,
+and ordered evidence relationships. Code assigns sequential claim IDs, restores
+exact source text and visible labels, constructs evidence links, and derives the
+verdict before the existing Task 7 cross-field validators run. One compact
+structure-only retry remains, but it does not repeat the long evidence prompt.
+Tests reject unknown/reordered spans and missing positional judgments.
+
+R6 (`job_097f59e9ea3b45e383deae420c7c4bd0`) first combined the context cap
+with answer-span binding. It completed all ten cases with zero tool errors,
+confirming the OOM fix, but stayed at `0.6000` decision accuracy and `0.4000`
+claim failure because three responses changed model-authored top-level fields and
+the comparison omitted one label assessment. It used 38 graph LLM calls, 41
+physical calls including smoke, and 1,321.8 graph seconds.
+
+R7 (`job_842ae6a6bd924b62acd7171e47d44009`) removed contract version, answer,
+and evidence count from model output. Decision accuracy rose to `0.9000`, answer-
+case accuracy `0.8750`, both abstentions remained correct, claim failure fell to
+`0.1000`, and mean latency fell to 65.2 seconds. The one remaining comparison
+failure copied the wrong assessment citation label. R8
+(`job_b280142291d440049ead48c9d3a3c20b`) replaced those copied labels and the
+model verdict with ordered relationships bound and derived in code. Structural
+claim failure reached `0.0000`, but decision accuracy stayed `0.9000`: the valid
+comparison bundle exposed an uncited factual lead sentence, the one answer
+revision returned the same text, and the graph safely abstained. R8 mean latency
+was 58.1 seconds with zero execution or tool errors.
+
+Inspection showed that `[1]` closed a two-sentence Transformer explanation in
+one paragraph. Sentence-level spans attached it only to the second sentence.
+The splitter now forms exact citation scopes: uncited lead sentences are joined
+to the next sentence carrying a label, while trailing uncited sentences remain
+separate. Atomic claims within a shared span still receive separate evidence
+relationships, so this changes citation scope rather than automatically marking
+claims supported.
+
+R9 (`job_2ec379f20ff44e90895c446a294abb4b`) validated that rule on the same
+suite fingerprint and pinned model revisions. A transient Kaggle CLI status
+timeout set `remote_may_be_running`; Control Plane kept the remote job active and
+later reconciled it without a duplicate submission. The schema-valid report had
+decision, answer-case, and abstention accuracy `1.0000`; answer F1 `0.4480`;
+Recall@5 `0.6667`; Precision@5 `0.2222`; MRR `0.5556`; and zero claim-verifier,
+citation-safety, execution, and tool-error failures. The comparison verified on
+its first claim attempt with no answer revision. Graph accounting was 32 LLM
+calls and 518.5 seconds; adapter accounting including smoke was 35 physical LLM
+calls, two document-embedding calls, and 14 query-embedding calls. R9 is a clean
+development checkpoint, not a frozen baseline, because eight answer cases remain
+repo-authored and lack independent review.
+
+The Kaggle packager now accepts `--kernel-slug` and `--title` before computing
+the source manifest, preventing the stale metadata hash produced by manual
+post-build edits in R7/R8. Embedded source ZIP entries now use a fixed timestamp
+and mode so identical content rebuilds byte-for-byte rather than inheriting file
+modification times. R9's submitted metadata and `main.py` matched their recorded
+hashes; all current embedded source-file hashes matched the submitted archive.
+Runtime ZIPs, reports, and logs remain ignored under the corresponding
+`data/evaluations/runs/end_to_end_v0_5_kaggle_r6/` through `..._r9/` directories.
+Final local verification passed Ruff and all 153 pytest tests.

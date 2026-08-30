@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import io
@@ -47,11 +48,30 @@ def _embedded_source() -> str:
     payload = io.BytesIO()
     with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for source, target in sorted(_source_files().items(), key=lambda item: item[1]):
-            archive.write(source, target)
+            info = zipfile.ZipInfo(target, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, source.read_bytes())
     return base64.b64encode(payload.getvalue()).decode("ascii")
 
 
-def main() -> None:
+def _arguments(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Prepare the isolated Task 11 Kaggle source bundle."
+    )
+    parser.add_argument(
+        "--kernel-slug",
+        help="Optional full owner/slug written before provenance hashes are computed.",
+    )
+    parser.add_argument(
+        "--title",
+        help="Optional Kaggle kernel title written before provenance hashes are computed.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = _arguments(argv or [])
     destination = DESTINATION.resolve()
     allowed_root = (ROOT / "data" / "evaluations" / "kaggle_jobs").resolve()
     if not destination.is_relative_to(allowed_root) or destination == allowed_root:
@@ -73,6 +93,15 @@ def main() -> None:
                 .replace("__KAGGLE_REQUIREMENTS_B64__", requirements),
                 encoding="utf-8",
             )
+        elif source.name == "kernel-metadata.json" and (
+            args.kernel_slug or args.title
+        ):
+            metadata = json.loads(source.read_text(encoding="utf-8"))
+            if args.kernel_slug:
+                metadata["id"] = args.kernel_slug
+            if args.title:
+                metadata["title"] = args.title
+            target.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         else:
             shutil.copy2(source, target)
     sources = json.loads(
@@ -100,4 +129,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(sys.argv[1:])

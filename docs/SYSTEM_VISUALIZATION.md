@@ -158,7 +158,7 @@ flowchart TD
     LEXICAL --> RRF
     RRF --> TOP["Top fused chunks per selected paper"]
     TOP --> MERGE["Merge with earlier attempts for the same paper"]
-    MERGE --> DEDUPE["Deduplicate; cap at 12 passages per paper"]
+    MERGE --> DEDUPE["Deduplicate; configured cap = 8 passages per paper"]
     DEDUPE --> EVIDENCE["Paper-isolated evidence map"]
 ```
 
@@ -227,11 +227,13 @@ flowchart TD
     INSUFFICIENT["Verifier says insufficient"] --> ABSTAIN["Reason + missing information"]
     ABSTAIN --> FINAL
 
-    FINAL --> CLAIMPROMPT["Atomic extraction + verification prompt"]
+    FINAL --> SPANS["Code-owned exact citation-scoped answer spans"]
+    SPANS --> CLAIMPROMPT["Atomic extraction + verification; model selects span IDs"]
     CLAIMPROMPT --> CLAIMQWEN["Qwen3 4B structured JSON"]
-    CLAIMQWEN --> CLAIMGUARD{"Lock inputs + Task 7 validation"}
+    CLAIMQWEN --> BIND["Code binds claim ID + source + labels; derives verdict"]
+    BIND --> CLAIMGUARD{"Lock inputs + Task 7 validation"}
     CLAIMGUARD -->|"valid"| CLAIMBUNDLE["Ordered claims + evidence links + derived verdicts"]
-    CLAIMGUARD -->|"invalid; no output retry yet"| FORMATRETRY["One structure-only retry; unchanged answer/evidence/schema"]
+    CLAIMGUARD -->|"invalid; no output retry yet"| FORMATRETRY["One compact structure-only retry; no repeated evidence"]
     FORMATRETRY --> CLAIMQWEN
     CLAIMGUARD -->|"invalid after retry"| CLAIMFAIL["Explicit claim-grounding abstention"]
     CLAIMBUNDLE -->|"all supported"| VERIFIED_FINAL["Return answer"]
@@ -247,9 +249,12 @@ Code never invents a citation when the model omits one. Missing citations and
 labels outside the verifier-approved passage list fail closed before any Sources
 block is rendered. The production graph then strips that deterministic block,
 checks atomic claims against only approved passages, and permits at most one
-answer repair. Separately, one malformed claim-verifier response may receive one
-structure-only retry against immutable inputs; a second invalid response
-abstains. The answer-repair model cannot author source metadata; code restores
+answer repair. Production claim extraction cannot author claim IDs, source text,
+visible labels, or verdicts: it selects a code-owned exact span and returns
+ordered semantic relationships, then code reconstructs those redundant fields.
+Separately, one malformed response may receive one compact
+structure-only retry against immutable spans; a second invalid response abstains.
+The answer-repair model cannot author source metadata; code restores
 it from trusted passage records before re-verification. Wholly unsupported
 answers and unresolved post-repair claims also abstain.
 
@@ -357,7 +362,8 @@ flowchart TD
     CLAIMBENCH --> CLAIMMETRICS["Schema + extraction + verdict + relationship metrics"]
     CLAIMMETRICS --> CLAIMGPU["Pinned isolated T4 package via Control Plane"]
     CLAIMMETRICS --> CLAIMOUTPUTS["Ignored JSON + Markdown report"]
-    CLAIMMODEL --> CLAIMFORMAT["Production-only one-shot structure repair"]
+    CLAIMMODEL --> CLAIMSPAN["Production code-owned citation-scope binding"]
+    CLAIMSPAN --> CLAIMFORMAT["Production-only compact structure repair"]
     CLAIMFORMAT --> CLAIMGRAPH["Task 10 bounded verify / repair / abstain graph"]
     CASES --> E2E["Task 11 end-to-end graph runner"]
     CLAIMGRAPH --> E2E
@@ -467,9 +473,20 @@ cases were false positives and four claim-verifier outputs failed the strict
 contract. R5 added semantic anchors and a one-shot structure repair: both
 negative cases abstained, but none of the four malformed claim bundles recovered
 and one final verifier call exhausted T4 memory. No regression baseline is
-frozen. Deterministic answer-span binding, bounded verifier context, production
-embedding-call instrumentation, and the first acceptable live development
-baseline remain future work.
+frozen. R6 added exact answer-span binding and an eight-passage cap; the cap
+removed tool errors, but model-authored top-level fields still caused three
+claim failures. R7 moved those fields into code and recovered three cases,
+leaving one comparison failure caused by a copied assessment citation label.
+R8 confirmed zero structural claim failures after v3, then exposed a semantic
+scope boundary: a factual lead sentence shared the citation placed at the end
+of the following sentence. Production v4 groups uncited lead sentences with the
+next cited sentence into one exact span; claims remain atomic and receive
+separate relationship judgments. Production embedding-call instrumentation and
+an independently reviewed baseline remain future work. R9 validated this path on
+all ten development cases with no claim-structure, citation-safety, execution,
+or tool errors and no answer revisions. Retrieval Recall@5 remained `0.6667`, so
+the clean graph decision checkpoint does not imply complete annotated-evidence
+retrieval or held-out quality.
 
 ## Maintenance rule
 

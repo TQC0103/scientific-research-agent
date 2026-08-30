@@ -47,7 +47,12 @@ def _group_evidence(evidence: list[dict]) -> dict[str, list[dict]]:
     return grouped
 
 
-def _merge_passages(new: list[dict], previous: list[dict], *, limit: int = 12) -> list[dict]:
+def _merge_passages(
+    new: list[dict], previous: list[dict], *, limit: int | None = None
+) -> list[dict]:
+    effective_limit = (
+        settings.max_accumulated_passages_per_paper if limit is None else limit
+    )
     unique = []
     seen = set()
     for item in new[:8] + previous:
@@ -55,7 +60,7 @@ def _merge_passages(new: list[dict], previous: list[dict], *, limit: int = 12) -
         if key not in seen:
             seen.add(key)
             unique.append(item)
-    return unique[:limit]
+    return unique[:effective_limit]
 
 
 def _coverage_sufficient(state: AgentState, verifications: dict[str, dict]) -> bool:

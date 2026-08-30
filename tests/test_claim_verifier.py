@@ -27,6 +27,30 @@ def _evidence() -> list[dict]:
     ]
 
 
+def _span_payload(payload: dict) -> dict:
+    spans = claim_verifier.answer_source_spans(payload["answer"])
+    span_ids = {span.text: span.span_id for span in spans}
+    assessments = {item["claim_id"]: item for item in payload["assessments"]}
+    return {
+        "claims": [
+            {
+                "claim_text": claim["claim_text"],
+                "source_span_id": span_ids[claim["source_text"]],
+                "requires_citation": claim["requires_citation"],
+                "evidence_judgments": [
+                    {
+                        "relationship": item["relationship"],
+                        "reason": item["reason"],
+                    }
+                    for item in assessments[claim["claim_id"]]["cited_evidence"]
+                ],
+                "assessment_reason": assessments[claim["claim_id"]]["reason"],
+            }
+            for claim in payload["claims"]
+        ],
+    }
+
+
 def _fake_model(monkeypatch, payload: dict, captured: dict | None = None) -> None:
     class FakeModel:
         def invoke(self, prompt: str) -> SimpleNamespace:
@@ -148,9 +172,10 @@ def test_invalid_model_bundle_fails_closed(monkeypatch) -> None:
 
 def test_bounded_verifier_repairs_invalid_source_and_citation_structure(monkeypatch) -> None:
     valid = _payload()
-    invalid = json.loads(json.dumps(valid))
-    invalid["claims"][0]["source_text"] = "The model reached 91%."
-    responses = iter([json.dumps(invalid), json.dumps(valid)])
+    span_valid = _span_payload(valid)
+    invalid = json.loads(json.dumps(span_valid))
+    invalid["claims"][0]["source_span_id"] = "span_99"
+    responses = iter([json.dumps(invalid), json.dumps(span_valid)])
     prompts = []
 
     class FakeModel:
@@ -164,14 +189,15 @@ def test_bounded_verifier_repairs_invalid_source_and_citation_structure(monkeypa
     assert run.bundle.answer == valid["answer"]
     assert run.model_calls == 2
     assert run.output_repaired is True
-    assert "previous JSON response failed strict validation" in prompts[1]
-    assert "source_text must be an exact contiguous substring" in prompts[1]
+    assert "Repair the structure" in prompts[1]
+    assert "claim IDs, source text" in prompts[1]
+    assert "Verifier-approved evidence" not in prompts[1]
 
 
 def test_bounded_verifier_fails_after_exactly_one_invalid_output_repair(monkeypatch) -> None:
     payload = _payload()
-    invalid = json.loads(json.dumps(payload))
-    invalid["claims"][0]["source_text"] = "Not in the answer."
+    invalid = _span_payload(payload)
+    invalid["claims"][0]["source_span_id"] = "span_99"
     calls = 0
 
     class FakeModel:
@@ -187,6 +213,83 @@ def test_bounded_verifier_fails_after_exactly_one_invalid_output_repair(monkeypa
     assert calls == 2
     assert captured.value.model_calls == 2
     assert "after one bounded output repair" in str(captured.value)
+
+
+def test_span_bound_parser_derives_exact_source_text_and_visible_labels() -> None:
+    payload = _payload()
+    span_payload = _span_payload(payload)
+
+    bundle = claim_verifier.parse_span_bound_claim_response(
+        json.dumps(span_payload),
+        expected_answer=payload["answer"],
+        evidence_count=4,
+    )
+
+    assert [claim.source_text for claim in bundle.claims] == [
+        claim["source_text"] for claim in payload["claims"]
+    ]
+    assert [claim.citation_labels for claim in bundle.claims] == [
+        claim["citation_labels"] for claim in payload["claims"]
+    ]
+    assert "source_text" not in span_payload["claims"][0]
+    assert "citation_labels" not in span_payload["claims"][0]
+    assert "claim_id" not in span_payload["claims"][0]
+    assert "citation_label" not in span_payload["claims"][0]["evidence_judgments"][0]
+    assert "verdict" not in span_payload["claims"][0]
+    assert "answer" not in span_payload
+    assert "evidence_count" not in span_payload
+    assert "contract_version" not in span_payload
+
+
+def test_answer_spans_keep_uncited_lead_in_the_following_citation_scope() -> None:
+    answer = (
+        "The architecture uses self-attention. This enables parallel processing [1]. "
+        "A second result is reported [2]. A trailing uncited claim."
+    )
+
+    spans = claim_verifier.answer_source_spans(answer)
+
+    assert [span.text for span in spans] == [
+        "The architecture uses self-attention. This enables parallel processing [1].",
+        "A second result is reported [2].",
+        "A trailing uncited claim.",
+    ]
+    assert all(span.text in answer for span in spans)
+
+
+def test_span_bound_parser_rejects_unknown_or_reordered_spans() -> None:
+    payload = _payload()
+    unknown = _span_payload(payload)
+    unknown["claims"][0]["source_span_id"] = "span_99"
+    with pytest.raises(ValueError, match="unknown source_span_id"):
+        claim_verifier.parse_span_bound_claim_response(
+            json.dumps(unknown),
+            expected_answer=payload["answer"],
+            evidence_count=4,
+        )
+
+    reordered = _span_payload(payload)
+    reordered["claims"][0]["source_span_id"] = "span_2"
+    reordered["claims"][1]["source_span_id"] = "span_1"
+    with pytest.raises(ValueError, match="source_span_id order"):
+        claim_verifier.parse_span_bound_claim_response(
+            json.dumps(reordered),
+            expected_answer=payload["answer"],
+            evidence_count=4,
+        )
+
+
+def test_span_bound_parser_binds_judgments_to_visible_labels_by_position() -> None:
+    payload = _payload()
+    span_payload = _span_payload(payload)
+    span_payload["claims"][0]["evidence_judgments"] = []
+
+    with pytest.raises(ValueError, match="one evidence judgment per visible"):
+        claim_verifier.parse_span_bound_claim_response(
+            json.dumps(span_payload),
+            expected_answer=payload["answer"],
+            evidence_count=4,
+        )
 
 
 def test_empty_answer_or_evidence_never_calls_model(monkeypatch) -> None:

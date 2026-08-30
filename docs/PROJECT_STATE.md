@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-29
+Last updated: 2026-08-30
 
 ## Current baseline
 
@@ -17,7 +17,7 @@ Last updated: 2026-08-29
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 148
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 153
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -87,8 +87,10 @@ Last updated: 2026-08-29
   claim verification, deterministic supported/repairable/unsupported routing,
   exactly one evidence-only repair, re-verification, and fail-closed abstention;
   graph state preserves attempts, revision count, history, and validation errors.
-  Production claim verification also permits exactly one structure-only output
-  retry against immutable answer/evidence inputs and counts both physical calls
+  Production claim verification binds model-selected IDs to code-owned exact
+  answer spans; code assigns claim IDs, derives visible labels and verdicts from
+  ordered model relationships, and permits exactly one compact structure-only
+  retry while counting both calls
 - Task 11 end-to-end evaluator and `python -m evaluation.run` command over the
   production node-update stream, with versioned schema, automatic node/final-state
   traces, exact-suite identity, registered metrics, case-level failure isolation,
@@ -115,15 +117,19 @@ Last updated: 2026-08-29
    required `all` paper coverage.
 2. Reuse current indexes or lazily download, validate, parse, chunk, embed, and
    index selected revisions; fall back to labeled abstract evidence on failure.
-3. Run hybrid retrieval separately per paper, apply deterministic semantic
-   anchors to positive verifier decisions, and retry with at most two focused
-   query rewrites per paper.
+3. Run hybrid retrieval separately per paper, retain at most eight accumulated
+   passages per paper, apply deterministic semantic anchors to positive verifier
+   decisions, and retry with at most two focused query rewrites per paper.
 4. If coverage remains insufficient, return paper-specific gaps without synthesis.
 5. Otherwise synthesize only from approved passages, validate every numeric label,
    and construct source metadata from trusted records.
-6. Verify atomic claims. Retry malformed output structure once against immutable
-   inputs. Return when supported; revise partial/mixed content once and verify
-   again; otherwise abstain. Neither retry branch can exceed its fixed bound.
+6. Split the answer into immutable citation-scoped spans and verify atomic claims
+   by model-selected span ID, then derive claim IDs, exact source/label fields,
+   and verdicts in code.
+   Retry malformed output
+   structure once without repeating evidence. Return when supported; revise
+   partial/mixed content once and verify again; otherwise abstain. Neither retry
+   branch can exceed its fixed bound.
 
 This flow is shared by CLI and Gradio. CLI `--trace` currently prints discovery,
 paper selection, coverage, and retrieval attempts, but not the new claim bundle
@@ -270,6 +276,48 @@ malformed claim bundles recovered after the structure-only retry. The report
 validated all ten cases with no top-level execution failures, but one case had a
 tool error; R5 is not a regression baseline.
 
+Task 11 Kaggle R6 (`job_097f59e9ea3b45e383deae420c7c4bd0`) introduced
+code-owned answer spans and capped accumulated verifier context at eight passages
+per paper. The cap eliminated R5's CUDA OOM: all ten cases completed with zero
+execution and tool errors. Decision accuracy/claim failure remained
+`0.6000`/`0.4000`, however, because three model responses changed redundant
+top-level fields and the comparison response omitted a cited-label assessment.
+The run used 38 graph LLM calls, 41 physical calls including smoke, and 1,321.8
+graph seconds.
+
+Task 11 Kaggle R7 (`job_842ae6a6bd924b62acd7171e47d44009`) removed the
+top-level contract version, answer, and evidence count from model-authored JSON.
+On the identical suite, decision accuracy reached `0.9000`, answer-case accuracy
+`0.8750`, abstention accuracy `1.0000`, answer F1 `0.4286`, Recall@5/MRR
+`0.6667/0.5556`, and claim-verifier failure `0.1000`. It had zero execution/tool
+errors, 32 graph LLM calls, 35 physical calls including smoke, and 651.6 graph
+seconds. Seven of eight answer cases completed and both negative cases cleanly
+abstained. The sole comparison failure still copied a citation label inside the
+assessment; production v3 now binds ordered relationships to code-owned labels
+and derives claim IDs/verdicts. R6/R7 are not frozen baselines.
+
+Task 11 Kaggle R8 (`job_b280142291d440049ead48c9d3a3c20b`) validated the
+fully code-owned assessment structure. Claim-verifier failure reached `0.0000`
+with zero execution/tool errors; decision accuracy stayed `0.9000`, answer-case
+accuracy `0.8750`, abstention accuracy `1.0000`, answer F1 `0.4280`, and mean
+latency fell to 58.1 seconds. The comparison case progressed through a valid
+claim bundle and one bounded answer revision, then abstained because a factual
+lead sentence had no visible label and the revision returned it unchanged. Its
+following sentence carried `[1]` for the same explanation. Production v4 now
+forms exact citation-scoped spans by joining uncited lead sentences to the next
+cited sentence while keeping separate atomic evidence judgments.
+
+Task 11 Kaggle R9 (`job_2ec379f20ff44e90895c446a294abb4b`) validated v4 on
+the identical ten-case suite and pinned model revisions. Decision accuracy,
+answer-case accuracy, and abstention accuracy all reached `1.0000`; answer F1 was
+`0.4480`, Recall@5/MRR stayed `0.6667/0.5556`, and claim-verifier, citation-
+safety, execution, and tool-error rates were all `0.0000`. The comparison case
+verified in one claim attempt with no answer revision. The run used 32 graph LLM
+calls, 35 physical calls including smoke, two document-embedding calls, 14 query-
+embedding calls, and 518.5 graph seconds (51.9 seconds/case). R9 is the first
+technically clean full-graph checkpoint, but is not frozen because the eight
+answer cases remain repo-authored development data without independent review.
+
 ## Known issues
 
 - Section detection can inherit incorrect labels around mid-page headings and
@@ -308,15 +356,10 @@ tool error; R5 is not a regression baseline.
 - CLI `--trace` and Gradio expose the final answer but do not yet render Task 10
   claim assessments, revision history, or claim-verifier errors. The state exists
   for Task 11 and future UI diagnostics.
-- R5 corrected R4's two negative decisions, but only the ImageNet path completed
-  cleanly. The energy path ended in CUDA OOM after two valid insufficient-
-  evidence checks; a correct fail-closed decision with a tool error is not a
-  clean verifier-quality success.
-- Four of eight positive cases still fail closed because Qwen3 changes exact
-  source text or emits labels inconsistent with that substring. A second model
-  call repeated the same errors in all four cases, increasing latency without
-  recovery. Source spans and visible labels should be bound deterministically
-  by code rather than recopied as free-form model fields.
+- R6's eight-passage bound removed the R5 CUDA OOM; R7-R9 retained zero tool
+  errors. R9 also validated citation-scoped spans with no structural or claim-
+  grounding abstentions on the ten development cases. This closes the observed
+  failure mode, not the independent-quality or generalization question.
 - End-to-end `answer_f1` is lexical overlap with the committed reference, not a
   semantic or LLM-judge score. Claim support rates are verifier judgments, not
   independently annotated entailment accuracy.
@@ -371,16 +414,15 @@ tool error; R5 is not a regression baseline.
 
 ## Next priorities
 
-1. Replace free-form claim `source_text`/visible-label copying with deterministic
-   answer-span binding, and bound accumulated verifier context so three retrieval
-   attempts fit T4 memory. Re-run the identical pinned Task 11 suite; do not save
-   a baseline, set thresholds, or tag while claim failures/tool errors remain.
-2. Instrument embedding calls at the production retriever boundary; the Kaggle
+1. Independently review the remaining eight answer cases before freezing any
+   benchmark snapshot. R9 is clean but still tuned development evidence.
+2. Repeat the exact reviewed R9 identity to observe variance, then freeze a
+   regression candidate without inventing thresholds from a single run.
+3. Expand the reviewed end-to-end suite from 10 to 25 cases before 50.
+4. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
-3. Independently review the remaining eight answer cases before freezing any
-   benchmark snapshot.
-4. Independently review and expand the seven Task 8 development cases, then
+5. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-5. Run Task 10 on reviewed cases and calibrate repair versus immediate
+6. Calibrate Task 10 repair versus immediate
    abstention, including distinct incomplete-evidence and contradiction reasons.
-6. Fix section boundaries and table-associated metadata.
+7. Fix section boundaries and table-associated metadata.

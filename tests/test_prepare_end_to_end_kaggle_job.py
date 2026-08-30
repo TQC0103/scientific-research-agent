@@ -30,18 +30,35 @@ def test_prepared_end_to_end_bundle_is_narrow(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr(package, "ROOT", root)
     monkeypatch.setattr(package, "TEMPLATE", template)
     monkeypatch.setattr(package, "DESTINATION", destination)
-    package.main()
+    package.main(
+        [
+            "--kernel-slug",
+            "owner/scientific-research-agent-r8",
+            "--title",
+            "Scientific Research Agent R8",
+        ]
+    )
     generated = (destination / "main.py").read_text(encoding="utf-8")
     encoded = generated.split('APP_ARCHIVE_B64 = "', 1)[1].split('"', 1)[0]
     with zipfile.ZipFile(io.BytesIO(base64.b64decode(encoded))) as archive:
         names = set(archive.namelist())
+        timestamps = {item.date_time for item in archive.infolist()}
     assert "app/agent/graph.py" in names
     assert "app/evaluation/end_to_end.py" in names
     assert "scripts/run_end_to_end_transformers.py" in names
     assert "evaluation/run.py" not in names
+    assert timestamps == {(1980, 1, 1, 0, 0, 0)}
     manifest = json.loads((destination / "source_manifest.json").read_text(encoding="utf-8"))
+    metadata = json.loads((destination / "kernel-metadata.json").read_text(encoding="utf-8"))
+    assert metadata == {
+        "id": "owner/scientific-research-agent-r8",
+        "title": "Scientific Research Agent R8",
+    }
     assert manifest["llm_revision"].startswith("1cfa9a")
     assert set(manifest["files"]) == {"kernel-metadata.json", "main.py"}
+    assert manifest["files"]["kernel-metadata.json"] == package._sha256(
+        destination / "kernel-metadata.json"
+    )
 
 
 def test_entrypoint_smokes_before_full_and_preserves_system_torch() -> None:

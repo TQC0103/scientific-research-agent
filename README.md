@@ -72,9 +72,12 @@ After citation-safe synthesis, the production graph performs atomic claim
 verification against those same approved passages. Answers whose factual claims
 are all supported return immediately. Partial claims, or a mix of supported and
 unsupported claims, may be revised once using only approved evidence and are then
-verified again. A malformed claim-verifier response receives exactly one
-structure-only retry against the unchanged answer and evidence; a second invalid
-response fails closed. Wholly unsupported answers, citation failures, repair
+verified again. Code first splits the answer into immutable citation-scoped
+spans; the model selects `span_#` IDs and returns evidence relationships in source order,
+while code assigns claim IDs, restores `source_text`/citation labels, and derives
+verdicts. A malformed response receives exactly one compact structure-
+only retry without repeating the long evidence prompt; a second invalid response
+fails closed. Wholly unsupported answers, citation failures, repair
 failures, and unresolved claims after that one revision all produce an explicit
 abstention. Both bounds are fixed, not open-ended agent loops.
 
@@ -84,12 +87,13 @@ abstention. Both bounds are fixed, not open-ended agent loops.
 question
   -> discover papers
   -> index/download as needed
-  -> hybrid retrieve per paper
+  -> hybrid retrieve per paper (max 8 accumulated passages per paper)
   -> evidence sufficiency check + semantic metric anchors
        (up to 2 query rewrites per paper)
   -> synthesize from approved passages only
   -> validate citation labels and restore trusted source metadata
-  -> verify atomic claims (at most 1 structure-only output retry per check)
+  -> bind exact citation-scoped answer spans and verify atomic claims
+       (at most 1 compact structure-only output retry per check)
        -> all supported: return answer
        -> partial or mixed: revise once, then verify again
        -> unsupported, invalid, or still failing: abstain
@@ -101,6 +105,10 @@ node updates and the final state are stored for every case, so later nodes and
 fields appear automatically. Aggregate scores remain opt-in: genuinely new
 capabilities need an explicit metric definition instead of receiving a guessed
 score.
+
+`MAX_ACCUMULATED_PASSAGES_PER_PAPER` defaults to `8` in `.env.example`. It
+bounds the verifier prompt across retrieval rewrites; increasing it raises
+context and accelerator-memory cost and requires a new benchmark config label.
 
 Repeated `--paper-id` options activate required coverage for every supplied
 paper. Comparison-style questions without explicit IDs require the first two
@@ -318,8 +326,11 @@ Task 9 citation metrics. Task 8 implements
 each attached label against verifier-approved evidence, then the Task 7 parser
 rejects altered answers, altered evidence counts, invented source text, missing
 links, and inconsistent verdicts. The standalone Task 8 diagnostic remains
-one-shot; production may retry malformed structure exactly once without changing
-the answer or evidence. Task 10 invokes this path after citation-safe
+one-shot with the original contract-shaped model output. Production instead
+pre-segments the answer, asks the model for `source_span_id` plus ordered semantic
+relationships, and derives claim IDs, exact source text, visible labels, and
+verdicts in code. It may retry malformed structure exactly
+once without changing the answer or evidence. Task 10 invokes this path after citation-safe
 synthesis. Fully supported answers finish; partial or mixed answers receive one
 evidence-only revision and are checked again; wholly unsupported, malformed,
 uncited, or still-failing answers abstain. The revision count is stored in graph
@@ -383,6 +394,10 @@ ignored Kaggle source with:
 python -m scripts.prepare_end_to_end_kaggle_job
 ```
 
+For an immutable rerun, pass the final Kaggle identity before the manifest is
+hashed, for example `--kernel-slug owner/project-r8 --title "Project R8"`.
+Editing `kernel-metadata.json` afterward makes its recorded provenance hash stale.
+
 The committed template lives in `evaluation/kaggle/end_to_end_v0_5/`. It creates
 an isolated system-site-aware runtime without replacing Kaggle Torch, pins the
 Qwen3-4B and Qwen3-Embedding revisions, runs one smoke case before the full
@@ -409,6 +424,36 @@ baseline: all four prior claim-structure failures remained after the retry, and
 the final energy verifier call hit CUDA OOM after two clean insufficient-evidence
 decisions. R5 therefore identifies the next fixes—deterministic answer-span
 binding and bounded verifier context—rather than establishing release quality.
+
+Kaggle R6 (`job_097f59e9ea3b45e383deae420c7c4bd0`) applied the eight-passage
+per-paper bound and initial span binding. It removed the CUDA OOM and all tool
+errors, but decision accuracy and claim failure remained `0.6000`/`0.4000`
+because the model still had to echo code-owned top-level fields. R7
+(`job_842ae6a6bd924b62acd7171e47d44009`) removed those fields: decision accuracy
+reached `0.9000`, answer-case accuracy `0.8750`, both abstentions remained
+correct, claim failure fell to `0.1000`, and mean case latency fell from R6's
+132.2 seconds to 65.2 seconds. The sole remaining failure copied an incorrect
+citation label inside a multi-paper assessment; production v3 now binds those
+labels and derives verdicts in code as well. These remain development runs, not
+a frozen or independently reviewed baseline.
+
+R8 (`job_b280142291d440049ead48c9d3a3c20b`) verified that change: structural
+claim-verifier failures reached `0.0000`, with zero execution/tool errors and
+58.1-second mean case latency. Decision accuracy remained `0.9000` because the
+comparison answer placed `[1]` after the second sentence in a shared citation
+scope; sentence-level spans treated the first factual sentence as uncited, the
+one allowed revision did not change it, and the graph correctly abstained.
+Production v4 therefore uses exact citation-scoped spans while still requiring
+the model to assess every atomic claim against the scoped evidence.
+
+R9 (`job_2ec379f20ff44e90895c446a294abb4b`) validated v4 on the identical
+suite: decision, answer-case, and abstention accuracy were all `1.0000`; claim-
+verifier, citation-safety, execution, and tool-error rates were all `0.0000`.
+The comparison case verified on its first attempt with no answer revision. Mean
+case latency was 51.9 seconds with 32 graph LLM calls. Retrieval did not change:
+Recall@5 remained `0.6667` and MRR `0.5556`. R9 is therefore a clean development
+checkpoint, not a publishable score or frozen baseline; the eight answer cases
+still require independent review.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

@@ -254,15 +254,18 @@ scientific, numeric, comparative, methodological, causal, or paper-specific
 assertion to remain citation-required even when the answer omitted a label.
 Purely organizational text alone may be `not_required`.
 
-Extraction and verification happen in one bounded semantic attempt so the returned
-`source_text`, labels, and evidence relationships share one schema. This is a
-latency-conscious first implementation, not evidence that one-pass judgment is
-optimal. The production structure-only retry does not reconsider the semantic
-task. Model JSON is treated as untrusted: the parser checks immutable inputs,
-then the Task 7 validators derive verdicts and enforce all cross-references.
+The standalone Task 8 diagnostic performs extraction and verification in one
+bounded semantic attempt using the original full contract. Production uses a
+stricter adapter: code splits the exact answer into citation-scoped immutable
+spans, the model returns a `source_span_id` and ordered evidence relationships for each
+claim, and code reconstructs claim IDs, `source_text`, visible labels, and
+verdicts before Task 7 validation. The structure-only
+retry is compact and does not repeat evidence or reconsider the semantic task.
+Model JSON remains untrusted: the parser checks immutable inputs, then the Task 7
+validators derive verdicts and enforce all cross-references.
 Invalid output raises a fail-closed error in the standalone Task 8 callable. The
-production wrapper may ask the same model to repair structure exactly once while
-repeating the unchanged answer, evidence, and schema; it cannot revise semantic
+production wrapper may ask the same model to repair structure exactly once using
+the unchanged answer-span catalog and prior judgments; it cannot revise semantic
 content, and a second invalid response fails closed.
 
 Synthetic tests cover fully supported, partially supported, unsupported,
@@ -276,7 +279,7 @@ labels are not independently reviewed and do not establish production accuracy.
 
 After synthesis has passed deterministic citation validation, LangGraph calls
 the bounded production wrapper with the answer and only verifier-approved
-passages. One malformed response may receive one structure-only retry.
+passages. One malformed response may receive one compact structure-only retry.
 The validated aggregate verdicts drive a fixed policy:
 
 - all citation-required claims supported (or only `not_required` text): return;
@@ -331,6 +334,8 @@ python scripts/export_end_to_end_schema.py `
 Build the narrow ignored source with
 `python -m scripts.prepare_end_to_end_kaggle_job`. The package embeds only the
 production modules, suite, and public source manifest needed by the graph. It
+accepts `--kernel-slug` and `--title`; supply the final values during preparation
+so the manifest hashes the submitted metadata rather than a later manual edit. It
 uses Qwen3-4B FP16 on T4 device 0. When device 1 exists, the pinned Qwen3
 embedding model uses it; on a single-T4 host embeddings fall back to CPU. The
 adapter retains left padding, deterministic generation, SDPA, CUDA cache
@@ -359,6 +364,42 @@ case abstained after two valid insufficient decisions followed by a third-call
 CUDA OOM, so its tool-error-assisted outcome is not a clean safety measurement.
 The ImageNet case was a clean guard/retrieval-rewrite abstention. R5 remains an
 ignored development artifact and is not frozen as a regression baseline.
+
+R6 (`job_097f59e9ea3b45e383deae420c7c4bd0`) bounded accumulated verifier
+context at eight passages per paper and introduced exact answer-span binding.
+It completed with zero tool errors, but decision accuracy stayed `0.6000` and
+claim-verifier failure stayed `0.4000`: three responses changed code-owned
+top-level fields and the comparison response did not assess every cited label.
+R7 (`job_842ae6a6bd924b62acd7171e47d44009`) removed the top-level answer,
+evidence count, and contract version from model output. On the identical suite it
+reached decision accuracy `0.9000`, answer-case accuracy `0.8750`, abstention
+accuracy `1.0000`, answer F1 `0.4286`, Recall@5 `0.6667`, MRR `0.5556`, and
+claim-verifier failure `0.1000`, with zero execution/tool errors. Mean latency
+was 65.2 seconds and the graph made 32 LLM calls. The remaining comparison
+failure showed that assessment-level citation labels were still redundantly
+model-authored; v3 replaces them with ordered relationships bound to labels in
+code. R6/R7 artifacts remain ignored development diagnostics, not baselines.
+
+R8 (`job_b280142291d440049ead48c9d3a3c20b`) removed model-authored assessment
+labels and verdicts. Claim-verifier failure fell to `0.0000`; decision accuracy
+remained `0.9000`, answer-case accuracy `0.8750`, abstention accuracy `1.0000`,
+and mean latency fell to 58.1 seconds. The comparison case now passed structural
+validation, exposed one unsupported uncited lead sentence, attempted the single
+allowed answer revision, and safely abstained when the revision was unchanged.
+Because its following sentence carried `[1]` for the shared explanation, v4
+groups uncited lead sentences with the next cited sentence into an exact
+citation-scoped span; each atomic claim still receives its own evidence judgment.
+
+R9 (`job_2ec379f20ff44e90895c446a294abb4b`) validated the citation-scope rule
+on the same fingerprint, model revisions, and dual-T4 placement. Decision,
+answer-case, and abstention accuracy were all `1.0000`; answer F1 was `0.4480`,
+Recall@5 `0.6667`, Precision@5 `0.2222`, MRR `0.5556`, and claim-verifier,
+citation-safety, execution, and tool-error rates were all `0.0000`. Mean latency
+was 51.9 seconds, graph accounting was 32 LLM calls, and adapter accounting
+including smoke was 35 physical LLM calls, two document-embedding calls, and 14
+query-embedding calls. The comparison produced two atomic Transformer claims
+bound to the same exact `[1]` citation scope and verified without revision. R9
+remains an ignored, tunable development checkpoint pending independent review.
 
 ## Retrieval matching contract
 

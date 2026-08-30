@@ -24,6 +24,17 @@ def _paper_chunk(paper_id: str, index: int, text: str) -> dict:
     return item
 
 
+def test_accumulated_passages_are_bounded_with_new_results_first(monkeypatch) -> None:
+    monkeypatch.setattr(graph.settings, "max_accumulated_passages_per_paper", 8)
+    previous = [_chunk(index) for index in range(8)]
+    new = [_chunk(index) for index in range(8, 13)]
+
+    merged = graph._merge_passages(new, previous)
+
+    assert len(merged) == 8
+    assert [item["chunk_index"] for item in merged] == [8, 9, 10, 11, 12, 0, 1, 2]
+
+
 def test_extract_json_accepts_fenced_or_prefixed_model_output() -> None:
     payload = _extract_json('```json\n{"sufficient": false, "reason": "missing"}\n```')
     assert payload == {"sufficient": False, "reason": "missing"}
