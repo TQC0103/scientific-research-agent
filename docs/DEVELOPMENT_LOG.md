@@ -1434,3 +1434,44 @@ configured experiments root. A2 used kernel
 `tqc0103/sra-r25-retrieval-rerank-a2`; its ignored artifact is under
 `data/evaluations/runs/r25_retrieval_rerank_a2`. No model ran on the laptop.
 Final local verification passed Ruff and all 164 pytest tests.
+
+## 2026-08-31 — R25 end-to-end RRF versus windowed reranker
+
+The Task 11 Kaggle package now accepts explicit suite, retrieval mode, config
+name, and destination values. Production `rrf` remains the default. The opt-in
+`windowed_rerank` path installs a pinned MiniLM cross-encoder at the production
+retriever boundary, scores the same overlapping windows used in the retrieval
+diagnostic, and records reranker model/revision/device/calls separately. Both
+generated archives were checked to contain `development_25` and exclude R10.
+
+Batch `batch_e4416ec2be2a41b29538f518ae4bb928` ran the two configurations
+concurrently on the primary account with exact `NvidiaTeslaT4` shape. RRF R12
+job `job_d0f70fc4027d4e29978fa966cf30ef75`, kernel
+`tqc0103/sra-e2e-r25-rrf-r12`, completed in 1,626 seconds. Reranker R13 job
+`job_e171a22389bd45398a5c20a173c582ee`, kernel
+`tqc0103/sra-e2e-r25-rerank-r13`, completed in 1,776 seconds. Both passed the
+one-case smoke gate and all 25 full cases with zero execution or tool errors.
+
+RRF reached decision/answer-case/abstention accuracy
+`0.9200/0.9545/0.6667`, answer F1 `0.4334`, Recall@5 `0.8333`, MRR `0.6403`,
+claim-verifier failure `0.0400`, and mean latency 56.2 seconds. Reranking raised
+Recall@5 to `0.8542`, MRR to `0.6719`, and gold/required-paper coverage to
+`0.8542`; nevertheless, decision accuracy fell to `0.8400`, answer F1 to
+`0.4015`, claim-verifier failure rose to `0.1200`, and mean latency rose to
+61.9 seconds. On the unchanged R10 slice, RRF decision accuracy remained
+`1.0000` versus reranker's `0.9000`.
+
+Per-case analysis explains the rejection. Reranking introduced fail-closed
+claim-verifier abstentions for `transformer_sinusoidal_position_reason` and
+`lora_no_inference_latency` while retaining the existing LoRA equation claim
+failure. Both modes incorrectly answered
+`lora_all_resource_reduction_factors_missing`: selected evidence reported
+parameter and memory reductions, but the model invented or misinterpreted a
+numerical inference-latency factor. This is the next safety regression target.
+Higher annotation-relative retrieval alone did not improve the grounded final
+answer, so the reranker is not promoted and RRF remains production default.
+
+Artifacts remain ignored under `data/evaluations/runs/r25_e2e_rrf_r12` and
+`data/evaluations/runs/r25_e2e_rerank_r13`. No model ran on the laptop. The
+implementation added two local tests; final verification passed Ruff and all
+166 pytest tests.

@@ -102,6 +102,14 @@ def test_packager_rejects_kernel_slug_without_owner() -> None:
         package._validate_kernel_identity("missing-owner", "Valid title")
 
 
+def test_r25_source_selection_is_explicit_and_excludes_r10() -> None:
+    names = set(package._source_files("development_25").values())
+
+    assert "evaluation/suites/v0_5/development_25.json" in names
+    assert "evaluation/suites/v0_5/development_25_sources.json" in names
+    assert "evaluation/suites/v0_5/development_10.json" not in names
+
+
 def test_real_embedded_archive_imports_metrics_dependency_in_isolation(tmp_path: Path) -> None:
     with zipfile.ZipFile(io.BytesIO(base64.b64decode(package._embedded_source()))) as archive:
         archive.extractall(tmp_path)

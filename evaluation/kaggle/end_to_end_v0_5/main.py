@@ -13,7 +13,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-OUTPUT = Path("/kaggle/working/end_to_end_v0_5")
+OUTPUT = Path("/kaggle/working/__OUTPUT_DIRNAME__")
 ENV_ROOT = Path("/kaggle/working/end_to_end_v0_5_venv")
 ENV_PYTHON = ENV_ROOT / "bin" / "python"
 CODE_ROOT = Path("/tmp/end_to_end_v0_5_source")
@@ -104,10 +104,12 @@ print(json.dumps({"python": __import__("sys").version, "torch": torch.__version_
 def _run_benchmark() -> None:
     subprocess.run(
         [str(ENV_PYTHON), "-m", "scripts.run_end_to_end_transformers",
-         "--suite", str(CODE_ROOT / "evaluation/suites/v0_5/development_10.json"),
-         "--sources", str(CODE_ROOT / "evaluation/suites/v0_5/development_10_sources.json"),
+         "--suite", str(CODE_ROOT / "evaluation/suites/v0_5/__SUITE_FILENAME__"),
+         "--sources", str(CODE_ROOT / "evaluation/suites/v0_5/__SOURCES_FILENAME__"),
          "--output-dir", str(OUTPUT / "report"),
          "--data-dir", str(DATA_ROOT),
+         "--retrieval-mode", "__RETRIEVAL_MODE__",
+         "--config-name", "__CONFIG_NAME__",
          "--smoke-cases", "1"],
         check=True,
         cwd=CODE_ROOT,

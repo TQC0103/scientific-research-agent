@@ -343,12 +343,25 @@ python scripts/export_end_to_end_schema.py `
 Build the narrow ignored source with
 `python -m scripts.prepare_end_to_end_kaggle_job`. The package embeds only the
 production modules, suite, and public source manifest needed by the graph. It
-accepts `--kernel-slug` and `--title`; supply the final values during preparation
+accepts `--kernel-slug`, `--title`, `--suite-name`, `--retrieval-mode`,
+`--config-name`, and `--destination`; supply final values during preparation
 so the manifest hashes the submitted metadata rather than a later manual edit. It
 uses Qwen3-4B FP16 on T4 device 0. When device 1 exists, the pinned Qwen3
 embedding model uses it; on a single-T4 host embeddings fall back to CPU. The
 adapter retains left padding, deterministic generation, SDPA, CUDA cache
 cleanup, exact arXiv revision checks, and a smoke gate before the full run.
+The `rrf` mode is production default. `windowed_rerank` applies the pinned
+MiniLM cross-encoder to overlapping candidate passages and records model,
+revision, device, and call count in `adapter_runtime.json`.
+
+R25 production RRF R12 (`job_d0f70fc4027d4e29978fa966cf30ef75`)
+completed all 25 cases with decision accuracy `0.9200`, answer F1 `0.4334`,
+Recall@5 `0.8333`, MRR `0.6403`, and claim-verifier failure `0.0400`.
+Windowed reranker R13 (`job_e171a22389bd45398a5c20a173c582ee`)
+improved Recall@5/MRR to `0.8542/0.6719` but reduced decision accuracy to
+`0.8400`, increased claim-verifier failure to `0.1200`, and added 5.7 seconds
+mean latency per case. The paired result rejects promotion of the reranker on
+this development suite; retrieval coverage alone did not improve final answers.
 
 Kaggle R4 (`job_77d8f29fa5074e858e826793ad4d7540`) completed the report contract
 for all ten cases with zero execution and tool errors. Its development metrics

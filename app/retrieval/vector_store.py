@@ -2,6 +2,7 @@ import json
 import math
 import re
 from collections import Counter
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -33,6 +34,8 @@ LEXICAL_STOPWORDS = {
     "without",
 }
 RRF_K = 60
+RERANKER_WINDOW_CHARS = 900
+RERANKER_WINDOW_OVERLAP = 150
 
 
 def _embeddings() -> OllamaEmbeddings:
@@ -120,7 +123,24 @@ def _lexical_scores(query: str, chunks: list[dict]) -> list[float]:
     return scores
 
 
-def retrieve(arxiv_id: str, query: str, *, top_k: int = 5) -> list[dict]:
+def _reranker_windows(text: str) -> list[str]:
+    if len(text) <= RERANKER_WINDOW_CHARS:
+        return [text]
+    step = RERANKER_WINDOW_CHARS - RERANKER_WINDOW_OVERLAP
+    return [
+        text[start : start + RERANKER_WINDOW_CHARS]
+        for start in range(0, len(text), step)
+        if text[start : start + RERANKER_WINDOW_CHARS].strip()
+    ]
+
+
+def retrieve(
+    arxiv_id: str,
+    query: str,
+    *,
+    top_k: int = 5,
+    reranker: Callable[[str, list[str]], list[float]] | None = None,
+) -> list[dict]:
     source = index_directory(arxiv_id)
     index_path, chunks_path = source / "index.faiss", source / "chunks.json"
     if not index_path.exists() or not chunks_path.exists():
@@ -147,7 +167,8 @@ def retrieve(arxiv_id: str, query: str, *, top_k: int = 5) -> list[dict]:
         for rank, position in enumerate(lexical_order, 1)
         if lexical_scores[position] > 0
     }
-    candidates = set(dense_by_position) | set(lexical_order[:top_k])
+    lexical_candidate_count = candidate_count if reranker else top_k
+    candidates = set(dense_by_position) | set(lexical_order[:lexical_candidate_count])
     fused = []
     for position in candidates:
         dense_rank, dense_score = dense_by_position.get(position, (None, 0.0))
@@ -157,6 +178,26 @@ def retrieve(arxiv_id: str, query: str, *, top_k: int = 5) -> list[dict]:
         )
         fused.append((retrieval_score, dense_score, dense_rank, word_rank, position))
     fused.sort(reverse=True)
+    reranker_by_position: dict[int, float] = {}
+    if reranker:
+        windows: list[str] = []
+        window_owners: list[int] = []
+        for position in sorted(candidates):
+            chunk_windows = _reranker_windows(chunks[position]["text"])
+            windows.extend(chunk_windows)
+            window_owners.extend([position] * len(chunk_windows))
+        values = reranker(query, windows)
+        if len(values) != len(windows):
+            raise ValueError("Reranker returned the wrong score count.")
+        reranker_by_position = {position: float("-inf") for position in candidates}
+        for position, value in zip(window_owners, values, strict=True):
+            reranker_by_position[position] = max(
+                reranker_by_position[position], float(value)
+            )
+        fused.sort(
+            key=lambda item: (reranker_by_position[item[-1]], -item[-1]),
+            reverse=True,
+        )
     results = []
     for retrieval_score, dense_score, dense_rank, word_rank, position in fused[:top_k]:
         item = dict(chunks[position])
@@ -165,9 +206,15 @@ def retrieve(arxiv_id: str, query: str, *, top_k: int = 5) -> list[dict]:
                 "arxiv_id": arxiv_id,
                 "versioned_id": metadata.get("versioned_id", arxiv_id),
                 "score": dense_score,
-                "retrieval_score": retrieval_score,
+                "retrieval_score": reranker_by_position.get(
+                    position, retrieval_score
+                ),
                 "dense_rank": dense_rank,
                 "lexical_rank": word_rank,
+                "fusion_method": (
+                    "cross_encoder_rerank" if reranker else "reciprocal_rank_fusion"
+                ),
+                "reranker_score": reranker_by_position.get(position),
             }
         )
         results.append(item)

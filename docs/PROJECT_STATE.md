@@ -16,8 +16,8 @@ Last updated: 2026-08-31
   slice and adds 15 source-audited cases across ResNet v1, LoRA v2, and RAG v4.
   Its normalized fingerprint is
   `54b62586dc9a51e6c88f7c7738807ba6ccedeeed3050ab45a2b19f4b1cee8494`.
-  It is committed development data with advisory-judge and retrieval-only
-  development diagnostics; no end-to-end R25 result exists yet.
+  It is committed development data with advisory-judge, retrieval-only, and
+  paired RRF/reranker end-to-end development diagnostics.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -28,7 +28,7 @@ Last updated: 2026-08-31
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 164
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 166
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -227,6 +227,18 @@ papers in the LoRA/RAG comparison. The result is still a development ablation:
 the previously covered `resnet_identity_shortcut_cost` case regressed, while
 the BERT masked-LM and Transformer/BERT comparison misses remained. Production
 RRF is therefore unchanged until the reranker is validated outside R25 tuning.
+
+The paired R25 end-to-end run is now complete. Production RRF R12
+(`job_d0f70fc4027d4e29978fa966cf30ef75`) completed all 25 cases with zero
+execution/tool errors: decision accuracy `0.9200`, answer-case accuracy
+`0.9545`, abstention accuracy `0.6667`, answer F1 `0.4334`, Recall@5 `0.8333`,
+MRR `0.6403`, and claim-verifier failure `0.0400`. Windowed reranker R13
+(`job_e171a22389bd45398a5c20a173c582ee`) also completed cleanly and improved
+Recall@5/MRR to `0.8542/0.6719`, but decision accuracy fell to `0.8400`, answer
+F1 to `0.4015`, claim-verifier failure rose to `0.1200`, and mean latency rose
+from 56.2 to 61.9 seconds/case. On the unchanged first-ten slice, RRF retained
+decision accuracy `1.0000` versus reranker's `0.9000`. Production RRF remains
+the selected configuration.
 
 The R25 advisory judge A2 (`job_12b1e882b15d4e778a12ca9d82bbbc8f`)
 returned 22 `pass` and three `needs_revision` verdicts with 25 schema-valid
@@ -449,6 +461,11 @@ aggregate is now the first ignored development regression baseline.
   target misses, but swaps out one ResNet shortcut hit. It adds about 6.5 seconds
   of measured per-suite ranking latency versus CombSUM on Kaggle and has not
   been validated on a held-out internal suite; keep it opt-in.
+- The end-to-end R13 result confirms that better annotation-relative retrieval
+  does not guarantee better grounded answers. Reranking introduced two extra
+  fail-closed claim-verifier abstentions (sinusoidal position reasoning and LoRA
+  no-latency) and did not fix the shared LoRA false-positive abstention case.
+  Keep selection based on full-pipeline metrics, not Recall@K alone.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -466,12 +483,12 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Build a separately identified R25 Kaggle package and run the production graph
-   on T4. Compare R10 versus R25 only on the unchanged first-ten slice; retain
-   full-suite R25 aggregates under their own identity. Keep production RRF and
-   the windowed reranker as explicitly distinct configurations.
-2. Validate the windowed reranker on a new independently reviewed slice before
-   promoting it; preserve the R25 A1/A2 trade-off rather than tuning to perfection.
+1. Diagnose and fix the shared false-positive
+   `lora_all_resource_reduction_factors_missing` outcome: both RRF and reranker
+   converted absent numerical latency evidence into an answer. Add a verifier/
+   synthesis regression before another end-to-end run.
+2. Diagnose the three claim-verifier structure/grounding failures in R13 without
+   tuning retrieval further on R25. RRF remains production default.
 3. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
 4. Independently review and expand the seven Task 8 development cases, then

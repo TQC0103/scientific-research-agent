@@ -389,8 +389,11 @@ flowchart TD
     E2EPACKAGE --> E2ESMOKE["1-case production-graph smoke gate"]
     E2ESMOKE --> E2ER10["10-case live development baseline"]
     E2ER10 --> E2EOUTPUTS
-    R25 -.-> E2ER25["Distinct 25-case diagnostic — pending"]
-    E2ER25 -.-> E2EOUTPUTS
+    R25 --> E2ER25["R25 paired E2E: production RRF vs opt-in reranker"]
+    E2ER25 --> E2ERRF["R12 RRF: 0.92 decision accuracy"]
+    E2ER25 --> E2ERERANK["R13 rerank: higher retrieval, 0.84 decision accuracy"]
+    E2ERRF --> E2EOUTPUTS
+    E2ERERANK --> E2EOUTPUTS
     E2EBASELINE["Prior exact-suite metrics.json"] --> E2ECOMPARE["Directional deltas; no threshold"]
     E2EMETRICS --> E2ECOMPARE
     E2ECOMPARE --> E2EOUTPUTS

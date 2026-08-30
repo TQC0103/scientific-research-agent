@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "evaluation" / "kaggle" / "end_to_end_v0_5"
 DESTINATION = ROOT / "data" / "evaluations" / "kaggle_jobs" / "end_to_end_v0_5"
 KAGGLE_KERNEL_TEXT_LIMIT = 50
+DEFAULT_SUITE_NAME = "development_10"
+DEFAULT_RETRIEVAL_MODE = "rrf"
+DEFAULT_CONFIG_NAME = "hybrid_verified_citation_scoped_v4_qwen3_4b_fp16"
 
 
 def _sha256(path: Path) -> str:
@@ -25,7 +28,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _source_files() -> dict[Path, str]:
+def _source_files(suite_name: str = DEFAULT_SUITE_NAME) -> dict[Path, str]:
     relative = [
         "app/__init__.py", "app/config.py", "app/agent/__init__.py", "app/agent/graph.py",
         "app/agent/state.py", "app/db/__init__.py", "app/db/database.py",
@@ -39,16 +42,18 @@ def _source_files() -> dict[Path, str]:
         "app/evaluation/external.py",
         "app/evaluation/loader.py", "app/evaluation/metrics.py", "app/evaluation/models.py",
         "app/evaluation/retrieval.py", "scripts/run_end_to_end_transformers.py",
-        "evaluation/suites/v0_5/development_10.json",
-        "evaluation/suites/v0_5/development_10_sources.json",
+        f"evaluation/suites/v0_5/{suite_name}.json",
+        f"evaluation/suites/v0_5/{suite_name}_sources.json",
     ]
     return {ROOT / name: name for name in relative}
 
 
-def _embedded_source() -> str:
+def _embedded_source(suite_name: str = DEFAULT_SUITE_NAME) -> str:
     payload = io.BytesIO()
     with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for source, target in sorted(_source_files().items(), key=lambda item: item[1]):
+        for source, target in sorted(
+            _source_files(suite_name).items(), key=lambda item: item[1]
+        ):
             info = zipfile.ZipInfo(target, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o100644 << 16
@@ -68,6 +73,14 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         "--title",
         help="Optional Kaggle kernel title written before provenance hashes are computed.",
     )
+    parser.add_argument("--suite-name", default=DEFAULT_SUITE_NAME)
+    parser.add_argument(
+        "--retrieval-mode",
+        choices=("rrf", "windowed_rerank"),
+        default=DEFAULT_RETRIEVAL_MODE,
+    )
+    parser.add_argument("--config-name")
+    parser.add_argument("--destination", type=Path)
     return parser.parse_args(argv)
 
 
@@ -91,7 +104,12 @@ def _validate_kernel_identity(kernel_slug: str | None, title: str | None) -> Non
 def main(argv: list[str] | None = None) -> None:
     args = _arguments(argv or [])
     _validate_kernel_identity(args.kernel_slug, args.title)
-    destination = DESTINATION.resolve()
+    if not args.suite_name.isidentifier() or not args.suite_name.startswith(
+        "development_"
+    ):
+        raise ValueError(f"Unsafe suite name: {args.suite_name}")
+    config_name = args.config_name or DEFAULT_CONFIG_NAME
+    destination = (args.destination or DESTINATION).resolve()
     allowed_root = (ROOT / "data" / "evaluations" / "kaggle_jobs").resolve()
     if not destination.is_relative_to(allowed_root) or destination == allowed_root:
         raise ValueError(f"Unsafe Kaggle job destination: {destination}")
@@ -108,8 +126,18 @@ def main(argv: list[str] | None = None) -> None:
         if source.name == "main.py":
             target.write_text(
                 source.read_text(encoding="utf-8")
-                .replace("__APP_ARCHIVE_B64__", _embedded_source())
-                .replace("__KAGGLE_REQUIREMENTS_B64__", requirements),
+                .replace("__APP_ARCHIVE_B64__", _embedded_source(args.suite_name))
+                .replace("__KAGGLE_REQUIREMENTS_B64__", requirements)
+                .replace("__SUITE_FILENAME__", f"{args.suite_name}.json")
+                .replace(
+                    "__SOURCES_FILENAME__", f"{args.suite_name}_sources.json"
+                )
+                .replace("__OUTPUT_DIRNAME__", destination.name)
+                .replace("__RETRIEVAL_MODE__", args.retrieval_mode)
+                .replace(
+                    "__CONFIG_NAME__",
+                    config_name,
+                ),
                 encoding="utf-8",
             )
         elif source.name == "kernel-metadata.json" and (
@@ -124,9 +152,13 @@ def main(argv: list[str] | None = None) -> None:
         else:
             shutil.copy2(source, target)
     sources = json.loads(
-        (ROOT / "evaluation/suites/v0_5/development_10_sources.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            ROOT
+            / "evaluation"
+            / "suites"
+            / "v0_5"
+            / f"{args.suite_name}_sources.json"
+        ).read_text(encoding="utf-8")
     )["sources"]
     files = sorted(path for path in destination.rglob("*") if path.is_file())
     manifest = {
@@ -135,6 +167,19 @@ def main(argv: list[str] | None = None) -> None:
         "llm_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
         "embedding_model": "Qwen/Qwen3-Embedding-0.6B",
         "embedding_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+        "suite_name": args.suite_name,
+        "retrieval_mode": args.retrieval_mode,
+        "config_name": config_name,
+        "reranker_model": (
+            "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            if args.retrieval_mode == "windowed_rerank"
+            else None
+        ),
+        "reranker_revision": (
+            "233902d25c440f23af6f7d6e94d2946bac0bee0a"
+            if args.retrieval_mode == "windowed_rerank"
+            else None
+        ),
         "public_sources": sources,
         "files": {
             str(path.relative_to(destination)).replace("\\", "/"): _sha256(path)

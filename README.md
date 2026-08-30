@@ -436,6 +436,20 @@ ignored Kaggle source with:
 python -m scripts.prepare_end_to_end_kaggle_job
 ```
 
+Select R25 and an explicit retrieval configuration without changing R10:
+
+```powershell
+python -m scripts.prepare_end_to_end_kaggle_job `
+  --suite-name development_25 `
+  --retrieval-mode rrf `
+  --config-name r25_production_rrf_qwen3_4b_fp16 `
+  --destination data/evaluations/kaggle_jobs/end_to_end_v0_5_r25_rrf
+```
+
+`--retrieval-mode windowed_rerank` enables the pinned cross-encoder candidate;
+`rrf` remains the production default. Bundle manifests record suite, config,
+retrieval mode, model revisions, and exact source hashes.
+
 For an immutable rerun, pass the final Kaggle identity before the manifest is
 hashed, for example `--kernel-slug owner/project-r8 --title "Project R8"`.
 Editing `kernel-metadata.json` afterward makes its recorded provenance hash stale.
@@ -510,6 +524,14 @@ are regression-tested against `development_10.json`, and its five source
 revisions are checksum-pinned in `development_25_sources.json`. Keeping the two
 suite identities separate means future R25 diagnostics cannot overwrite or be
 mistaken for the R10 baseline.
+
+The first R25 end-to-end controlled pair completed on 2026-08-31. Production
+RRF R12 reached decision accuracy `0.9200`, answer F1 `0.4334`, Recall@5
+`0.8333`, MRR `0.6403`, and claim-verifier failure `0.0400`. Windowed reranker
+R13 improved Recall@5 to `0.8542` and MRR to `0.6719`, but decision accuracy
+fell to `0.8400`, answer F1 to `0.4015`, claim-verifier failure rose to `0.1200`,
+and mean latency increased by 5.7 seconds/case. RRF therefore remains the
+production default. Both are development diagnostics, not held-out scores.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

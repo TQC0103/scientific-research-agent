@@ -16,6 +16,8 @@ DEFAULT_LLM_MODEL = "Qwen/Qwen3-4B"
 DEFAULT_LLM_REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
 DEFAULT_EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 DEFAULT_EMBEDDING_REVISION = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+DEFAULT_RERANKER_REVISION = "233902d25c440f23af6f7d6e94d2946bac0bee0a"
 
 
 class TransformersRuntime:
@@ -122,10 +124,31 @@ class SentenceTransformerEmbeddings:
         )[0].tolist()
 
 
+class CrossEncoderRuntime:
+    def __init__(
+        self, model_name: str, revision: str | None, *, batch_size: int, device: str
+    ) -> None:
+        from sentence_transformers import CrossEncoder
+
+        self.model = CrossEncoder(model_name, revision=revision, device=device)
+        self.batch_size = batch_size
+        self.device = device
+        self.calls = 0
+
+    def score(self, query: str, texts: list[str]) -> list[float]:
+        self.calls += 1
+        return self.model.predict(
+            [(query, text) for text in texts],
+            batch_size=self.batch_size,
+            show_progress_bar=False,
+        ).reshape(-1).tolist()
+
+
 def _install_adapters(
     llm: TransformersRuntime,
     embeddings: SentenceTransformerEmbeddings,
     expected_revisions: dict[str, str],
+    reranker: CrossEncoderRuntime | None = None,
 ) -> Any:
     import app.agent.graph as graph_module
     import app.models.claim_verifier as claim_module
@@ -155,6 +178,13 @@ def _install_adapters(
     claim_module.get_llm = llm.wrapper
     graph_module.get_arxiv_metadata = pinned_metadata
     vector_module._embeddings = lambda: embeddings
+    if reranker is not None:
+        graph_module.retrieve = lambda arxiv_id, query, top_k=5: vector_module.retrieve(
+            arxiv_id,
+            query,
+            top_k=top_k,
+            reranker=reranker.score,
+        )
     settings.ollama_model = f"hf:{DEFAULT_LLM_MODEL}@{DEFAULT_LLM_REVISION}"
     settings.ollama_embed_model = (
         f"hf:{DEFAULT_EMBEDDING_MODEL}@{DEFAULT_EMBEDDING_REVISION}"
@@ -176,14 +206,21 @@ def _invoke(graph: Any, payload: dict, config: dict) -> dict:
     return state
 
 
-def _run_suite(suite_path: Path, output_dir: Path, graph: Any, *, limit: int = 0) -> Any:
+def _run_suite(
+    suite_path: Path,
+    output_dir: Path,
+    graph: Any,
+    *,
+    config_name: str,
+    limit: int = 0,
+) -> Any:
     suite = load_suite(suite_path)
     if limit:
         suite = suite.model_copy(update={"cases": suite.cases[:limit]})
     report = run_end_to_end(
         suite,
         lambda payload, config: _invoke(graph, payload, config),
-        config_name="hybrid_verified_citation_scoped_v4_qwen3_4b_fp16",
+        config_name=config_name,
     )
     write_end_to_end_outputs(report, output_dir)
     return report
@@ -200,6 +237,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--embedding-revision", default=DEFAULT_EMBEDDING_REVISION)
     parser.add_argument("--embedding-batch-size", type=int, default=8)
+    parser.add_argument(
+        "--retrieval-mode", choices=("rrf", "windowed_rerank"), default="rrf"
+    )
+    parser.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
+    parser.add_argument("--reranker-revision", default=DEFAULT_RERANKER_REVISION)
+    parser.add_argument("--reranker-batch-size", type=int, default=32)
+    parser.add_argument(
+        "--config-name",
+        default="hybrid_verified_citation_scoped_v4_qwen3_4b_fp16",
+    )
     parser.add_argument("--smoke-cases", type=int, default=1)
     return parser.parse_args()
 
@@ -219,17 +266,38 @@ def main() -> None:
         batch_size=args.embedding_batch_size,
         device="cuda:1" if llm.torch.cuda.device_count() > 1 else "cpu",
     )
-    graph = _install_adapters(llm, embeddings, expected)
+    reranker = None
+    if args.retrieval_mode == "windowed_rerank":
+        reranker = CrossEncoderRuntime(
+            args.reranker_model,
+            args.reranker_revision,
+            batch_size=args.reranker_batch_size,
+            device="cuda:1" if llm.torch.cuda.device_count() > 1 else "cpu",
+        )
+    graph = _install_adapters(llm, embeddings, expected, reranker)
 
-    smoke = _run_suite(args.suite, args.output_dir / "smoke", graph, limit=args.smoke_cases)
+    smoke = _run_suite(
+        args.suite,
+        args.output_dir / "smoke",
+        graph,
+        config_name=args.config_name,
+        limit=args.smoke_cases,
+    )
     if smoke.aggregate.execution_failures:
         raise RuntimeError("End-to-end smoke failed; the full suite was not started.")
-    full = _run_suite(args.suite, args.output_dir / "full", graph)
+    full = _run_suite(
+        args.suite, args.output_dir / "full", graph, config_name=args.config_name
+    )
     runtime = {
         "llm_physical_calls": llm.calls,
         "embedding_document_calls": embeddings.document_calls,
         "embedding_query_calls": embeddings.query_calls,
         "embedding_device": embeddings.device,
+        "retrieval_mode": args.retrieval_mode,
+        "reranker_model": args.reranker_model if reranker else None,
+        "reranker_revision": args.reranker_revision if reranker else None,
+        "reranker_device": reranker.device if reranker else None,
+        "reranker_calls": reranker.calls if reranker else 0,
         "smoke_execution_failures": smoke.aggregate.execution_failures,
         "full_execution_failures": full.aggregate.execution_failures,
     }

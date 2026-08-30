@@ -38,11 +38,11 @@ Continue in this order:
    cross-encoder reranking A2 recovered all three A1 target failures and reached
    `0.8958`, with one different ResNet regression. Preserve both runs as
    diagnostics, not thresholds or a production-default selection.
-3. Run the 25-case production graph on the Kaggle T4 using a separately named
-   configuration; do not silently replace production RRF with the development
-   reranker. Compare directionally
-   with R10 only on the unchanged ten-case slice. Do not compare raw aggregate
-   rates across different suite membership.
+3. The paired 25-case production-graph run is complete. RRF reached decision
+   accuracy `0.9200`; reranking improved Recall@5 from `0.8333` to `0.8542` but
+   reduced decision accuracy to `0.8400` and tripled claim-verifier failures.
+   Retain RRF. Next fix the shared LoRA missing-factor false positive and analyze
+   reranker's additional fail-closed claim errors before any rerun.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.
