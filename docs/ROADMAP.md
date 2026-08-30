@@ -34,10 +34,13 @@ Continue in this order:
    one new partial-evidence abstention, and a LoRA/RAG cross-paper comparison.
    Its advisory judge completed with all 22 answer cases passing; the three
    intentional abstentions remain human-retained. Retrieval-only A1 found
-   CombSUM ahead of RRF at Recall@5 `0.8542` versus `0.8125`, but exposed three
-   targeted coverage failures. Preserve these as diagnostics, not thresholds.
-3. Diagnose those retrieval misses and multi-paper fixed-K coverage before
-   running the 25-case production graph on the Kaggle T4. Compare directionally
+   CombSUM ahead of RRF at Recall@5 `0.8542` versus `0.8125`. Windowed
+   cross-encoder reranking A2 recovered all three A1 target failures and reached
+   `0.8958`, with one different ResNet regression. Preserve both runs as
+   diagnostics, not thresholds or a production-default selection.
+3. Run the 25-case production graph on the Kaggle T4 using a separately named
+   configuration; do not silently replace production RRF with the development
+   reranker. Compare directionally
    with R10 only on the unchanged ten-case slice. Do not compare raw aggregate
    rates across different suite membership.
 4. Add production embedding-call instrumentation and structured abstention-

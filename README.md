@@ -259,7 +259,7 @@ annotation-relative Recall@K, Precision@K, MRR, gold-evidence coverage,
 required-paper coverage, macro paper recall, and per-case failure reasons. It is
 CPU-only and does not invoke an embedding model or LLM.
 
-Run the six-configuration internal diagnostic with identical PDFs, chunking,
+Run the eight-configuration internal diagnostic with identical PDFs, chunking,
 questions, K, and scoring using:
 
 ```powershell
@@ -268,13 +268,17 @@ python scripts/run_internal_retrieval_ablation.py `
   --sources evaluation/suites/v0_5/development_10_sources.json `
   --papers-dir data/papers `
   --modes lexical dense hybrid hybrid_score hybrid_per_paper `
-    hybrid_score_per_paper --top-k 5 `
+    hybrid_score_per_paper hybrid_rerank hybrid_rerank_per_paper --top-k 5 `
   --output-dir data/evaluations/runs/internal-retrieval-ablation
 ```
 
 Dense and hybrid default to a pinned `Qwen/Qwen3-Embedding-0.6B` revision,
 matching the repo's configured embedding-model family. Run those arms through
 Kaggle Control Plane, not on the laptop.
+The two rerank modes score the lexical/dense candidate union with a pinned
+`cross-encoder/ms-marco-MiniLM-L-6-v2`. Each long chunk is scored as overlapping
+900-character passages and max-pooled back to one chunk score; the per-paper
+variant retains the fixed total K while reserving fair paper coverage.
 `scripts/prepare_internal_retrieval_kaggle_job.py` builds a narrow T4 bundle
 containing only required code; the remote entrypoint downloads the suite's
 pinned paper revisions and verifies their SHA-256 before parsing. The Markdown
@@ -306,6 +310,13 @@ CombSUM Recall@5 were `0.8333`, `0.8125`, `0.8125`, and `0.8542`; their MRRs
 were `0.6354`, `0.6250`, `0.5951`, and `0.6472`. CombSUM led this diagnostic but
 still missed two single-paper gold passages and complete annotated LoRA/RAG
 coverage, so production RRF remains unchanged pending failure analysis.
+
+R25 windowed-reranker A2 (`job_941b1b0763c2472e8d71cf78bff8a7b9`) recovered
+all three A1 target failures. Global and per-paper reranking reached Recall@5
+`0.8958`, Precision@5 `0.2667`, MRR `0.6688`, and required-paper coverage
+`0.8958`. This is a development ablation, not a production-default change:
+`resnet_identity_shortcut_cost` regressed while three target cases improved, and
+the BERT masked-LM and Transformer/BERT comparison misses remain.
 
 Run the controlled Task 6 verifier diagnostic with the production prompt and
 response parser using:

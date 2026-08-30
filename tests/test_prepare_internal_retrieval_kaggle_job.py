@@ -94,6 +94,9 @@ def test_kaggle_entrypoint_preserves_system_torch_and_cleans_environment() -> No
     assert "_download_papers()" in entrypoint
     assert "Downloaded PDF checksum mismatch" in entrypoint
     assert '"scripts.run_internal_retrieval_ablation"' in entrypoint
+    assert '"hybrid_rerank"' in entrypoint
+    assert '"hybrid_rerank_per_paper"' in entrypoint
+    assert "233902d25c440f23af6f7d6e94d2946bac0bee0a" in entrypoint
     assert "shutil.rmtree(ENV_ROOT" in entrypoint
     assert "shutil.rmtree(VIRTUALENV_BOOTSTRAP" in entrypoint
     assert "torch==" not in requirements

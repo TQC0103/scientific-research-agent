@@ -34,6 +34,7 @@ class RetrievedChunk(StrictModel):
     fusion_method: str | None = None
     dense_score: float | None = None
     lexical_score: float | None = None
+    reranker_score: float | None = None
     dense_rank: int | None = Field(default=None, ge=1)
     lexical_rank: int | None = Field(default=None, ge=1)
 

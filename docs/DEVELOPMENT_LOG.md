@@ -1397,3 +1397,40 @@ All model and embedding work ran on Kaggle; the laptop performed packaging,
 tests, status polling, and report analysis only. Runtime ZIPs, logs, and reports
 remain under ignored `data/evaluations/runs/r25_diagnostics_*` directories.
 Final local verification passed Ruff and all 162 pytest tests.
+
+## 2026-08-31 — R25 windowed cross-encoder retrieval diagnostic
+
+The R25 A1 misses showed a consistent fusion failure: min-max CombSUM favored
+chunks supported by both BM25 and dense retrieval, while the ResNet degradation
+gold was BM25 rank 4 and the LoRA mechanism gold was dense rank 3. A new opt-in
+retrieval arm now reranks the gold-hidden union of the top lexical and dense
+candidates with pinned `cross-encoder/ms-marco-MiniLM-L-6-v2` revision
+`233902d25c440f23af6f7d6e94d2946bac0bee0a`. The per-paper variant applies the
+existing fixed-total-K paper quota after reranking. Rankings record lexical,
+dense, and reranker diagnostics, while the production RRF path is unchanged.
+
+Whole-chunk A1 job `job_731edb846da34803976508a3fb43d65c` reached Recall@5
+`0.8750` but still missed the ResNet degradation passage and regressed two other
+cases. Inspection indicated that scoring complete 1,800-character chunks made
+late or locally relevant evidence vulnerable to truncation/context dilution.
+The reranker was therefore changed to score overlapping 900-character windows
+with 150-character overlap and max-pool each candidate back to one chunk score.
+This change is query/chunk-only and never reads gold evidence during ranking.
+
+Windowed A2 job `job_941b1b0763c2472e8d71cf78bff8a7b9` completed on Tesla T4
+with all 25 predictions and 24 retrieval-eligible cases. Global and per-paper
+reranking both reached Recall@5/Precision@5/MRR
+`0.8958/0.2667/0.6688`, gold-evidence coverage `0.8958`, and required-paper
+coverage `0.8958`. This recovered all three A1 targets: ResNet degradation,
+LoRA frozen-weight adaptation, and complete annotated LoRA/RAG paper coverage.
+It also exposed a real trade-off: `resnet_identity_shortcut_cost`, previously a
+CombSUM rank-5 hit, fell outside reranker top-5. The BERT masked-LM and
+Transformer/BERT comparison misses remain. The mode therefore stays opt-in and
+is not promoted by tuning further on R25.
+
+Both GPU jobs used account `acct_d321057bf0954d048b448711e0efed7f`, exact
+shape `NvidiaTeslaT4`, and separately versioned bundles beneath Control Plane's
+configured experiments root. A2 used kernel
+`tqc0103/sra-r25-retrieval-rerank-a2`; its ignored artifact is under
+`data/evaluations/runs/r25_retrieval_rerank_a2`. No model ran on the laptop.
+Final local verification passed Ruff and all 164 pytest tests.

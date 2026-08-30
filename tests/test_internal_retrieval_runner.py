@@ -7,6 +7,7 @@ import pymupdf
 import pytest
 
 from app.evaluation.internal_retrieval_runner import (
+    _reranker_windows,
     load_internal_corpus,
     render_ablation_markdown,
     run_internal_retrieval_ablation,
@@ -29,6 +30,16 @@ class FakeDenseEncoder:
     def encode_query(self, text: str) -> np.ndarray:
         del text
         return np.asarray([0.0, 1.0], dtype="float32")
+
+
+class FakeReranker:
+    marker = "dot products grow large"
+
+    def score(self, question: str, texts: list[str]) -> np.ndarray:
+        del question
+        return np.asarray(
+            [1.0 if self.marker in text else 0.0 for text in texts], dtype="float32"
+        )
 
 
 def _sha256(path: Path) -> str:
@@ -114,6 +125,39 @@ def test_dense_and_hybrid_share_chunks_and_emit_reports(tmp_path: Path) -> None:
     assert (output / "ablation_report.md").is_file()
     assert (output / "hybrid" / "retrieved.jsonl").is_file()
     assert "annotation-relative" in render_ablation_markdown(result)
+
+
+def test_cross_encoder_reranks_union_candidates_and_records_model(tmp_path: Path) -> None:
+    suite, sources, papers = _single_case_inputs(tmp_path)
+    result = run_internal_retrieval_ablation(
+        suite,
+        sources_path=sources,
+        papers_dir=papers,
+        modes=("hybrid_rerank",),
+        top_k=1,
+        dense_encoder=FakeDenseEncoder(),
+        dense_model="fake/dense",
+        reranker=FakeReranker(),
+        reranker_model="fake/reranker",
+        reranker_revision="test-revision",
+    )
+
+    aggregate = result.reports["hybrid_rerank"].aggregate
+    top = result.rankings["hybrid_rerank"][suite.cases[0].case_id][0]
+    assert aggregate.recall_at_k == 1.0
+    assert top["fusion_method"] == "cross_encoder_rerank"
+    assert top["reranker_score"] == 1.0
+    assert result.reranker_model == "fake/reranker"
+    assert result.reranker_revision == "test-revision"
+
+
+def test_reranker_windows_keep_late_evidence_with_overlap() -> None:
+    marker = "late evidence marker"
+    windows = _reranker_windows("x" * 1400 + marker + "y" * 400)
+
+    assert len(windows) > 1
+    assert any(marker in window for window in windows)
+    assert all(len(window) <= 900 for window in windows)
 
 
 def test_fusion_variants_emit_scores_and_per_paper_quota(tmp_path: Path) -> None:

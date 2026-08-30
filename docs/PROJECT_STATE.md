@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-30
+Last updated: 2026-08-31
 
 ## Current baseline
 
@@ -16,7 +16,8 @@ Last updated: 2026-08-30
   slice and adds 15 source-audited cases across ResNet v1, LoRA v2, and RAG v4.
   Its normalized fingerprint is
   `54b62586dc9a51e6c88f7c7738807ba6ccedeeed3050ab45a2b19f4b1cee8494`.
-  It is committed development data with no model benchmark result yet.
+  It is committed development data with advisory-judge and retrieval-only
+  development diagnostics; no end-to-end R25 result exists yet.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -27,7 +28,7 @@ Last updated: 2026-08-30
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 162
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 164
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -216,6 +217,16 @@ The 15 new cases alone reached mean recall `0.8667`; misses remained for the
 ResNet degradation passage, LoRA mechanism passage, and complete annotated
 LoRA/RAG comparison coverage. This supports targeted retrieval analysis, not an
 automatic production fusion change.
+
+R25 reranker A2 (`job_941b1b0763c2472e8d71cf78bff8a7b9`) added a pinned
+MiniLM cross-encoder over the lexical/dense candidate union. Scoring overlapping
+900-character windows and max-pooling to chunks reached Recall@5/Precision@5/MRR
+`0.8958/0.2667/0.6688`; gold-evidence and required-paper coverage were both
+`0.8958`. It recovered all three A1 target failures, including both annotated
+papers in the LoRA/RAG comparison. The result is still a development ablation:
+the previously covered `resnet_identity_shortcut_cost` case regressed, while
+the BERT masked-LM and Transformer/BERT comparison misses remained. Production
+RRF is therefore unchanged until the reranker is validated outside R25 tuning.
 
 The R25 advisory judge A2 (`job_12b1e882b15d4e778a12ca9d82bbbc8f`)
 returned 22 `pass` and three `needs_revision` verdicts with 25 schema-valid
@@ -434,6 +445,10 @@ aggregate is now the first ignored development regression baseline.
   but swapped one successful case for two others and still missed one paper in
   the comparison. Nine eligible development cases are insufficient for fusion
   selection, statistical testing, or parameter optimization.
+- R25 windowed reranking improves aggregate coverage and fixes the three A1
+  target misses, but swaps out one ResNet shortcut hit. It adds about 6.5 seconds
+  of measured per-suite ranking latency versus CombSUM on Kaggle and has not
+  been validated on a held-out internal suite; keep it opt-in.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -451,13 +466,12 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Inspect and address the R25 retrieval misses before synthesis: preserve the
-   diagnostic evidence for score fusion, improve exact abstract/table ranking,
-   and enforce complete top-K coverage for multi-paper cases without tuning only
-   to these 25 development examples.
-2. Build a separately identified R25 Kaggle package and run the production graph
+1. Build a separately identified R25 Kaggle package and run the production graph
    on T4. Compare R10 versus R25 only on the unchanged first-ten slice; retain
-   full-suite R25 aggregates under their own identity.
+   full-suite R25 aggregates under their own identity. Keep production RRF and
+   the windowed reranker as explicitly distinct configurations.
+2. Validate the windowed reranker on a new independently reviewed slice before
+   promoting it; preserve the R25 A1/A2 trade-off rather than tuning to perfection.
 3. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
 4. Independently review and expand the seven Task 8 development cases, then

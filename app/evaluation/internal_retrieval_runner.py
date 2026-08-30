@@ -25,10 +25,16 @@ SUPPORTED_MODES = (
     "hybrid_score",
     "hybrid_per_paper",
     "hybrid_score_per_paper",
+    "hybrid_rerank",
+    "hybrid_rerank_per_paper",
 )
 HYBRID_MODES = frozenset(SUPPORTED_MODES[2:])
 DEFAULT_DENSE_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 DEFAULT_DENSE_REVISION = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+DEFAULT_RERANKER_REVISION = "233902d25c440f23af6f7d6e94d2946bac0bee0a"
+RERANKER_WINDOW_CHARS = 900
+RERANKER_WINDOW_OVERLAP = 150
 
 
 @dataclass(frozen=True)
@@ -57,6 +63,10 @@ class DenseEncoder(Protocol):
     def encode_documents(self, texts: list[str]) -> np.ndarray: ...
 
     def encode_query(self, text: str) -> np.ndarray: ...
+
+
+class Reranker(Protocol):
+    def score(self, question: str, texts: list[str]) -> np.ndarray: ...
 
 
 class SentenceTransformerDenseEncoder:
@@ -96,6 +106,31 @@ class SentenceTransformerDenseEncoder:
         )
 
 
+class CrossEncoderReranker:
+    def __init__(
+        self, model_name: str, *, revision: str | None = None, batch_size: int = 32
+    ):
+        try:
+            from sentence_transformers import CrossEncoder
+        except ImportError as exc:
+            raise RuntimeError(
+                "Internal retrieval reranking requires sentence-transformers."
+            ) from exc
+        self.model = CrossEncoder(model_name, revision=revision)
+        self.batch_size = batch_size
+
+    def score(self, question: str, texts: list[str]) -> np.ndarray:
+        if not texts:
+            return np.asarray([], dtype="float32")
+        return np.asarray(
+            self.model.predict(
+                [(question, text) for text in texts],
+                batch_size=self.batch_size,
+                show_progress_bar=False,
+            ),
+            dtype="float32",
+        ).reshape(-1)
+
 @dataclass(frozen=True)
 class InternalAblationResult:
     reports: dict[str, RetrievalReport]
@@ -105,6 +140,8 @@ class InternalAblationResult:
     source_hashes: dict[str, str]
     dense_model: str | None
     dense_revision: str | None
+    reranker_model: str | None
+    reranker_revision: str | None
 
 
 def _sha256(path: Path) -> str:
@@ -327,6 +364,115 @@ def _hybrid_payload(
     ]
 
 
+def _apply_paper_quota(
+    order: list[int],
+    chunks: dict[int, CorpusChunk],
+    scores: dict[int, float],
+    *,
+    top_k: int,
+    paper_order: tuple[str, ...],
+) -> list[int]:
+    if len(paper_order) <= 1 or top_k < len(paper_order):
+        return order[:top_k]
+    quota = top_k // len(paper_order)
+    selected: list[int] = []
+    selected_set: set[int] = set()
+    for paper_id in paper_order:
+        paper_candidates = [
+            index
+            for index in order
+            if chunks[index].paper_id == paper_id and index not in selected_set
+        ]
+        for index in paper_candidates[:quota]:
+            selected.append(index)
+            selected_set.add(index)
+    for index in order:
+        if len(selected) >= top_k:
+            break
+        if index not in selected_set:
+            selected.append(index)
+            selected_set.add(index)
+    return sorted(selected, key=lambda index: (-scores[index], index))[:top_k]
+
+
+def _reranker_windows(text: str) -> list[str]:
+    if len(text) <= RERANKER_WINDOW_CHARS:
+        return [text]
+    step = RERANKER_WINDOW_CHARS - RERANKER_WINDOW_OVERLAP
+    return [
+        text[start : start + RERANKER_WINDOW_CHARS]
+        for start in range(0, len(text), step)
+        if text[start : start + RERANKER_WINDOW_CHARS].strip()
+    ]
+
+
+def _rerank_payload(
+    question: str,
+    lexical: list[tuple[CorpusChunk, float]],
+    dense: list[tuple[CorpusChunk, float]],
+    *,
+    reranker: Reranker,
+    top_k: int,
+    paper_order: tuple[str, ...] = (),
+) -> list[dict[str, Any]]:
+    chunks: dict[int, CorpusChunk] = {}
+    lexical_scores: dict[int, float] = {}
+    dense_scores: dict[int, float] = {}
+    lexical_ranks: dict[int, int] = {}
+    dense_ranks: dict[int, int] = {}
+    lexical_paper_ranks: dict[str, int] = {}
+    dense_paper_ranks: dict[str, int] = {}
+    by_paper = bool(paper_order)
+    for global_rank, (chunk, score) in enumerate(lexical, 1):
+        lexical_paper_ranks[chunk.paper_id] = lexical_paper_ranks.get(chunk.paper_id, 0) + 1
+        chunks[chunk.corpus_index] = chunk
+        lexical_scores[chunk.corpus_index] = score
+        lexical_ranks[chunk.corpus_index] = (
+            lexical_paper_ranks[chunk.paper_id] if by_paper else global_rank
+        )
+    for global_rank, (chunk, score) in enumerate(dense, 1):
+        dense_paper_ranks[chunk.paper_id] = dense_paper_ranks.get(chunk.paper_id, 0) + 1
+        chunks[chunk.corpus_index] = chunk
+        dense_scores[chunk.corpus_index] = score
+        dense_ranks[chunk.corpus_index] = (
+            dense_paper_ranks[chunk.paper_id] if by_paper else global_rank
+        )
+    candidate_ids = list(chunks)
+    windows: list[str] = []
+    window_owners: list[int] = []
+    for index in candidate_ids:
+        chunk_windows = _reranker_windows(chunks[index].text)
+        windows.extend(chunk_windows)
+        window_owners.extend([index] * len(chunk_windows))
+    reranker_values = reranker.score(question, windows)
+    if reranker_values.shape != (len(windows),):
+        raise ValueError("Reranker returned the wrong score count.")
+    reranker_scores = {index: float("-inf") for index in candidate_ids}
+    for index, value in zip(window_owners, reranker_values, strict=True):
+        reranker_scores[index] = max(reranker_scores[index], float(value))
+    order = sorted(candidate_ids, key=lambda index: (-reranker_scores[index], index))
+    order = _apply_paper_quota(
+        order,
+        chunks,
+        reranker_scores,
+        top_k=top_k,
+        paper_order=paper_order,
+    )
+    return [
+        chunks[index].retrieval_payload(
+            score=reranker_scores[index],
+            retrieval_score=reranker_scores[index],
+            fusion_method="cross_encoder_rerank",
+            lexical_score=lexical_scores.get(index),
+            dense_score=dense_scores.get(index),
+            lexical_rank=lexical_ranks.get(index),
+            dense_rank=dense_ranks.get(index),
+            reranker_score=reranker_scores[index],
+        )
+        for index in order
+    ]
+
+
 def _ranking_payload(
     mode: str,
     lexical: list[tuple[CorpusChunk, float]],
@@ -334,6 +480,8 @@ def _ranking_payload(
     *,
     top_k: int,
     paper_order: tuple[str, ...] = (),
+    question: str = "",
+    reranker: Reranker | None = None,
 ) -> list[dict[str, Any]]:
     if mode == "lexical":
         return [
@@ -345,6 +493,17 @@ def _ranking_payload(
             chunk.retrieval_payload(score=score, dense_rank=rank)
             for rank, (chunk, score) in enumerate(dense[:top_k], 1)
         ]
+    if "rerank" in mode:
+        if reranker is None:
+            raise ValueError("A reranker is required for rerank modes.")
+        return _rerank_payload(
+            question,
+            lexical,
+            dense,
+            reranker=reranker,
+            top_k=top_k,
+            paper_order=paper_order if "per_paper" in mode else (),
+        )
     return _hybrid_payload(
         lexical,
         dense,
@@ -364,9 +523,13 @@ def run_internal_retrieval_ablation(
     dense_model: str = DEFAULT_DENSE_MODEL,
     dense_revision: str | None = DEFAULT_DENSE_REVISION,
     dense_batch_size: int = 32,
+    reranker_model: str = DEFAULT_RERANKER_MODEL,
+    reranker_revision: str | None = DEFAULT_RERANKER_REVISION,
+    reranker_batch_size: int = 32,
     chunk_size: int = 1800,
     overlap: int = 250,
     dense_encoder: DenseEncoder | None = None,
+    reranker: Reranker | None = None,
 ) -> InternalAblationResult:
     if not modes or any(mode not in SUPPORTED_MODES for mode in modes):
         raise ValueError(f"modes must be a non-empty subset of {SUPPORTED_MODES}")
@@ -396,6 +559,14 @@ def run_internal_retrieval_ablation(
         document_vectors = encoder.encode_documents([chunk.text for chunk in corpus])
         if document_vectors.shape[0] != len(corpus):
             raise ValueError("Dense encoder returned the wrong document count.")
+    uses_reranker = any("rerank" in mode for mode in modes)
+    active_reranker = reranker
+    if uses_reranker:
+        active_reranker = active_reranker or CrossEncoderReranker(
+            reranker_model,
+            revision=reranker_revision,
+            batch_size=reranker_batch_size,
+        )
 
     rankings = {mode: {} for mode in modes}
     latency = {mode: 0.0 for mode in modes}
@@ -457,6 +628,8 @@ def run_internal_retrieval_ablation(
                 mode_dense,
                 top_k=top_k,
                 paper_order=tuple(paper.paper_id for paper in case.papers),
+                question=case.question,
+                reranker=active_reranker,
             )
             fusion_seconds = time.perf_counter() - mode_started
             if mode == "lexical":
@@ -485,6 +658,8 @@ def run_internal_retrieval_ablation(
         source_hashes=source_hashes,
         dense_model=dense_model if uses_dense else None,
         dense_revision=dense_revision if uses_dense else None,
+        reranker_model=reranker_model if uses_reranker else None,
+        reranker_revision=reranker_revision if uses_reranker else None,
     )
 
 
@@ -565,6 +740,8 @@ def write_ablation_outputs(result: InternalAblationResult, output_dir: str | Pat
         "dataset_version": next(iter(result.reports.values())).aggregate.dataset_version,
         "dense_model": result.dense_model,
         "dense_revision": result.dense_revision,
+        "reranker_model": result.reranker_model,
+        "reranker_revision": result.reranker_revision,
         "chunk_counts": result.chunk_counts,
         "source_hashes": result.source_hashes,
         "modes": modes,

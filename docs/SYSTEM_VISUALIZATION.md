@@ -340,16 +340,21 @@ flowchart TD
     CASES --> ABLATION["Gold-hidden BM25 / Qwen dense candidate runs"]
     PAPERS --> ABLATION
     ABLATION --> FUSION["RRF or min-max CombSUM"]
+    ABLATION --> RERANK["Pinned cross-encoder over lexical/dense union"]
+    RERANK --> WINDOWS["900-char overlapping passage scores"]
+    WINDOWS --> MAXPOOL["Max-pool passage score back to chunk"]
     FUSION --> GLOBAL["Global fixed-K ranking"]
     FUSION --> PERPAPER["Per-paper rank reset + fair fixed-K quota"]
     GLOBAL --> RANKED
     PERPAPER --> RANKED
+    MAXPOOL --> GLOBAL
+    MAXPOOL --> PERPAPER
     ABLATION --> ABLATIONREPORT["Ignored JSON summary + Markdown comparison"]
     R10 --> SUITEPACKAGE["Suite-selectable R10/R25 packagers"]
     R25 --> SUITEPACKAGE
     SUITEPACKAGE --> ABLATIONGPU["Pinned isolated T4 package via Control Plane"]
     ABLATION -.-> ABLATIONGPU
-    ABLATIONGPU --> R25RETRIEVAL["R25 A1: 6 retrieval arms completed"]
+    ABLATIONGPU --> R25RETRIEVAL["R25 A1/A2: 8 retrieval arms completed"]
 
     CASES --> VDEFINITION["Controlled initial + recovery evidence snapshots"]
     VDEFINITION --> VPROMPT["Production verifier prompt + parser"]

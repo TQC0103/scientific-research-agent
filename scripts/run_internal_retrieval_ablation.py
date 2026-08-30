@@ -9,6 +9,8 @@ from pathlib import Path
 from app.evaluation.internal_retrieval_runner import (
     DEFAULT_DENSE_MODEL,
     DEFAULT_DENSE_REVISION,
+    DEFAULT_RERANKER_MODEL,
+    DEFAULT_RERANKER_REVISION,
     SUPPORTED_MODES,
     run_internal_retrieval_ablation,
     write_ablation_outputs,
@@ -27,6 +29,9 @@ def main() -> None:
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--dense-revision", default=DEFAULT_DENSE_REVISION)
     parser.add_argument("--dense-batch-size", type=int, default=32)
+    parser.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
+    parser.add_argument("--reranker-revision", default=DEFAULT_RERANKER_REVISION)
+    parser.add_argument("--reranker-batch-size", type=int, default=32)
     parser.add_argument("--chunk-size", type=int, default=1800)
     parser.add_argument("--overlap", type=int, default=250)
     args = parser.parse_args()
@@ -41,6 +46,9 @@ def main() -> None:
         dense_model=args.dense_model,
         dense_revision=args.dense_revision,
         dense_batch_size=args.dense_batch_size,
+        reranker_model=args.reranker_model,
+        reranker_revision=args.reranker_revision,
+        reranker_batch_size=args.reranker_batch_size,
         chunk_size=args.chunk_size,
         overlap=args.overlap,
     )

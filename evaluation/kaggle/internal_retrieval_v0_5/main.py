@@ -197,6 +197,8 @@ def _run_ablation() -> None:
         "hybrid_score",
         "hybrid_per_paper",
         "hybrid_score_per_paper",
+        "hybrid_rerank",
+        "hybrid_rerank_per_paper",
         "--top-k",
         "5",
         "--dense-model",
@@ -205,6 +207,12 @@ def _run_ablation() -> None:
         "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
         "--dense-batch-size",
         "8",
+        "--reranker-model",
+        "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        "--reranker-revision",
+        "233902d25c440f23af6f7d6e94d2946bac0bee0a",
+        "--reranker-batch-size",
+        "32",
     ]
     subprocess.run(command, check=True, cwd=CODE_ROOT)
 
