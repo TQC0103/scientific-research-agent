@@ -312,7 +312,8 @@ comparisons when its Control Plane connection is available.
 Implementation: `evaluation/schema/evaluation-suite.schema.json`,
 `evaluation/schema/claim-verification.schema.json`,
 `evaluation/suites/v0_5/schema_fixtures.json`,
-`evaluation/suites/v0_5/development_10.json`, `app/evaluation/`,
+`evaluation/suites/v0_5/development_10.json`,
+`evaluation/suites/v0_5/development_25.json`, `app/evaluation/`,
 `app/models/claims.py`, `scripts/download_external_benchmarks.py`,
 `evaluation/README.md`.
 
@@ -324,6 +325,10 @@ flowchart TD
     CASES --> EXPECTED["Answer/abstain decision + atomic criteria"]
     CASES --> GOLD["Gold evidence groups"]
     CASES --> PROVENANCE["Fixture/development/test + provenance + annotation"]
+    CASES --> R10["Immutable reviewed 10-case R10 slice"]
+    R10 --> R25["Separate 25-case suite: same first 10 + 15 new cases"]
+    R25 --> NEWSOURCES["ResNet v1 + LoRA v2 + RAG v4"]
+    R25 --> SOURCEMANIFEST["Five checksum-pinned PDFs + page counts"]
     GOLD --> ANCHOR["Versioned ID + source type + page + exact quote"]
     GOLD --> OPTIONAL["Optional chunk index; never sole identity"]
 
@@ -373,8 +378,10 @@ flowchart TD
     E2E --> E2EIDENTITY["Validate owner/slug + 50-char Kaggle limits"]
     E2EIDENTITY --> E2EPACKAGE["Narrow T4 Kaggle package; dual-GPU or CPU-embedding fallback"]
     E2EPACKAGE --> E2ESMOKE["1-case production-graph smoke gate"]
-    E2ESMOKE --> E2EFULL["10-case live development run"]
-    E2EFULL --> E2EOUTPUTS
+    E2ESMOKE --> E2ER10["10-case live development baseline"]
+    E2ER10 --> E2EOUTPUTS
+    R25 -.-> E2ER25["Distinct 25-case diagnostic — pending"]
+    E2ER25 -.-> E2EOUTPUTS
     E2EBASELINE["Prior exact-suite metrics.json"] --> E2ECOMPARE["Directional deltas; no threshold"]
     E2EMETRICS --> E2ECOMPARE
     E2ECOMPARE --> E2EOUTPUTS

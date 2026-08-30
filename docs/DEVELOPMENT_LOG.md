@@ -1319,3 +1319,35 @@ regression baseline. It remains tuned development evidence, not a held-out score
 
 Final local verification passed Ruff and all 156 pytest tests. No model workload
 ran on the laptop.
+
+## 2026-08-30 — Source-audited 25-case development expansion
+
+The internal evaluation data expanded from the immutable reviewed R10 slice to
+a separately identified `v0_5_development_25` v0.1.0 suite. The first ten parsed
+case objects are unchanged from `development_10.json`; a regression test makes
+that inheritance explicit instead of relying on naming or ordering alone. The
+15 additions cover ResNet v1, LoRA v2, and RAG v4: mechanism questions, exact
+table results, failure analysis, one partial-evidence numerical abstention, and
+a cross-paper LoRA/RAG comparison. The complete suite contains 22 answer and
+three abstention cases over five exact arXiv revisions.
+The normalized R25 suite fingerprint is
+`54b62586dc9a51e6c88f7c7738807ba6ccedeeed3050ab45a2b19f4b1cee8494`.
+
+Each new question, rubric, forbidden claim, evidence quote, page, relevant
+table, and surrounding prose was checked directly in the rendered source PDF.
+The five-paper source manifest records exact revision URLs, SHA-256 hashes, and
+page counts. The ResNet Table 4 question explicitly says single-model to avoid
+collision with 10-crop and ensemble results; the RAG Table 1 question names
+RAG-Sequence to avoid the adjacent RAG-Token row; and the LoRA negative case
+requires abstention because the paper reports numerical parameter and memory
+reductions but no numerical inference-latency reduction factor.
+
+This commit creates evaluation source data only. It does not relabel R10, does
+not create an R25 result, and does not make development data held out or
+publishable. No LLM, embedding model, or GPU workload ran on the laptop. The
+next step is an advisory case audit plus retrieval-only diagnostic against this
+exact suite, followed by a separately named R25 end-to-end Kaggle run if those
+checks are acceptable.
+
+Final local verification passed Ruff and all 160 pytest tests. No model workload
+ran on the laptop.

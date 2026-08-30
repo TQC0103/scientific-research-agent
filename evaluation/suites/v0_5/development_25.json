@@ -1,0 +1,1423 @@
+{
+  "schema_version": "1.1.0",
+  "suite_id": "v0_5_development_25",
+  "dataset_version": "0.1.0",
+  "benchmark_status": "development",
+  "description": "Twenty-five-case development suite for retrieval, evidence sufficiency, abstention, and multi-paper coverage. The first ten cases preserve the reviewed R10 baseline slice exactly. LLM judge output is advisory and does not make this suite held-out or publishable.",
+  "cases": [
+    {
+      "case_id": "transformer_scaled_dot_product_reason",
+      "question": "Why does the Transformer scale dot-product attention by 1/sqrt(d_k)?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_scaled_dot_product_reason",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v7 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned Transformer v7 page 4; the question, answer criteria, reference answer, and evidence anchor were retained without change. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "For large key dimensions, unscaled dot products can grow large, push softmax into regions with extremely small gradients, and impair learning; dividing by sqrt(d_k) counteracts that effect.",
+        "answer_criteria": [
+          {
+            "criterion_id": "large_dot_products",
+            "description": "States that dot-product magnitude grows for large key dimensions.",
+            "required": true
+          },
+          {
+            "criterion_id": "small_softmax_gradients",
+            "description": "Connects large logits to softmax regions with extremely small gradients.",
+            "required": true
+          },
+          {
+            "criterion_id": "scaling_counteracts",
+            "description": "States that the 1/sqrt(d_k) factor counteracts this effect.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims the scaling factor was selected from a reported BLEU ablation."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "scaled_attention_reason_p4",
+          "evidence_group_id": "scaled_attention_reason",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 4,
+          "section": "3.2.1 Scaled Dot-Product Attention",
+          "quote": "We suspect that for large values of d_k, the dot products grow large in magnitude, pushing the softmax function into regions where it has extremely small gradients. To counteract this effect, we scale the dot products by 1/sqrt(d_k).",
+          "supports": ["large_dot_products", "small_softmax_gradients", "scaling_counteracts"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "method"]
+    },
+    {
+      "case_id": "transformer_sinusoidal_position_reason",
+      "question": "Why did the Transformer authors choose sinusoidal positional encodings instead of learned positional embeddings?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_sinusoidal_position_reason",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v7 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned Transformer v7 page 6; the question, answer criteria, reference answer, and evidence anchor were retained without change. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "Learned and sinusoidal positional encodings produced nearly identical results, but the authors chose the sinusoidal version because it might extrapolate to sequence lengths longer than those seen during training.",
+        "answer_criteria": [
+          {
+            "criterion_id": "similar_results",
+            "description": "States that learned and sinusoidal positional encodings gave nearly identical results.",
+            "required": true
+          },
+          {
+            "criterion_id": "length_extrapolation",
+            "description": "States that sinusoidal encodings may extrapolate to longer unseen sequence lengths.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims the sinusoidal version achieved a reported accuracy improvement over learned embeddings."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "sinusoidal_choice_p6",
+          "evidence_group_id": "sinusoidal_choice",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 6,
+          "section": "3.5 Positional Encoding",
+          "quote": "We also experimented with using learned positional embeddings instead, and found that the two versions produced nearly identical results. We chose the sinusoidal version because it may allow the model to extrapolate to sequence lengths longer than the ones encountered during training.",
+          "supports": ["similar_results", "length_extrapolation"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "method"]
+    },
+    {
+      "case_id": "transformer_wmt14_en_de_result",
+      "question": "What BLEU score did Transformer (big) achieve on WMT 2014 English-to-German, and how did it compare with prior reported systems?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_wmt14_en_de_result",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v7 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned Transformer v7 page 8, including Table 2 and its surrounding text; the annotation was retained without change. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "Transformer (big) achieved 28.4 BLEU, more than 2.0 BLEU above the best previously reported systems, including ensembles, establishing a new state of the art for that task.",
+        "answer_criteria": [
+          {
+            "criterion_id": "bleu_28_4",
+            "description": "Reports the 28.4 BLEU score.",
+            "required": true
+          },
+          {
+            "criterion_id": "over_two_bleu",
+            "description": "Reports an improvement of more than 2.0 BLEU over prior systems including ensembles.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Reports the English-to-French BLEU score as the English-to-German result."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "wmt14_en_de_result_p8",
+          "evidence_group_id": "wmt14_en_de_result",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 8,
+          "section": "6.1 Machine Translation",
+          "quote": "On the WMT 2014 English-to-German translation task, the big transformer model outperforms the best previously reported models (including ensembles) by more than 2.0 BLEU, establishing a new state-of-the-art BLEU score of 28.4.",
+          "supports": ["bleu_28_4", "over_two_bleu"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "result", "numeric"]
+    },
+    {
+      "case_id": "bert_masked_lm_mechanism",
+      "question": "How does BERT's masked language model objective enable deep bidirectional pre-training?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1810.04805v2",
+        "source_case_id": "bert_masked_lm_mechanism",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v2 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned BERT v2 page 4; the masked-LM mechanism, answer criteria, and evidence anchor were retained without change. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1810.04805v2"],
+        "reference_answer": "BERT masks a random subset of input tokens and predicts those masked tokens from their context, allowing representations to condition on both left and right context instead of using only a left-to-right or right-to-left language model.",
+        "answer_criteria": [
+          {
+            "criterion_id": "mask_tokens",
+            "description": "States that a percentage of input tokens is masked at random.",
+            "required": true
+          },
+          {
+            "criterion_id": "predict_masked_tokens",
+            "description": "States that the model predicts the masked tokens from context.",
+            "required": true
+          },
+          {
+            "criterion_id": "bidirectional_context",
+            "description": "Connects the objective to deep bidirectional context rather than a one-directional LM.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims BERT reconstructs every input token like a standard autoencoder."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "bert_mlm_mechanism_p4",
+          "evidence_group_id": "bert_mlm_mechanism",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "full_text",
+          "page": 4,
+          "section": "3.1 Pre-training BERT",
+          "quote": "In order to train a deep bidirectional representation, we simply mask some percentage of the input tokens at random, and then predict those masked tokens. We refer to this procedure as a masked LM.",
+          "supports": ["mask_tokens", "predict_masked_tokens", "bidirectional_context"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "method"]
+    },
+    {
+      "case_id": "bert_pretraining_corpora",
+      "question": "Which corpora were used to pre-train BERT, and approximately how many words did each contain?",
+      "question_type": "single_paper_fact",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1810.04805v2",
+        "source_case_id": "bert_pretraining_corpora",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v2 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned BERT v2 page 5; the corpus names, word counts, and evidence anchor were retained without change. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1810.04805v2"],
+        "reference_answer": "BERT used BooksCorpus with about 800 million words and English Wikipedia with about 2.5 billion words.",
+        "answer_criteria": [
+          {
+            "criterion_id": "bookscorpus_800m",
+            "description": "Names BooksCorpus and its approximately 800M words.",
+            "required": true
+          },
+          {
+            "criterion_id": "wikipedia_2500m",
+            "description": "Names English Wikipedia and its approximately 2,500M words.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims BERT was pre-trained only on BooksCorpus."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "bert_pretraining_data_p5",
+          "evidence_group_id": "bert_pretraining_data",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "full_text",
+          "page": 5,
+          "section": "3.1 Pre-training data",
+          "quote": "For the pre-training corpus we use the BooksCorpus (800M words) and English Wikipedia (2,500M words).",
+          "supports": ["bookscorpus_800m", "wikipedia_2500m"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "fact", "numeric"]
+    },
+    {
+      "case_id": "bert_glue_multinli_results",
+      "question": "What GLUE score and MultiNLI accuracy does BERT report, including the stated absolute improvements?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1810.04805v2",
+        "source_case_id": "bert_glue_multinli_results",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the pinned v2 abstract and full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against the checksum-pinned BERT v2 abstract; both reported scores and absolute improvements were retained without change. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1810.04805v2"],
+        "reference_answer": "BERT reports a GLUE score of 80.5%, a 7.7-point absolute improvement, and MultiNLI accuracy of 86.7%, a 4.6-point absolute improvement.",
+        "answer_criteria": [
+          {
+            "criterion_id": "glue_result",
+            "description": "Reports GLUE 80.5% and a 7.7-point absolute improvement.",
+            "required": true
+          },
+          {
+            "criterion_id": "multinli_result",
+            "description": "Reports MultiNLI 86.7% and a 4.6-point absolute improvement.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Swaps the GLUE and MultiNLI values or improvement amounts."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "bert_abstract_glue_multinli",
+          "evidence_group_id": "bert_glue_multinli_results",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "abstract",
+          "page": null,
+          "section": "Abstract",
+          "quote": "It obtains new state-of-the-art results on eleven natural language processing tasks, including pushing the GLUE score to 80.5% (7.7% point absolute improvement), MultiNLI accuracy to 86.7% (4.6% absolute improvement).",
+          "supports": ["glue_result", "multinli_result"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "result", "numeric", "abstract-evidence"]
+    },
+    {
+      "case_id": "transformer_bert_architecture_comparison_dev",
+      "question": "Compare the Transformer paper's central architecture with BERT's central representation-learning approach.",
+      "question_type": "multi_paper_comparison",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_bert_architecture_comparison_dev",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Cross-paper question authored from the pinned Transformer v7 and BERT v2 abstracts."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against both checksum-pinned abstracts; the two-paper comparison and required-paper coverage were retained without change. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        },
+        {
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "revision": 2,
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7", "1810.04805v2"],
+        "reference_answer": "The Transformer introduces an attention-only sequence architecture that removes recurrence and convolution, while BERT uses a Transformer encoder to pre-train deep bidirectional representations by jointly conditioning on left and right context.",
+        "answer_criteria": [
+          {
+            "criterion_id": "transformer_attention_only",
+            "description": "Attributes an attention-only architecture without recurrence or convolution to the Transformer paper.",
+            "required": true
+          },
+          {
+            "criterion_id": "bert_bidirectional_pretraining",
+            "description": "Attributes deep bidirectional pre-training using both left and right context to BERT.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Attributes BERT's masked-language-model objective to the Transformer paper.",
+          "Claims the papers report a direct head-to-head experiment."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "transformer_abstract_architecture_dev",
+          "evidence_group_id": "transformer_architecture_dev",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "abstract",
+          "page": null,
+          "section": "Abstract",
+          "quote": "We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.",
+          "supports": ["transformer_attention_only"]
+        },
+        {
+          "evidence_id": "bert_abstract_bidirectional_dev",
+          "evidence_group_id": "bert_bidirectional_pretraining_dev",
+          "paper_id": "1810.04805",
+          "versioned_id": "1810.04805v2",
+          "source_type": "abstract",
+          "page": null,
+          "section": "Abstract",
+          "quote": "BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers.",
+          "supports": ["bert_bidirectional_pretraining"]
+        }
+      ],
+      "tags": ["multi-paper", "positive", "comparison", "required-coverage"]
+    },
+    {
+      "case_id": "transformer_training_energy_missing_dev",
+      "question": "How much electrical energy did the authors consume to train Transformer (big)?",
+      "question_type": "evidence_missing",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_training_energy_missing_dev",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Negative case authored after reviewing the pinned v7 full text for reported training resources."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Human-reviewed and retained on 2026-08-27 after the full-paper audit confirmed that training duration and GPU count are reported but electrical energy consumption is not. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "abstain",
+        "abstention_reason": "evidence_missing",
+        "required_paper_ids": ["1706.03762v7"],
+        "answer_criteria": [
+          {
+            "criterion_id": "training_resources_only",
+            "description": "Recognizes that the paper reports training duration and GPU count but not electrical energy consumption.",
+            "required": false
+          }
+        ],
+        "forbidden_claims": [
+          "Converts reported GPU count and training duration into an unreported energy value.",
+          "Imports an energy estimate from outside the pinned paper."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "transformer_training_resources_p8",
+          "evidence_group_id": "transformer_training_resources",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 8,
+          "section": "6.1 Machine Translation",
+          "quote": "Training took 3.5 days on 8 P100 GPUs.",
+          "supports": ["training_resources_only"]
+        }
+      ],
+      "challenge": {
+        "kinds": ["negative", "evidence_missing", "partial_evidence"],
+        "description": "The paper reports training time and GPU hardware but not electrical energy consumption."
+      },
+      "tags": ["single-paper", "negative", "abstention", "numeric-distractor"]
+    },
+    {
+      "case_id": "transformer_imagenet_unsupported_dev",
+      "question": "What ImageNet top-1 accuracy does the Transformer paper report?",
+      "question_type": "unsupported_question",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_imagenet_unsupported_dev",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Adversarial false-premise case authored from the pinned v7 task scope."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Human-reviewed and retained on 2026-08-27 after the full-paper audit confirmed that the paper does not report an ImageNet top-1 experiment. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "abstain",
+        "abstention_reason": "unsupported_question",
+        "required_paper_ids": ["1706.03762v7"],
+        "answer_criteria": [],
+        "forbidden_claims": [
+          "Invents an ImageNet result.",
+          "Treats machine-translation BLEU as ImageNet accuracy."
+        ]
+      },
+      "gold_evidence": [],
+      "challenge": {
+        "kinds": ["negative", "adversarial", "unsupported_premise"],
+        "description": "The question presupposes an ImageNet experiment outside the paper's reported task scope."
+      },
+      "tags": ["single-paper", "negative", "adversarial", "abstention"]
+    },
+    {
+      "case_id": "transformer_single_head_bleu_difference",
+      "question": "What BLEU difference did the Transformer authors report between single-head attention and the best attention-head setting?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark",
+        "dataset_version": "0.1.1",
+        "source_url": "https://arxiv.org/abs/1706.03762v7",
+        "source_case_id": "transformer_single_head_bleu_difference",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Numeric ablation question authored from Table 3 and the accompanying model-variations text in the pinned v7 paper."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned Transformer v7 page 9, including Table 3 and its surrounding text; the corrected 0.9 BLEU comparison was retained. The automated judge remains advisory."
+      },
+      "papers": [
+        {
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "revision": 7,
+          "title": "Attention Is All You Need"
+        }
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1706.03762v7"],
+        "reference_answer": "Single-head attention was 0.9 BLEU worse than the best attention-head setting in the reported English-to-German development-set ablation.",
+        "answer_criteria": [
+          {
+            "criterion_id": "single_head_0_9_worse",
+            "description": "Reports that single-head attention was 0.9 BLEU worse than the best setting.",
+            "required": true
+          }
+        ],
+        "forbidden_claims": [
+          "Claims every multi-head configuration improves BLEU by 0.9.",
+          "Describes the reported development-set difference as a universal causal effect."
+        ]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "single_head_bleu_difference_p9",
+          "evidence_group_id": "single_head_bleu_difference",
+          "paper_id": "1706.03762",
+          "versioned_id": "1706.03762v7",
+          "source_type": "full_text",
+          "page": 9,
+          "section": "6.2 Model Variations",
+          "quote": "While single-head attention is 0.9 BLEU worse than the best setting, quality also drops off with too many heads.",
+          "supports": ["single_head_0_9_worse"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "result", "numeric", "ablation"]
+    },
+    {
+      "case_id": "resnet_degradation_problem",
+      "question": "What degradation problem motivated residual learning in the ResNet paper, and why did the authors say it was not simply overfitting?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1512.03385v1",
+        "source_case_id": "resnet_degradation_problem",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v1 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned ResNet v1 page 1; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "1512.03385", "versioned_id": "1512.03385v1", "revision": 1, "title": "Deep Residual Learning for Image Recognition"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1512.03385v1"],
+        "reference_answer": "As depth increased, already-converging plain networks first saturated and then degraded in accuracy, with deeper models showing higher training error. Because training error itself worsened, the authors argued that the effect was not ordinary test-set overfitting.",
+        "answer_criteria": [
+          {"criterion_id": "accuracy_degrades_with_depth", "description": "States that accuracy saturates and then degrades as depth increases.", "required": true},
+          {"criterion_id": "higher_training_error", "description": "States that adding layers led to higher training error in a suitably deep model.", "required": true},
+          {"criterion_id": "not_overfitting", "description": "Explains that the higher training error distinguishes the degradation problem from ordinary overfitting.", "required": true}
+        ],
+        "forbidden_claims": ["Claims the degradation problem was caused by vanishing gradients or test-set overfitting in the reported experiment."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "resnet_degradation_p1",
+        "evidence_group_id": "resnet_degradation",
+        "paper_id": "1512.03385",
+        "versioned_id": "1512.03385v1",
+        "source_type": "full_text",
+        "page": 1,
+        "section": "1 Introduction",
+        "quote": "When deeper networks are able to start converging, a degradation problem has been exposed: with the network depth increasing, accuracy gets saturated (which might be unsurprising) and then degrades rapidly. Unexpectedly, such degradation is not caused by overfitting, and adding more layers to a suitably deep model leads to higher training error.",
+        "supports": ["accuracy_degrades_with_depth", "higher_training_error", "not_overfitting"]
+      }],
+      "tags": ["single-paper", "positive", "method", "failure-mode"]
+    },
+    {
+      "case_id": "resnet_residual_formulation",
+      "question": "How does the ResNet paper reformulate a desired mapping H(x) as a residual learning problem?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1512.03385v1",
+        "source_case_id": "resnet_residual_formulation",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v1 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned ResNet v1 page 3; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "1512.03385", "versioned_id": "1512.03385v1", "revision": 1, "title": "Deep Residual Learning for Image Recognition"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1512.03385v1"],
+        "reference_answer": "Instead of directly approximating H(x), the stacked layers approximate the residual F(x) = H(x) - x, so the original mapping is represented as F(x) + x.",
+        "answer_criteria": [
+          {"criterion_id": "residual_definition", "description": "Defines the residual as F(x) = H(x) - x.", "required": true},
+          {"criterion_id": "reconstructed_mapping", "description": "States that the original mapping becomes F(x) + x.", "required": true}
+        ],
+        "forbidden_claims": ["Claims that the shortcut replaces H(x) with F(x) alone."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "resnet_residual_formulation_p3",
+        "evidence_group_id": "resnet_residual_formulation",
+        "paper_id": "1512.03385",
+        "versioned_id": "1512.03385v1",
+        "source_type": "full_text",
+        "page": 3,
+        "section": "3.1 Residual Learning",
+        "quote": "So rather than expect stacked layers to approximate H(x), we explicitly let these layers approximate a residual function F(x) := H(x) - x. The original function thus becomes F(x) + x.",
+        "supports": ["residual_definition", "reconstructed_mapping"]
+      }],
+      "tags": ["single-paper", "positive", "method", "equation"]
+    },
+    {
+      "case_id": "resnet_identity_shortcut_cost",
+      "question": "What parameter and computation cost do ResNet identity shortcuts add, and when is a projection shortcut W_s used?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1512.03385v1",
+        "source_case_id": "resnet_identity_shortcut_cost",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v1 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned ResNet v1 page 3; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "1512.03385", "versioned_id": "1512.03385v1", "revision": 1, "title": "Deep Residual Learning for Image Recognition"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1512.03385v1"],
+        "reference_answer": "An identity shortcut adds neither parameters nor computational complexity. The projection W_s is used only when dimensions must be matched.",
+        "answer_criteria": [
+          {"criterion_id": "no_extra_parameters", "description": "States that identity shortcuts add no extra parameters.", "required": true},
+          {"criterion_id": "no_extra_computation", "description": "States that identity shortcuts add no computational complexity.", "required": true},
+          {"criterion_id": "projection_for_dimensions", "description": "States that W_s is used only to match dimensions.", "required": true}
+        ],
+        "forbidden_claims": ["Claims every shortcut is a learned projection."]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "resnet_shortcut_cost_p3",
+          "evidence_group_id": "resnet_shortcut_cost",
+          "paper_id": "1512.03385",
+          "versioned_id": "1512.03385v1",
+          "source_type": "full_text",
+          "page": 3,
+          "section": "3.2 Identity Mapping by Shortcuts",
+          "quote": "The shortcut connections in Eqn.(1) introduce neither extra parameter nor computation complexity.",
+          "supports": ["no_extra_parameters", "no_extra_computation"]
+        },
+        {
+          "evidence_id": "resnet_projection_dimensions_p3",
+          "evidence_group_id": "resnet_shortcut_cost",
+          "paper_id": "1512.03385",
+          "versioned_id": "1512.03385v1",
+          "source_type": "full_text",
+          "page": 3,
+          "section": "3.2 Identity Mapping by Shortcuts",
+          "quote": "But we will show by experiments that the identity mapping is sufficient for addressing the degradation problem and is economical, and thus W_s is only used when matching dimensions.",
+          "supports": ["projection_for_dimensions"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "method", "efficiency"]
+    },
+    {
+      "case_id": "resnet152_imagenet_single_model_error",
+      "question": "In ResNet Table 4, what single-model ImageNet validation top-1 and top-5 error rates were reported for ResNet-152?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1512.03385v1",
+        "source_case_id": "resnet152_imagenet_single_model_error",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question explicitly identifies Table 4 to distinguish single-model results from 10-crop and ensemble results elsewhere in the paper."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned ResNet v1 page 6, including the complete Table 4 and surrounding captions; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "1512.03385", "versioned_id": "1512.03385v1", "revision": 1, "title": "Deep Residual Learning for Image Recognition"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1512.03385v1"],
+        "reference_answer": "Table 4 reports 19.38% top-1 error and 4.49% top-5 error for the single-model ResNet-152 result on the ImageNet validation set.",
+        "answer_criteria": [
+          {"criterion_id": "top1_error_19_38", "description": "Reports a top-1 validation error of 19.38%.", "required": true},
+          {"criterion_id": "top5_error_4_49", "description": "Reports a top-5 validation error of 4.49%.", "required": true},
+          {"criterion_id": "single_model_context", "description": "Identifies the values as the Table 4 single-model validation result.", "required": true}
+        ],
+        "forbidden_claims": ["Substitutes the 10-crop Table 3 values or the Table 5 ensemble result."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "resnet152_table4_p6",
+        "evidence_group_id": "resnet152_table4",
+        "paper_id": "1512.03385",
+        "versioned_id": "1512.03385v1",
+        "source_type": "full_text",
+        "page": 6,
+        "section": "3.4 Implementation / Table 4",
+        "quote": "ResNet-152 19.38 4.49. Table 4. Error rates (%) of single-model results on the ImageNet validation set.",
+        "supports": ["top1_error_19_38", "top5_error_4_49", "single_model_context"]
+      }],
+      "tags": ["single-paper", "positive", "result", "numeric", "table"]
+    },
+    {
+      "case_id": "resnet1202_cifar_overfitting",
+      "question": "How did the 1202-layer ResNet behave on CIFAR-10, and what explanation did the authors give for its worse test result than the 110-layer model?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/1512.03385v1",
+        "source_case_id": "resnet1202_cifar_overfitting",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v1 full text and Table 6 discussion."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned ResNet v1 page 8, including Figure 6 and the complete 1202-layer discussion; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "1512.03385", "versioned_id": "1512.03385v1", "revision": 1, "title": "Deep Residual Learning for Image Recognition"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["1512.03385v1"],
+        "reference_answer": "The 1202-layer network optimized successfully to below 0.1% training error and obtained 7.93% test error, but it tested worse than the 110-layer network despite similar training error. The authors attributed the gap to overfitting in an unnecessarily large model for the small CIFAR-10 dataset.",
+        "answer_criteria": [
+          {"criterion_id": "training_error_below_point1", "description": "Reports training error below 0.1%.", "required": true},
+          {"criterion_id": "test_error_7_93", "description": "Reports a 7.93% test error.", "required": true},
+          {"criterion_id": "worse_than_110", "description": "States that the 1202-layer result was worse than the 110-layer result despite similar training error.", "required": true},
+          {"criterion_id": "authors_argue_overfitting", "description": "Attributes the worse test result to overfitting, as argued by the authors.", "required": true}
+        ],
+        "forbidden_claims": ["Claims the 1202-layer model failed to optimize or had higher training error than the 110-layer model."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "resnet1202_behavior_p8",
+        "evidence_group_id": "resnet1202_behavior",
+        "paper_id": "1512.03385",
+        "versioned_id": "1512.03385v1",
+        "source_type": "full_text",
+        "page": 8,
+        "section": "4.2 CIFAR-10 and Analysis",
+        "quote": "Our method shows no optimization difficulty, and this 10^3-layer network is able to achieve training error <0.1% (Fig. 6, right). Its test error is still fairly good (7.93%, Table 6). But there are still open problems on such aggressively deep models. The testing result of this 1202-layer network is worse than that of our 110-layer network, although both have similar training error. We argue that this is because of overfitting.",
+        "supports": ["training_error_below_point1", "test_error_7_93", "worse_than_110", "authors_argue_overfitting"]
+      }],
+      "tags": ["single-paper", "positive", "result", "numeric", "failure-mode"]
+    },
+    {
+      "case_id": "lora_frozen_low_rank_mechanism",
+      "question": "How does LoRA adapt a pretrained model while keeping its original weights frozen?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2106.09685v2",
+        "source_case_id": "lora_frozen_low_rank_mechanism",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v2 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned LoRA v2 page 1; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2106.09685", "versioned_id": "2106.09685v2", "revision": 2, "title": "LoRA: Low-Rank Adaptation of Large Language Models"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2106.09685v2"],
+        "reference_answer": "LoRA freezes the pretrained model weights and injects trainable low-rank decomposition matrices into each Transformer layer, greatly reducing the number of trainable parameters for downstream adaptation.",
+        "answer_criteria": [
+          {"criterion_id": "freezes_pretrained_weights", "description": "States that the pretrained model weights remain frozen.", "required": true},
+          {"criterion_id": "injects_low_rank_matrices", "description": "States that trainable low-rank decomposition matrices are injected into Transformer layers.", "required": true},
+          {"criterion_id": "reduces_trainable_parameters", "description": "Connects the low-rank parameterization to fewer trainable parameters.", "required": true}
+        ],
+        "forbidden_claims": ["Claims LoRA fully fine-tunes all pretrained weights."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "lora_mechanism_p1",
+        "evidence_group_id": "lora_mechanism",
+        "paper_id": "2106.09685",
+        "versioned_id": "2106.09685v2",
+        "source_type": "full_text",
+        "page": 1,
+        "section": "Abstract",
+        "quote": "We propose Low-Rank Adaptation, or LoRA, which freezes the pre-trained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture, greatly reducing the number of trainable parameters for downstream tasks.",
+        "supports": ["freezes_pretrained_weights", "injects_low_rank_matrices", "reduces_trainable_parameters"]
+      }],
+      "tags": ["single-paper", "positive", "method", "parameter-efficient"]
+    },
+    {
+      "case_id": "lora_gpt3_resource_reductions",
+      "question": "For GPT-3 175B, what reductions in trainable parameters and GPU memory did the LoRA abstract report?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2106.09685v2",
+        "source_case_id": "lora_gpt3_resource_reductions",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v2 abstract."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned LoRA v2 page 1; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2106.09685", "versioned_id": "2106.09685v2", "revision": 2, "title": "LoRA: Low-Rank Adaptation of Large Language Models"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2106.09685v2"],
+        "reference_answer": "For GPT-3 175B, LoRA reports up to 10,000 times fewer trainable parameters and a threefold reduction in GPU memory requirement.",
+        "answer_criteria": [
+          {"criterion_id": "trainable_10000x", "description": "Reports up to 10,000 times fewer trainable parameters.", "required": true},
+          {"criterion_id": "gpu_memory_3x", "description": "Reports a threefold reduction in GPU memory requirement.", "required": true},
+          {"criterion_id": "gpt3_175b_context", "description": "Attributes both figures to GPT-3 175B.", "required": true}
+        ],
+        "forbidden_claims": ["Claims that the full GPT-3 175B model itself has 10,000 times fewer total parameters."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "lora_gpt3_resources_p1",
+        "evidence_group_id": "lora_gpt3_resources",
+        "paper_id": "2106.09685",
+        "versioned_id": "2106.09685v2",
+        "source_type": "full_text",
+        "page": 1,
+        "section": "Abstract",
+        "quote": "Compared to GPT-3 175B fine-tuned with Adam, LoRA can reduce the number of trainable parameters by 10,000 times and the GPU memory requirement by 3 times.",
+        "supports": ["trainable_10000x", "gpu_memory_3x", "gpt3_175b_context"]
+      }],
+      "tags": ["single-paper", "positive", "result", "numeric", "efficiency"]
+    },
+    {
+      "case_id": "lora_no_inference_latency",
+      "question": "Why can LoRA avoid adding inference latency once a task-specific adapter has been trained?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2106.09685v2",
+        "source_case_id": "lora_no_inference_latency",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v2 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned LoRA v2 page 4; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2106.09685", "versioned_id": "2106.09685v2", "revision": 2, "title": "LoRA: Low-Rank Adaptation of Large Language Models"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2106.09685v2"],
+        "reference_answer": "At deployment, LoRA can explicitly form and store W = W0 + BA and then run inference as usual. Because the low-rank update is merged into the base weight instead of evaluated as a separate serial module, it does not add inference latency.",
+        "answer_criteria": [
+          {"criterion_id": "merge_weight_update", "description": "States that W0 and BA can be merged into W = W0 + BA.", "required": true},
+          {"criterion_id": "ordinary_inference", "description": "States that inference then proceeds as usual without a separate adapter path.", "required": true},
+          {"criterion_id": "no_added_latency", "description": "Connects the merge to no additional inference latency.", "required": true}
+        ],
+        "forbidden_claims": ["Claims LoRA eliminates all model inference time or reports a numerical latency speedup."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "lora_merge_inference_p4",
+        "evidence_group_id": "lora_merge_inference",
+        "paper_id": "2106.09685",
+        "versioned_id": "2106.09685v2",
+        "source_type": "full_text",
+        "page": 4,
+        "section": "4.1 Low-Rank-Parametrized Update Matrices / No Additional Inference Latency",
+        "quote": "We can explicitly compute and store W = W0 + BA and perform inference as usual. Note that both W0 and BA are in R^(d x k). When we need to switch to another downstream task, we can recover W0 by subtracting BA and then adding a different B'A', a quick operation with very little memory overhead. Critically, this guarantees that we do not introduce any additional latency during inference compared to a fine-tuned model by construction.",
+        "supports": ["merge_weight_update", "ordinary_inference", "no_added_latency"]
+      }],
+      "tags": ["single-paper", "positive", "method", "latency"]
+    },
+    {
+      "case_id": "lora_low_rank_update_equation",
+      "question": "How is a LoRA weight update parameterized as a low-rank decomposition, and which quantities are trainable?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2106.09685v2",
+        "source_case_id": "lora_low_rank_update_equation",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v2 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned LoRA v2 page 4, including the full equation and definitions; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2106.09685", "versioned_id": "2106.09685v2", "revision": 2, "title": "LoRA: Low-Rank Adaptation of Large Language Models"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2106.09685v2"],
+        "reference_answer": "For a pretrained weight W0, LoRA constrains the update as Delta W = BA, so the forward pass uses W0 + BA. W0 remains frozen while A and B are trainable, with rank r much smaller than the original matrix dimensions.",
+        "answer_criteria": [
+          {"criterion_id": "update_is_ba", "description": "States that the update is parameterized as Delta W = BA and the effective weight is W0 + BA.", "required": true},
+          {"criterion_id": "w0_frozen", "description": "States that W0 is frozen.", "required": true},
+          {"criterion_id": "a_b_trainable", "description": "States that A and B are trainable.", "required": true},
+          {"criterion_id": "rank_is_small", "description": "States that r is much smaller than the original dimensions.", "required": true}
+        ],
+        "forbidden_claims": ["Claims W0, A, and B are all trained together."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "lora_update_equation_p4",
+        "evidence_group_id": "lora_update_equation",
+        "paper_id": "2106.09685",
+        "versioned_id": "2106.09685v2",
+        "source_type": "full_text",
+        "page": 4,
+        "section": "4.1 Low-Rank-Parametrized Update Matrices",
+        "quote": "For a pre-trained weight matrix W0 in R^(d x k), we constrain its update by representing the latter with a low-rank decomposition W0 + Delta W = W0 + BA, where B in R^(d x r), A in R^(r x k), and the rank r << min(d, k). During training, W0 is frozen and does not receive gradient updates, while A and B contain trainable parameters.",
+        "supports": ["update_is_ba", "w0_frozen", "a_b_trainable", "rank_is_small"]
+      }],
+      "tags": ["single-paper", "positive", "method", "equation"]
+    },
+    {
+      "case_id": "lora_all_resource_reduction_factors_missing",
+      "question": "For GPT-3 175B, by what numerical factors did LoRA reduce trainable parameters, GPU memory, and inference latency?",
+      "question_type": "partial_evidence",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2106.09685v2",
+        "source_case_id": "lora_all_resource_reduction_factors_missing",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Adversarial partial-evidence question: the paper gives numerical factors for trainable parameters and GPU memory but not a numerical inference-latency reduction factor."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned LoRA v2 pages 1 and 4; retained as an intentional evidence-missing abstention case. The automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2106.09685", "versioned_id": "2106.09685v2", "revision": 2, "title": "LoRA: Low-Rank Adaptation of Large Language Models"}],
+      "expected": {
+        "decision": "abstain",
+        "abstention_reason": "evidence_missing",
+        "required_paper_ids": ["2106.09685v2"],
+        "answer_criteria": [
+          {"criterion_id": "trainable_factor_reported", "description": "Recognizes the reported 10,000-times trainable-parameter reduction.", "required": true},
+          {"criterion_id": "memory_factor_reported", "description": "Recognizes the reported threefold GPU-memory reduction.", "required": true},
+          {"criterion_id": "latency_factor_not_reported", "description": "Recognizes that no numerical inference-latency reduction factor is reported.", "required": true}
+        ],
+        "forbidden_claims": ["Invents a numerical inference-latency reduction factor.", "Treats 'no additional inference latency' as a reported multiplicative speedup."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "lora_partial_resource_factors_p1",
+        "evidence_group_id": "lora_partial_resource_factors",
+        "paper_id": "2106.09685",
+        "versioned_id": "2106.09685v2",
+        "source_type": "full_text",
+        "page": 1,
+        "section": "Abstract",
+        "quote": "Compared to GPT-3 175B fine-tuned with Adam, LoRA can reduce the number of trainable parameters by 10,000 times and the GPU memory requirement by 3 times.",
+        "supports": ["trainable_factor_reported", "memory_factor_reported"]
+      }],
+      "challenge": {
+        "kinds": ["negative", "adversarial", "partial_evidence", "evidence_missing"],
+        "description": "Two requested numerical factors are present, while the paper only states that LoRA adds no inference latency and gives no numerical latency reduction factor."
+      },
+      "tags": ["single-paper", "negative", "adversarial", "abstention", "partial-evidence", "numeric-distractor"]
+    },
+    {
+      "case_id": "rag_parametric_nonparametric_memory",
+      "question": "What are the parametric and non-parametric memory components in the RAG model?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2005.11401v4",
+        "source_case_id": "rag_parametric_nonparametric_memory",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v4 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned RAG v4 page 1; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2005.11401", "versioned_id": "2005.11401v4", "revision": 4, "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2005.11401v4"],
+        "reference_answer": "RAG uses a pretrained sequence-to-sequence model as parametric memory and a dense vector index of Wikipedia, accessed through a pretrained neural retriever, as non-parametric memory.",
+        "answer_criteria": [
+          {"criterion_id": "seq2seq_parametric", "description": "Identifies the pretrained seq2seq model as parametric memory.", "required": true},
+          {"criterion_id": "wikipedia_index_nonparametric", "description": "Identifies the dense Wikipedia vector index as non-parametric memory.", "required": true},
+          {"criterion_id": "neural_retriever_access", "description": "States that a pretrained neural retriever accesses the index.", "required": true}
+        ],
+        "forbidden_claims": ["Claims Wikipedia is stored directly inside the parametric seq2seq weights."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "rag_memory_components_p1",
+        "evidence_group_id": "rag_memory_components",
+        "paper_id": "2005.11401",
+        "versioned_id": "2005.11401v4",
+        "source_type": "full_text",
+        "page": 1,
+        "section": "Abstract",
+        "quote": "We explore a general-purpose fine-tuning recipe for retrieval-augmented generation (RAG) -- models which combine pre-trained parametric and non-parametric memory for language generation. We introduce RAG models where the parametric memory is a pre-trained seq2seq model and the non-parametric memory is a dense vector index of Wikipedia, accessed with a pre-trained neural retriever.",
+        "supports": ["seq2seq_parametric", "wikipedia_index_nonparametric", "neural_retriever_access"]
+      }],
+      "tags": ["single-paper", "positive", "method", "retrieval"]
+    },
+    {
+      "case_id": "rag_sequence_token_difference",
+      "question": "How do RAG-Sequence and RAG-Token differ in their use of retrieved documents during generation?",
+      "question_type": "method",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2005.11401v4",
+        "source_case_id": "rag_sequence_token_difference",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v4 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned RAG v4 page 3, including both model definitions; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2005.11401", "versioned_id": "2005.11401v4", "revision": 4, "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2005.11401v4"],
+        "reference_answer": "RAG-Sequence uses the same retrieved document to generate the entire output sequence, treating that document as a single latent variable. RAG-Token can select a different latent document for each target token, allowing one output to draw from several documents.",
+        "answer_criteria": [
+          {"criterion_id": "sequence_same_document", "description": "States that RAG-Sequence uses one retrieved document for the complete output sequence.", "required": true},
+          {"criterion_id": "token_different_per_token", "description": "States that RAG-Token may use a different document for each target token.", "required": true},
+          {"criterion_id": "token_several_documents", "description": "States that RAG-Token can combine content from several documents in one generation.", "required": true}
+        ],
+        "forbidden_claims": ["Reverses the RAG-Sequence and RAG-Token definitions."]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "rag_sequence_definition_p3",
+          "evidence_group_id": "rag_variant_difference",
+          "paper_id": "2005.11401",
+          "versioned_id": "2005.11401v4",
+          "source_type": "full_text",
+          "page": 3,
+          "section": "2.1 Models",
+          "quote": "RAG-Sequence Model The RAG-Sequence model uses the same document to predict each target token. Specifically, the top K documents are retrieved using the retriever, and the generator produces the output sequence probability for each document, which are then marginalized.",
+          "supports": ["sequence_same_document"]
+        },
+        {
+          "evidence_id": "rag_token_definition_p3",
+          "evidence_group_id": "rag_variant_difference",
+          "paper_id": "2005.11401",
+          "versioned_id": "2005.11401v4",
+          "source_type": "full_text",
+          "page": 3,
+          "section": "2.1 Models",
+          "quote": "RAG-Token Model In the RAG-Token model we can draw a different latent document for each target token and marginalize accordingly. This allows the generator to choose content from several documents when producing an answer.",
+          "supports": ["token_different_per_token", "token_several_documents"]
+        }
+      ],
+      "tags": ["single-paper", "positive", "method", "comparison"]
+    },
+    {
+      "case_id": "rag_sequence_open_qa_results",
+      "question": "In RAG Table 1, what exact-match scores did RAG-Sequence obtain on Natural Questions and CuratedTREC?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2005.11401v4",
+        "source_case_id": "rag_sequence_open_qa_results",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question explicitly identifies RAG-Sequence and Table 1 to prevent leakage from the adjacent RAG-Token row."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned RAG v4 page 6, including the complete Table 1 and its metric caption; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2005.11401", "versioned_id": "2005.11401v4", "revision": 4, "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2005.11401v4"],
+        "reference_answer": "RAG-Sequence scored 44.5 exact match on Natural Questions and 52.2 exact match on CuratedTREC.",
+        "answer_criteria": [
+          {"criterion_id": "nq_44_5", "description": "Reports 44.5 EM on Natural Questions.", "required": true},
+          {"criterion_id": "ct_52_2", "description": "Reports 52.2 EM on CuratedTREC.", "required": true},
+          {"criterion_id": "rag_sequence_context", "description": "Attributes both values to the RAG-Sequence row.", "required": true}
+        ],
+        "forbidden_claims": ["Substitutes the RAG-Token values 44.1 and 50.0."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "rag_sequence_table1_p6",
+        "evidence_group_id": "rag_sequence_table1",
+        "paper_id": "2005.11401",
+        "versioned_id": "2005.11401v4",
+        "source_type": "full_text",
+        "page": 6,
+        "section": "4.1 Open-domain Question Answering / Table 1",
+        "quote": "RAG-Sequence 44.5 56.8 68.0 52.2. Table 1: Open-Domain QA Test Scores. For TQA, left column uses the standard test set for Open-Domain QA and the right column uses the T5 test set. See Appendix D for further details. The best model for each class (Extractive, Closed-Book, Open-Book) is bolded. For FEVER-3, results are 3-way classification accuracy, and for 2-way results are normalized accuracy. All other results are exact match.",
+        "supports": ["nq_44_5", "ct_52_2", "rag_sequence_context"]
+      }],
+      "tags": ["single-paper", "positive", "result", "numeric", "table"]
+    },
+    {
+      "case_id": "rag_jeopardy_factuality_human_eval",
+      "question": "In the RAG Jeopardy human factuality evaluation, how many BART/RAG pairs were assessed and what percentages favored BART, favored RAG, or judged both factual?",
+      "question_type": "result",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2005.11401v4",
+        "source_case_id": "rag_jeopardy_factuality_human_eval",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Question and rubric authored from the checksum-pinned v4 full text."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned RAG v4 page 6, including the complete factuality paragraph and footnote context; the automated judge remains advisory."
+      },
+      "papers": [{"paper_id": "2005.11401", "versioned_id": "2005.11401v4", "revision": 4, "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"}],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2005.11401v4"],
+        "reference_answer": "The study evaluated 452 BART/RAG-Token generation pairs. BART was judged more factual in 7.1% of cases, RAG in 42.7%, and both were judged factual in another 17%.",
+        "answer_criteria": [
+          {"criterion_id": "pairs_452", "description": "Reports that 452 generation pairs were evaluated.", "required": true},
+          {"criterion_id": "bart_7_1", "description": "Reports BART as more factual in 7.1% of cases.", "required": true},
+          {"criterion_id": "rag_42_7", "description": "Reports RAG as more factual in 42.7% of cases.", "required": true},
+          {"criterion_id": "both_17", "description": "Reports both as factual in a further 17% of cases.", "required": true}
+        ],
+        "forbidden_claims": ["Claims the three percentages exhaust all evaluation outcomes or sum to 100%."]
+      },
+      "gold_evidence": [{
+        "evidence_id": "rag_jeopardy_factuality_p6",
+        "evidence_group_id": "rag_jeopardy_factuality",
+        "paper_id": "2005.11401",
+        "versioned_id": "2005.11401v4",
+        "source_type": "full_text",
+        "page": 6,
+        "section": "4.3 Jeopardy Question Generation",
+        "quote": "We also find that RAG generations are more factual than BART, with 42.7% of RAG generations being classified as more factual, compared to 7.1% for BART. 17% of cases were classified as equally factual. We also find that RAG generations are more specific by a large margin. These results indicate that RAG produces more factual and specific generations than BART. The annotators evaluated 452 pairs of generations from BART and RAG-Token.",
+        "supports": ["pairs_452", "bart_7_1", "rag_42_7", "both_17"]
+      }],
+      "tags": ["single-paper", "positive", "result", "numeric", "human-evaluation"]
+    },
+    {
+      "case_id": "lora_rag_adaptation_comparison",
+      "question": "How do LoRA and RAG use a pretrained model differently when adapting it to downstream knowledge-intensive tasks?",
+      "question_type": "multi_paper_comparison",
+      "evaluation_split": "development",
+      "provenance": {
+        "kind": "repo_curated",
+        "dataset_name": "v0.5 internal development benchmark expansion",
+        "dataset_version": "0.1.0",
+        "source_url": "https://arxiv.org/abs/2106.09685v2",
+        "source_case_id": "lora_rag_adaptation_comparison",
+        "source_split": "development",
+        "license": "Source paper terms apply; distributed by arXiv.",
+        "adaptation_notes": "Cross-paper comparison authored from checksum-pinned LoRA v2 and RAG v4 full texts; the source_url identifies the first paper and both revisions are declared in the case."
+      },
+      "annotation": {
+        "source": "repo_authored",
+        "annotator_count": 1,
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Source-audited on 2026-08-30 against checksum-pinned LoRA v2 page 1 and RAG v4 page 1; the automated judge remains advisory."
+      },
+      "papers": [
+        {"paper_id": "2106.09685", "versioned_id": "2106.09685v2", "revision": 2, "title": "LoRA: Low-Rank Adaptation of Large Language Models"},
+        {"paper_id": "2005.11401", "versioned_id": "2005.11401v4", "revision": 4, "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"}
+      ],
+      "expected": {
+        "decision": "answer",
+        "required_paper_ids": ["2106.09685v2", "2005.11401v4"],
+        "reference_answer": "LoRA keeps the pretrained model weights frozen and learns small low-rank update matrices for task adaptation. RAG instead combines a pretrained seq2seq model as parametric memory with an external dense Wikipedia index accessed by a neural retriever, so generation can draw on retrieved non-parametric knowledge.",
+        "answer_criteria": [
+          {"criterion_id": "lora_frozen_low_rank", "description": "Explains that LoRA freezes pretrained weights and trains low-rank update matrices.", "required": true},
+          {"criterion_id": "rag_parametric_seq2seq", "description": "Explains that RAG uses a pretrained seq2seq model as parametric memory.", "required": true},
+          {"criterion_id": "rag_external_retrieval", "description": "Explains that RAG adds non-parametric knowledge through a retriever-accessed Wikipedia index.", "required": true},
+          {"criterion_id": "explicit_contrast", "description": "Explicitly contrasts parameter-efficient weight adaptation with retrieval-augmented knowledge access.", "required": true}
+        ],
+        "forbidden_claims": ["Claims LoRA retrieves Wikipedia passages.", "Claims RAG represents task adaptation only as low-rank weight updates."]
+      },
+      "gold_evidence": [
+        {
+          "evidence_id": "lora_comparison_mechanism_p1",
+          "evidence_group_id": "lora_rag_comparison",
+          "paper_id": "2106.09685",
+          "versioned_id": "2106.09685v2",
+          "source_type": "full_text",
+          "page": 1,
+          "section": "Abstract",
+          "quote": "We propose Low-Rank Adaptation, or LoRA, which freezes the pre-trained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture, greatly reducing the number of trainable parameters for downstream tasks.",
+          "supports": ["lora_frozen_low_rank", "explicit_contrast"]
+        },
+        {
+          "evidence_id": "rag_comparison_memory_p1",
+          "evidence_group_id": "lora_rag_comparison",
+          "paper_id": "2005.11401",
+          "versioned_id": "2005.11401v4",
+          "source_type": "full_text",
+          "page": 1,
+          "section": "Abstract",
+          "quote": "We introduce RAG models where the parametric memory is a pre-trained seq2seq model and the non-parametric memory is a dense vector index of Wikipedia, accessed with a pre-trained neural retriever.",
+          "supports": ["rag_parametric_seq2seq", "rag_external_retrieval", "explicit_contrast"]
+        }
+      ],
+      "challenge": {
+        "kinds": ["adversarial", "cross_paper_leakage"],
+        "description": "The evaluator must preserve which adaptation mechanism belongs to each paper and cover both required revisions."
+      },
+      "tags": ["multi-paper", "positive", "comparison", "cross-paper"]
+    }
+  ]
+}

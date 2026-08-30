@@ -1,0 +1,41 @@
+{
+  "suite_id": "v0_5_development_25",
+  "verified_at": "2026-08-30",
+  "sources": [
+    {
+      "versioned_id": "1512.03385v1",
+      "abstract_url": "https://arxiv.org/abs/1512.03385v1",
+      "pdf_url": "https://arxiv.org/pdf/1512.03385v1",
+      "pdf_sha256": "1e0651b6810ecba34a3dbc5b5b0209226f889004607c1f203540a48d64e5a93a",
+      "page_count": 12
+    },
+    {
+      "versioned_id": "1706.03762v7",
+      "abstract_url": "https://arxiv.org/abs/1706.03762v7",
+      "pdf_url": "https://arxiv.org/pdf/1706.03762v7",
+      "pdf_sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+      "page_count": 15
+    },
+    {
+      "versioned_id": "1810.04805v2",
+      "abstract_url": "https://arxiv.org/abs/1810.04805v2",
+      "pdf_url": "https://arxiv.org/pdf/1810.04805v2",
+      "pdf_sha256": "5692a5514787a8c6727b4ff3b726a3385798bc68e12138d1d4af83947e2acf6e",
+      "page_count": 16
+    },
+    {
+      "versioned_id": "2005.11401v4",
+      "abstract_url": "https://arxiv.org/abs/2005.11401v4",
+      "pdf_url": "https://arxiv.org/pdf/2005.11401v4",
+      "pdf_sha256": "23e3249e9a1e75418d82efecab0ea8c4d033b89c93742f63208d47ce01f21233",
+      "page_count": 19
+    },
+    {
+      "versioned_id": "2106.09685v2",
+      "abstract_url": "https://arxiv.org/abs/2106.09685v2",
+      "pdf_url": "https://arxiv.org/pdf/2106.09685v2",
+      "pdf_sha256": "e9a0d3128767db616085dc0f4e6e455e672e89af823e8ed1282793682787395a",
+      "page_count": 26
+    }
+  ]
+}

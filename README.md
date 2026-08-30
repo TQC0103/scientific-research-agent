@@ -128,9 +128,12 @@ Runtime artifacts stay under `data/` and are ignored by Git:
 
 Committed evaluation source data lives under `evaluation/`. Its JSON Schema,
 evidence identity rules, decision taxonomy, and metric contract are documented
-in `evaluation/README.md`. The initial four cases are schema fixtures, while
-`development_10.json` is a repo-authored development regression suite. Neither
-is a held-out or publishable benchmark.
+in `evaluation/README.md`. The initial four cases are schema fixtures.
+`development_10.json` is the immutable repo-authored R10 regression slice,
+while `development_25.json` preserves those ten cases exactly and adds 15
+source-audited ResNet, LoRA, and RAG cases. All remain tunable development data
+rather than held-out or publishable benchmarks. The 25-case suite is an
+authored evaluation artifact; no R25 model score is claimed yet.
 
 Download the checksum-pinned public QASPER v0.3 and SciFact artifacts with:
 
@@ -461,6 +464,13 @@ R10 repeated the R9 configuration under the new exact suite identity. It
 completed with identical quality metrics and 32 graph calls;
 its aggregate is the first local development regression baseline. It remains
 Git-ignored and must not be presented as held-out accuracy.
+
+The next internal suite is committed separately as
+`evaluation/suites/v0_5/development_25.json`. Its first ten parsed case objects
+are regression-tested against `development_10.json`, and its five source
+revisions are checksum-pinned in `development_25_sources.json`. Keeping the two
+suite identities separate means future R25 diagnostics cannot overwrite or be
+mistaken for the R10 baseline.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

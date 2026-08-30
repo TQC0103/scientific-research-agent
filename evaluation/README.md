@@ -19,6 +19,12 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
   suite rather than held-out evidence.
 - `suites/v0_5/development_10_sources.json`: source URLs, PDF hashes, and page
   counts used while checking the committed quotes and page anchors.
+- `suites/v0_5/development_25.json`: the reviewed R10 slice unchanged plus 15
+  newly source-audited cases over ResNet v1, LoRA v2, and RAG v4. The expansion
+  has 22 answer and three abstention cases, remains development-only, and has
+  not yet produced a benchmark result.
+- `suites/v0_5/development_25_sources.json`: exact source revisions, PDF hashes,
+  and page counts for all five papers used by the 25-case suite.
 - `suites/v0_5/verifier_development.json`: 22 controlled initial/recovery
   evidence snapshots derived from the development suite; this is a prompt and
   flow diagnostic, not an independently labeled benchmark.
@@ -49,6 +55,8 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
 - `kaggle/end_to_end_v0_5/`: isolated T4 template that replaces only the
   Ollama transports with pinned Hugging Face adapters while executing the
   production LangGraph, one-case smoke, and full ten-case Task 11 suite.
+  It still targets the immutable R10 baseline; the R25 expansion must receive a
+  new package identity rather than silently replacing that input.
 
 The former empty `questions.json` and `ground_truth.json` placeholders were
 removed so there is one canonical data shape.

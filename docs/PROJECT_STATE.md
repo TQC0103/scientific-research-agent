@@ -12,6 +12,11 @@ Last updated: 2026-08-30
   `0939bd12b4ffb2e4b4906368a33a4aad8f0b5b963659ae6985b517353c4ec051`,
   R10 job `job_9f37ffbd7cb245fea6519d69d29da32e`; aggregate stored locally in
   ignored `data/evaluations/baselines/v0_5/metrics.json`.
+- Evaluation expansion: `v0_5_development_25` v0.1.0 preserves the complete R10
+  slice and adds 15 source-audited cases across ResNet v1, LoRA v2, and RAG v4.
+  Its normalized fingerprint is
+  `54b62586dc9a51e6c88f7c7738807ba6ccedeeed3050ab45a2b19f4b1cee8494`.
+  It is committed development data with no model benchmark result yet.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -19,9 +24,10 @@ Last updated: 2026-08-30
 - Runtime: Python 3.11, Ollama, `qwen3:4b-instruct`,
   `qwen3-embedding:0.6b`
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
-  suite, the 22-case controlled verifier definition, citation fixtures, and the
+  baseline and separate 25-case development expansion, the 22-case controlled
+  verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 156
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 160
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -424,12 +430,15 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Expand the reviewed end-to-end suite from 10 to 25 cases before 50, keeping
-   the current ten-case slice and R10 baseline identity immutable.
-2. Instrument embedding calls at the production retriever boundary; the Kaggle
+1. Run the advisory case judge and retrieval-only diagnostic on the exact
+   25-case suite, then review failures before spending GPU time on synthesis.
+2. Build a separately identified R25 Kaggle package and run the production graph
+   on T4. Compare R10 versus R25 only on the unchanged first-ten slice; retain
+   full-suite R25 aggregates under their own identity.
+3. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
-3. Independently review and expand the seven Task 8 development cases, then
+4. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-4. Calibrate Task 10 repair versus immediate
+5. Calibrate Task 10 repair versus immediate
    abstention, including distinct incomplete-evidence and contradiction reasons.
-5. Fix section boundaries and table-associated metadata.
+6. Fix section boundaries and table-associated metadata.
