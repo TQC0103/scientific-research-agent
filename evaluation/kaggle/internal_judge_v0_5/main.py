@@ -12,7 +12,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-OUTPUT = Path("/kaggle/working/internal_judge_v0_5")
+OUTPUT = Path("/kaggle/working/__OUTPUT_DIRNAME__")
 CODE_ROOT = Path("/tmp/internal_judge_source")
 ENV_ROOT = Path("/tmp/internal_judge_env")
 ENV_PYTHON = ENV_ROOT / "bin" / "python"
@@ -62,6 +62,7 @@ def _ensure_isolated_runtime() -> None:
             "virtualenv",
             "--clear",
             "--no-download",
+            "--system-site-packages",
             str(ENV_ROOT),
         ],
         check=True,
@@ -75,6 +76,7 @@ def _ensure_isolated_runtime() -> None:
             "install",
             "--disable-pip-version-check",
             "--no-cache-dir",
+            "--no-deps",
             "--requirement",
             str(REQUIREMENTS),
         ],
@@ -89,12 +91,19 @@ import accelerate
 import pydantic
 import torch
 import transformers
+import wrapt
 
 if not torch.cuda.is_available():
     raise RuntimeError("The isolated runtime cannot see a CUDA device.")
-capability = torch.cuda.get_device_capability()
-if capability != (7, 5):
-    raise RuntimeError(f"Expected Tesla T4 capability (7, 5), received {capability}.")
+devices = []
+for index in range(torch.cuda.device_count()):
+    devices.append({
+        "index": index,
+        "name": torch.cuda.get_device_name(index),
+        "capability": list(torch.cuda.get_device_capability(index)),
+    })
+if not devices or any(item["capability"] != [7, 5] for item in devices):
+    raise RuntimeError(f"Expected only Tesla T4 capability 7.5 devices, received {devices}.")
 left = torch.ones((64, 64), device="cuda")
 right = left @ left
 torch.cuda.synchronize()
@@ -102,12 +111,13 @@ print(json.dumps({
     "python": __import__("sys").version,
     "torch": torch.__version__,
     "cuda_runtime": torch.version.cuda,
-    "cuda_device": torch.cuda.get_device_name(0),
-    "cuda_capability": capability,
+    "cuda_device_count": torch.cuda.device_count(),
+    "cuda_devices": devices,
     "cuda_preflight_sum": float(right.sum().item()),
     "transformers": transformers.__version__,
     "accelerate": accelerate.__version__,
     "pydantic": pydantic.__version__,
+    "wrapt": wrapt.__version__,
 }, sort_keys=True))
 """
     completed = subprocess.run(
@@ -141,7 +151,7 @@ def main() -> None:
             "-m",
             "app.run_evaluation_judge",
             "--suite",
-            str(CODE_ROOT / "evaluation" / "suites" / "v0_5" / "development_10.json"),
+            str(CODE_ROOT / "evaluation" / "suites" / "v0_5" / "__SUITE_FILENAME__"),
             "--output",
             str(OUTPUT / "judge_report.json"),
             "--model",

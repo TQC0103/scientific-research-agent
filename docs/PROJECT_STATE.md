@@ -27,7 +27,7 @@ Last updated: 2026-08-30
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 160
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 162
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -206,6 +206,27 @@ Precision@5 `0.2444`, and MRR `0.6204`. Both recovered sinusoidal position
 encoding and GLUE/MultiNLI but lost masked-LM. Per-paper RRF stayed at Recall@5
 `0.7222` and MRR `0.4944`; for the comparison case it swapped the covered paper
 instead of covering both. This trade-off does not justify a production change.
+
+The R25 retrieval A1 diagnostic (`job_e55936e15e8b40aaa83954c77a476e4a`)
+completed all 25 cases over five checksum-pinned PDFs on two visible Tesla T4s.
+Across 24 retrieval-eligible cases, lexical Recall@5/MRR was `0.8333/0.6354`,
+dense was `0.8125/0.6250`, production-style RRF was `0.8125/0.5951`, and global
+or per-paper CombSUM was best at `0.8542/0.6472` with Precision@5 `0.2417`.
+The 15 new cases alone reached mean recall `0.8667`; misses remained for the
+ResNet degradation passage, LoRA mechanism passage, and complete annotated
+LoRA/RAG comparison coverage. This supports targeted retrieval analysis, not an
+automatic production fusion change.
+
+The R25 advisory judge A2 (`job_12b1e882b15d4e778a12ca9d82bbbc8f`)
+returned 22 `pass` and three `needs_revision` verdicts with 25 schema-valid
+outputs. All 22 answer cases passed. The three flags were exactly the three
+intentional abstentions, including the new partial-evidence LoRA latency-factor
+case; source review retained them because selected evidence cannot prove
+document-wide absence. Mean lint scores were `4.88/4.72/4.68/4.80/4.88` for
+clarity, entailment, answer alignment, citation specificity, and challenge
+validity. A1 had failed before model load because Pydantic 2.11.7 inherited an
+incompatible system core; the package now pins `pydantic-core==2.33.2` while
+preserving Kaggle's PyTorch/CUDA stack.
 
 The Task 6 verifier R2 run completed 22 controlled development cases with the
 official FP16 `Qwen/Qwen3-4B` revision on Kaggle. Initial accuracy was `0.8636`,
@@ -430,8 +451,10 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Run the advisory case judge and retrieval-only diagnostic on the exact
-   25-case suite, then review failures before spending GPU time on synthesis.
+1. Inspect and address the R25 retrieval misses before synthesis: preserve the
+   diagnostic evidence for score fusion, improve exact abstract/table ranking,
+   and enforce complete top-K coverage for multi-paper cases without tuning only
+   to these 25 development examples.
 2. Build a separately identified R25 Kaggle package and run the production graph
    on T4. Compare R10 versus R25 only on the unchanged first-ten slice; retain
    full-suite R25 aggregates under their own identity.

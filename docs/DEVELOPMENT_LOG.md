@@ -1351,3 +1351,49 @@ checks are acceptable.
 
 Final local verification passed Ruff and all 160 pytest tests. No model workload
 ran on the laptop.
+
+## 2026-08-31 — R25 advisory judge and retrieval-only diagnostics
+
+The internal judge and retrieval Kaggle packagers now accept an explicit
+`--suite-name` and `--destination`, allowing the separate R25 identity to run
+without modifying or overwriting the R10 bundle. The retrieval packager no
+longer requires local PDFs during packaging; the remote entrypoint downloads
+every revision declared by the selected source manifest and verifies its hash.
+The judge environment now inherits Kaggle's compatible PyTorch/CUDA stack and
+installs only the pinned evaluation/model additions into an isolated virtual
+environment.
+
+Initial submission was rejected locally because Control Plane's configured
+allowed source root still points to
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments`, while the bundle was
+first staged under the newer fallback root. The plugin reported the resulting
+HTTP 400 as “API offline,” even though health/accounts/jobs endpoints remained
+responsive. After moving the immutable bundles beneath the actual configured
+root, batch `batch_521c1512c5be40719c4aa7eafca373ac` was accepted. No remote
+job existed for either rejected request.
+
+Retrieval A1 job `job_e55936e15e8b40aaa83954c77a476e4a` completed all 25 cases
+on two visible Tesla T4 devices. Across 24 eligible cases, BM25 achieved
+Recall@5/Precision@5/MRR `0.8333/0.2250/0.6354`; dense achieved
+`0.8125/0.2333/0.6250`; current RRF achieved `0.8125/0.2333/0.5951`; and both
+global and per-paper min-max CombSUM led at `0.8542/0.2417/0.6472`. The 15 new
+cases alone had mean Recall@5 `0.8667`. CombSUM still missed the ResNet
+degradation and LoRA mechanism gold passages and did not retrieve the annotated
+LoRA side of the LoRA/RAG comparison inside the global K=5. These are targeted
+failure signals; production RRF remains unchanged.
+
+Judge A1 `job_eee5c27ec892429b98068aacaff6cb33` passed CUDA preflight but failed
+before loading the suite because locally installed Pydantic 2.11.7 inherited
+the incompatible system `pydantic-core` 2.41.4 under `--no-deps`. The package
+now pins `pydantic-core==2.33.2`. Judge A2
+`job_12b1e882b15d4e778a12ca9d82bbbc8f` then completed 25 schema-valid calls:
+22 answer cases passed and exactly the three intentional abstentions were marked
+`needs_revision`/human-review-required. Mean clarity, entailment, alignment,
+citation, and challenge scores were `4.88/4.72/4.68/4.80/4.88`. The abstentions
+were retained after source review because the advisory model's inability to
+prove document-wide absence is expected and does not invalidate their design.
+
+All model and embedding work ran on Kaggle; the laptop performed packaging,
+tests, status polling, and report analysis only. Runtime ZIPs, logs, and reports
+remain under ignored `data/evaluations/runs/r25_diagnostics_*` directories.
+Final local verification passed Ruff and all 162 pytest tests.

@@ -58,9 +58,20 @@ def test_judge_entrypoint_requires_isolated_t4_runtime_and_deterministic_batchin
 
     assert 'ENV_ROOT = Path("/tmp/internal_judge_env")' in entrypoint
     assert 'CODE_ROOT = Path("/tmp/internal_judge_source")' in entrypoint
-    assert 'OUTPUT = Path("/kaggle/working/internal_judge_v0_5")' in entrypoint
+    assert 'OUTPUT = Path("/kaggle/working/__OUTPUT_DIRNAME__")' in entrypoint
     assert 'VIRTUALENV_VERSION = "20.36.1"' in entrypoint
-    assert 'capability != (7, 5)' in entrypoint
+    assert '"--system-site-packages"' in entrypoint
+    assert '"--no-deps"' in entrypoint
+    assert "torch.cuda.device_count()" in entrypoint
+    requirements = (
+        package.ROOT
+        / "evaluation"
+        / "kaggle"
+        / "internal_judge_v0_5"
+        / "requirements-kaggle.txt"
+    ).read_text(encoding="utf-8")
+    assert "pydantic-core==2.33.2" in requirements
+    assert "torch==" not in requirements
     assert '"--batch-size",\n            "2"' in entrypoint
     assert 'tokenizer.padding_side = "left"' in runner
     assert "do_sample=False" in runner
@@ -68,3 +79,39 @@ def test_judge_entrypoint_requires_isolated_t4_runtime_and_deterministic_batchin
     assert "model.generation_config.top_p = None" in runner
     assert "model.generation_config.top_k = None" in runner
     assert "torch_dtype=" not in runner
+
+
+def test_judge_packager_can_select_development_25(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "repo"
+    template = root / "evaluation" / "kaggle" / "internal_judge_v0_5"
+    suite_dir = root / "evaluation" / "suites" / "v0_5"
+    destination = (
+        root / "data" / "evaluations" / "kaggle_jobs" / "internal_judge_v0_5_r25"
+    )
+    for directory in (template, suite_dir, root / "app", root / "scripts"):
+        directory.mkdir(parents=True, exist_ok=True)
+    (template / "main.py").write_text(
+        'APP_ARCHIVE_B64 = "__APP_ARCHIVE_B64__"\n'
+        'SUITE = "__SUITE_FILENAME__"\n'
+        'OUTPUT = "__OUTPUT_DIRNAME__"\n'
+        'REQUIREMENTS_B64 = "__KAGGLE_REQUIREMENTS_B64__"\n',
+        encoding="utf-8",
+    )
+    (template / "kernel-metadata.json").write_text("{}\n", encoding="utf-8")
+    (template / "requirements-kaggle.txt").write_text("wrapt==1.17.3\n", encoding="utf-8")
+    (root / "app" / "__init__.py").write_text("", encoding="utf-8")
+    (root / "scripts" / "run_evaluation_judge.py").write_text("", encoding="utf-8")
+    (suite_dir / "development_25.json").write_text('{"cases": []}\n', encoding="utf-8")
+
+    monkeypatch.setattr(package, "ROOT", root)
+    monkeypatch.setattr(package, "TEMPLATE", template)
+    package.main(suite_name="development_25", destination_path=destination)
+
+    generated = (destination / "main.py").read_text(encoding="utf-8")
+    assert 'SUITE = "development_25.json"' in generated
+    assert 'OUTPUT = "internal_judge_v0_5_r25"' in generated
+    encoded = generated.split('APP_ARCHIVE_B64 = "', 1)[1].split('"', 1)[0]
+    with zipfile.ZipFile(io.BytesIO(base64.b64decode(encoded))) as archive:
+        assert "evaluation/suites/v0_5/development_25.json" in archive.namelist()

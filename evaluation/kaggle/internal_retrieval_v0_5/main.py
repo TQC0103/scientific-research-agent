@@ -14,7 +14,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-OUTPUT = Path("/kaggle/working/internal_retrieval_v0_5")
+OUTPUT = Path("/kaggle/working/__OUTPUT_DIRNAME__")
 ENV_ROOT = Path("/kaggle/working/internal_retrieval_venv")
 ENV_PYTHON = ENV_ROOT / "bin" / "python"
 CODE_ROOT = Path("/tmp/internal_retrieval_source")
@@ -39,7 +39,7 @@ def _extract_app() -> None:
 
 def _download_papers() -> None:
     manifest_path = (
-        CODE_ROOT / "evaluation" / "suites" / "v0_5" / "development_10_sources.json"
+        CODE_ROOT / "evaluation" / "suites" / "v0_5" / "__SOURCES_FILENAME__"
     )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     PAPERS.mkdir(parents=True, exist_ok=True)
@@ -177,14 +177,14 @@ def _run_ablation() -> None:
         "-m",
         "scripts.run_internal_retrieval_ablation",
         "--suite",
-        str(CODE_ROOT / "evaluation" / "suites" / "v0_5" / "development_10.json"),
+        str(CODE_ROOT / "evaluation" / "suites" / "v0_5" / "__SUITE_FILENAME__"),
         "--sources",
         str(
             CODE_ROOT
             / "evaluation"
             / "suites"
             / "v0_5"
-            / "development_10_sources.json"
+            / "__SOURCES_FILENAME__"
         ),
         "--papers-dir",
         str(PAPERS),

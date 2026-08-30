@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import io
@@ -13,9 +14,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "evaluation" / "kaggle" / "internal_retrieval_v0_5"
 DESTINATION = ROOT / "data" / "evaluations" / "kaggle_jobs" / "internal_retrieval_v0_5"
-PAPERS = ROOT / "data" / "papers"
+DEFAULT_SUITE_NAME = "development_10"
 
-def _app_files() -> dict[Path, str]:
+
+def _app_files(suite_name: str = DEFAULT_SUITE_NAME) -> dict[Path, str]:
     return {
         ROOT / "app" / "__init__.py": "app/__init__.py",
         ROOT / "app" / "evaluation" / "__init__.py": "app/evaluation/__init__.py",
@@ -34,11 +36,11 @@ def _app_files() -> dict[Path, str]:
         ROOT / "scripts" / "run_internal_retrieval_ablation.py": (
             "scripts/run_internal_retrieval_ablation.py"
         ),
-        ROOT / "evaluation" / "suites" / "v0_5" / "development_10.json": (
-            "evaluation/suites/v0_5/development_10.json"
+        ROOT / "evaluation" / "suites" / "v0_5" / f"{suite_name}.json": (
+            f"evaluation/suites/v0_5/{suite_name}.json"
         ),
-        ROOT / "evaluation" / "suites" / "v0_5" / "development_10_sources.json": (
-            "evaluation/suites/v0_5/development_10_sources.json"
+        ROOT / "evaluation" / "suites" / "v0_5" / f"{suite_name}_sources.json": (
+            f"evaluation/suites/v0_5/{suite_name}_sources.json"
         ),
     }
 
@@ -51,28 +53,9 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _validated_pdfs() -> dict[Path, str]:
-    manifest_path = (
-        ROOT / "evaluation" / "suites" / "v0_5" / "development_10_sources.json"
-    )
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    result = {}
-    for source in manifest["sources"]:
-        versioned_id = source["versioned_id"]
-        pdf = PAPERS / f"{versioned_id}.pdf"
-        if not pdf.is_file():
-            raise FileNotFoundError(f"Pinned source PDF is missing: {pdf}")
-        actual = _sha256(pdf)
-        if actual != source["pdf_sha256"]:
-            raise ValueError(f"Pinned PDF checksum mismatch: {versioned_id}")
-        result[pdf] = f"papers/{pdf.name}"
-    return result
-
-
-def _embedded_app() -> str:
+def _embedded_app(suite_name: str = DEFAULT_SUITE_NAME) -> str:
     payload = io.BytesIO()
-    _validated_pdfs()
-    files = _app_files()
+    files = _app_files(suite_name)
     with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for source, target in sorted(files.items(), key=lambda item: item[1]):
             archive.write(source, target)
@@ -85,8 +68,12 @@ def _embedded_requirements() -> str:
     )
 
 
-def main() -> None:
-    destination = DESTINATION.resolve()
+def main(
+    *, suite_name: str = DEFAULT_SUITE_NAME, destination_path: Path | None = None
+) -> None:
+    if not suite_name.isidentifier() or not suite_name.startswith("development_"):
+        raise ValueError(f"Unsafe suite name: {suite_name}")
+    destination = (destination_path or DESTINATION).resolve()
     allowed_root = (ROOT / "data" / "evaluations" / "kaggle_jobs").resolve()
     if not destination.is_relative_to(allowed_root) or destination == allowed_root:
         raise ValueError(f"Unsafe Kaggle job destination: {destination}")
@@ -100,9 +87,11 @@ def main() -> None:
         if source.name == "main.py":
             template = source.read_text(encoding="utf-8")
             target.write_text(
-                template.replace("__APP_ARCHIVE_B64__", _embedded_app()).replace(
-                    "__KAGGLE_REQUIREMENTS_B64__", _embedded_requirements()
-                ),
+                template.replace("__APP_ARCHIVE_B64__", _embedded_app(suite_name))
+                .replace("__KAGGLE_REQUIREMENTS_B64__", _embedded_requirements())
+                .replace("__SUITE_FILENAME__", f"{suite_name}.json")
+                .replace("__SOURCES_FILENAME__", f"{suite_name}_sources.json")
+                .replace("__OUTPUT_DIRNAME__", destination.name),
                 encoding="utf-8",
             )
         else:
@@ -110,13 +99,14 @@ def main() -> None:
     files = sorted(path for path in destination.rglob("*") if path.is_file())
     manifest = {
         "source": "scientific-research-agent internal retrieval v0.5",
+        "suite_name": suite_name,
         "public_sources": json.loads(
             (
                 ROOT
                 / "evaluation"
                 / "suites"
                 / "v0_5"
-                / "development_10_sources.json"
+                / f"{suite_name}_sources.json"
             ).read_text(encoding="utf-8")
         )["sources"],
         "files": {
@@ -131,4 +121,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--suite-name", default=DEFAULT_SUITE_NAME)
+    parser.add_argument("--destination", type=Path)
+    arguments = parser.parse_args()
+    main(suite_name=arguments.suite_name, destination_path=arguments.destination)

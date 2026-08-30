@@ -224,6 +224,23 @@ python scripts/prepare_internal_judge_kaggle_job.py
 The generated source remains under ignored runtime storage. The remote job uses
 batched deterministic generation with left padding and writes
 `judge_report.json`, `runtime.json`, and a resolved dependency fingerprint.
+Select the 25-case suite without changing the R10 template identity with:
+
+```powershell
+python scripts/prepare_internal_judge_kaggle_job.py `
+  --suite-name development_25 `
+  --destination data/evaluations/kaggle_jobs/internal_judge_v0_5_r25
+```
+
+The judge runtime inherits Kaggle's compatible CUDA/PyTorch installation inside
+an isolated `--system-site-packages` environment and pins the Pydantic/core pair
+used by the evaluation schema.
+
+R25 judge A2 completed 25 schema-valid calls: all 22 answer cases passed and the
+three intentional abstentions were flagged for human review, as designed. The
+flags do not invalidate the abstentions because selected evidence cannot prove
+document-wide absence. Mean lint scores were `4.88/4.72/4.68/4.80/4.88`; these
+remain advisory development signals.
 
 Score ranked retrieval output against the internal gold evidence with:
 
@@ -259,10 +276,15 @@ Dense and hybrid default to a pinned `Qwen/Qwen3-Embedding-0.6B` revision,
 matching the repo's configured embedding-model family. Run those arms through
 Kaggle Control Plane, not on the laptop.
 `scripts/prepare_internal_retrieval_kaggle_job.py` builds a narrow T4 bundle
-containing only required code; the remote entrypoint downloads the two pinned
-paper revisions and verifies their SHA-256 before parsing. The Markdown report
-explicitly labels results as internal development signals rather than held-out
-accuracy.
+containing only required code; the remote entrypoint downloads the suite's
+pinned paper revisions and verifies their SHA-256 before parsing. The Markdown
+report explicitly labels results as internal development signals rather than
+held-out accuracy.
+
+Both internal packagers accept `--suite-name development_25` and a distinct
+`--destination`. The R25 retrieval bundle downloads and verifies all five
+source revisions from `development_25_sources.json`; it does not require local
+PDFs or overwrite the R10 bundle.
 
 The first complete Kaggle T4 comparison (`R4`, 2026-08-27) scored nine
 retrieval-eligible development cases at K=5. Lexical achieved Recall `0.7778`,
@@ -278,6 +300,12 @@ balancing. CombSUM reached Recall@5 `0.8333`, Precision@5 `0.2444`, and MRR
 `0.6204`; per-paper balancing did not improve coverage. Because CombSUM traded
 away the masked-LM hit and the suite is development-only, production remains on
 the existing RRF path pending independent validation.
+
+R25 retrieval A1 evaluated 24 eligible cases at K=5. Lexical, dense, RRF, and
+CombSUM Recall@5 were `0.8333`, `0.8125`, `0.8125`, and `0.8542`; their MRRs
+were `0.6354`, `0.6250`, `0.5951`, and `0.6472`. CombSUM led this diagnostic but
+still missed two single-paper gold passages and complete annotated LoRA/RAG
+coverage, so production RRF remains unchanged pending failure analysis.
 
 Run the controlled Task 6 verifier diagnostic with the production prompt and
 response parser using:

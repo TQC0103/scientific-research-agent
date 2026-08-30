@@ -53,7 +53,6 @@ def test_prepared_bundle_is_narrow_and_embeds_only_pinned_sources(
     monkeypatch.setattr(package, "ROOT", root)
     monkeypatch.setattr(package, "TEMPLATE", template)
     monkeypatch.setattr(package, "DESTINATION", destination)
-    monkeypatch.setattr(package, "PAPERS", papers)
     package.main()
 
     top_level_code = [path.name for path in destination.glob("*.py")]
@@ -99,3 +98,50 @@ def test_kaggle_entrypoint_preserves_system_torch_and_cleans_environment() -> No
     assert "shutil.rmtree(VIRTUALENV_BOOTSTRAP" in entrypoint
     assert "torch==" not in requirements
     assert "wrapt==" in requirements
+
+
+def test_retrieval_packager_can_select_development_25(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "repo"
+    template = root / "evaluation" / "kaggle" / "internal_retrieval_v0_5"
+    suite_dir = root / "evaluation" / "suites" / "v0_5"
+    destination = (
+        root
+        / "data"
+        / "evaluations"
+        / "kaggle_jobs"
+        / "internal_retrieval_v0_5_r25"
+    )
+    template.mkdir(parents=True)
+    suite_dir.mkdir(parents=True)
+    (template / "main.py").write_text(
+        'APP_ARCHIVE_B64 = "__APP_ARCHIVE_B64__"\n'
+        'SUITE = "__SUITE_FILENAME__"\n'
+        'SOURCES = "__SOURCES_FILENAME__"\n'
+        'OUTPUT = "__OUTPUT_DIRNAME__"\n'
+        'REQUIREMENTS_B64 = "__KAGGLE_REQUIREMENTS_B64__"\n',
+        encoding="utf-8",
+    )
+    (template / "kernel-metadata.json").write_text("{}\n", encoding="utf-8")
+    (template / "requirements-kaggle.txt").write_text("wrapt==1.17.3\n", encoding="utf-8")
+    monkeypatch.setattr(package, "ROOT", root)
+    monkeypatch.setattr(package, "TEMPLATE", template)
+    for source in package._app_files("development_25"):
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("# fixture\n", encoding="utf-8")
+    (suite_dir / "development_25_sources.json").write_text(
+        json.dumps({"sources": []}), encoding="utf-8"
+    )
+
+    package.main(suite_name="development_25", destination_path=destination)
+
+    generated = (destination / "main.py").read_text(encoding="utf-8")
+    assert 'SUITE = "development_25.json"' in generated
+    assert 'SOURCES = "development_25_sources.json"' in generated
+    assert 'OUTPUT = "internal_retrieval_v0_5_r25"' in generated
+    encoded = generated.split('APP_ARCHIVE_B64 = "', 1)[1].split('"', 1)[0]
+    with zipfile.ZipFile(io.BytesIO(base64.b64decode(encoded))) as archive:
+        names = set(archive.namelist())
+    assert "evaluation/suites/v0_5/development_25.json" in names
+    assert "evaluation/suites/v0_5/development_25_sources.json" in names

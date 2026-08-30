@@ -32,11 +32,14 @@ Continue in this order:
 2. The 25-case development expansion is now authored and source-audited: it
    preserves the ten R10 cases unchanged and adds ResNet v1, LoRA v2, RAG v4,
    one new partial-evidence abstention, and a LoRA/RAG cross-paper comparison.
-   Run an advisory case audit and retrieval-only diagnostic on this exact suite
-   before creating a distinct R25 end-to-end package; do not overwrite R10.
-3. After inspecting those diagnostics, run the 25-case production graph on the
-   Kaggle T4 and compare directionally with R10 only on the unchanged ten-case
-   slice. Do not compare raw aggregate rates across different suite membership.
+   Its advisory judge completed with all 22 answer cases passing; the three
+   intentional abstentions remain human-retained. Retrieval-only A1 found
+   CombSUM ahead of RRF at Recall@5 `0.8542` versus `0.8125`, but exposed three
+   targeted coverage failures. Preserve these as diagnostics, not thresholds.
+3. Diagnose those retrieval misses and multi-paper fixed-K coverage before
+   running the 25-case production graph on the Kaggle T4. Compare directionally
+   with R10 only on the unchanged ten-case slice. Do not compare raw aggregate
+   rates across different suite membership.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

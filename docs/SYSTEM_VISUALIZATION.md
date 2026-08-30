@@ -345,7 +345,11 @@ flowchart TD
     GLOBAL --> RANKED
     PERPAPER --> RANKED
     ABLATION --> ABLATIONREPORT["Ignored JSON summary + Markdown comparison"]
-    ABLATION -.-> ABLATIONGPU["Pinned isolated T4 package via Control Plane"]
+    R10 --> SUITEPACKAGE["Suite-selectable R10/R25 packagers"]
+    R25 --> SUITEPACKAGE
+    SUITEPACKAGE --> ABLATIONGPU["Pinned isolated T4 package via Control Plane"]
+    ABLATION -.-> ABLATIONGPU
+    ABLATIONGPU --> R25RETRIEVAL["R25 A1: 6 retrieval arms completed"]
 
     CASES --> VDEFINITION["Controlled initial + recovery evidence snapshots"]
     VDEFINITION --> VPROMPT["Production verifier prompt + parser"]
@@ -386,8 +390,9 @@ flowchart TD
     E2EMETRICS --> E2ECOMPARE
     E2ECOMPARE --> E2EOUTPUTS
 
-    CASES --> JUDGEPROMPT["Case-local advisory judge prompt"]
+    SUITEPACKAGE --> JUDGEPROMPT["Case-local advisory judge prompt"]
     JUDGEPROMPT --> JUDGEMODEL["Batched deterministic Qwen on isolated T4"]
+    JUDGEMODEL --> JUDGEENV["Kaggle PyTorch inherited; Pydantic/core pinned"]
     JUDGEMODEL --> JUDGEJSON["Validated verdict + five scores + findings"]
     JUDGEJSON --> HUMAN["Human review still required; publication state unchanged"]
 

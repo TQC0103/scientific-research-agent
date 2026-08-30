@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import io
@@ -13,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "evaluation" / "kaggle" / "internal_judge_v0_5"
 DESTINATION = ROOT / "data" / "evaluations" / "kaggle_jobs" / "internal_judge_v0_5"
+DEFAULT_SUITE_NAME = "development_10"
 
 
 def _sha256(path: Path) -> str:
@@ -23,7 +25,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _embedded_source() -> str:
+def _embedded_source(suite_name: str = DEFAULT_SUITE_NAME) -> str:
     payload = io.BytesIO()
     with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for source in sorted((ROOT / "app").rglob("*.py")):
@@ -33,14 +35,18 @@ def _embedded_source() -> str:
             "app/run_evaluation_judge.py",
         )
         archive.write(
-            ROOT / "evaluation" / "suites" / "v0_5" / "development_10.json",
-            "evaluation/suites/v0_5/development_10.json",
+            ROOT / "evaluation" / "suites" / "v0_5" / f"{suite_name}.json",
+            f"evaluation/suites/v0_5/{suite_name}.json",
         )
     return base64.b64encode(payload.getvalue()).decode("ascii")
 
 
-def main() -> None:
-    destination = DESTINATION.resolve()
+def main(
+    *, suite_name: str = DEFAULT_SUITE_NAME, destination_path: Path | None = None
+) -> None:
+    if not suite_name.isidentifier() or not suite_name.startswith("development_"):
+        raise ValueError(f"Unsafe suite name: {suite_name}")
+    destination = (destination_path or DESTINATION).resolve()
     allowed_root = (ROOT / "data" / "evaluations" / "kaggle_jobs").resolve()
     if not destination.is_relative_to(allowed_root) or destination == allowed_root:
         raise ValueError(f"Unsafe Kaggle job destination: {destination}")
@@ -57,8 +63,10 @@ def main() -> None:
         if source.name == "main.py":
             target.write_text(
                 source.read_text(encoding="utf-8")
-                .replace("__APP_ARCHIVE_B64__", _embedded_source())
-                .replace("__KAGGLE_REQUIREMENTS_B64__", requirements),
+                .replace("__APP_ARCHIVE_B64__", _embedded_source(suite_name))
+                .replace("__KAGGLE_REQUIREMENTS_B64__", requirements)
+                .replace("__SUITE_FILENAME__", f"{suite_name}.json")
+                .replace("__OUTPUT_DIRNAME__", destination.name),
                 encoding="utf-8",
             )
         else:
@@ -66,6 +74,7 @@ def main() -> None:
     files = sorted(path for path in destination.rglob("*") if path.is_file())
     manifest = {
         "source": "scientific-research-agent v0.5 internal judge package",
+        "suite_name": suite_name,
         "files": {
             str(path.relative_to(destination)).replace("\\", "/"): _sha256(path)
             for path in files
@@ -78,4 +87,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--suite-name", default=DEFAULT_SUITE_NAME)
+    parser.add_argument("--destination", type=Path)
+    arguments = parser.parse_args()
+    main(suite_name=arguments.suite_name, destination_path=arguments.destination)

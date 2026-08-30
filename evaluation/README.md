@@ -473,10 +473,11 @@ K. Global RRF remains the production default.
 The runner writes each arm's ranked chunks, per-case metrics, aggregate metrics,
 `ablation_summary.json`, and `ablation_report.md`. Gold evidence is consulted
 only after all rankings have been produced. The portable Kaggle package embeds
-only the required code, downloads the two pinned PDFs remotely, verifies their
-SHA-256 before parsing, uses an isolated `--system-site-packages` environment
-without replacing Kaggle PyTorch, verifies actual T4 devices and CUDA execution,
-and removes the environment before artifact collection.
+only the required code, selects either the R10 or R25 suite at packaging time,
+downloads every PDF from that suite's source manifest, verifies SHA-256 before
+parsing, uses an isolated `--system-site-packages` environment without replacing
+Kaggle PyTorch, verifies actual T4 devices and CUDA execution, and removes the
+environment before artifact collection.
 
 The completed Kaggle R4 run used two visible Tesla T4 devices and scored all 10
 cases (nine with retrieval gold, one no-gold abstention). At K=5, lexical
@@ -488,6 +489,13 @@ lexical recovered. Current RRF inherited those dense misses, so the internal
 result does not show a hybrid win. The suite has only nine eligible,
 repo-authored development cases; use the report for failure analysis and keep
 the external QASPER result as the stronger broad retrieval signal.
+
+R25 retrieval A1 expanded the same contract to five PDFs and 24 eligible cases.
+Lexical Recall@5/MRR was `0.8333/0.6354`, dense was `0.8125/0.6250`, RRF was
+`0.8125/0.5951`, and both CombSUM variants led at `0.8542/0.6472`. The result
+still exposed two missed single-paper passages and incomplete annotated
+LoRA/RAG comparison coverage inside K=5. Keep production RRF unchanged until
+those failures are understood beyond this tunable development suite.
 
 R5 compared the four hybrid configurations without optimizing weights or RRF K.
 Global min-max CombSUM and its per-paper counterpart both produced Recall@5
@@ -568,10 +576,14 @@ useful annotation lint pass, not an accuracy metric or an independent reviewer.
 `scripts/run_evaluation_judge.py` uses a dynamically imported Transformers GPU
 runtime. The Kaggle package sets left padding for decoder-only generation, uses
 `do_sample=False`, batches two cases at a time, verifies Tesla T4 capability 7.5
-with a real CUDA operation, and records the resolved environment. Do not run the
-model workload on the laptop. Code, model cache, and the isolated environment
-live under Kaggle's temporary filesystem; only the small report directory is
-placed under `/kaggle/working` for artifact download.
+with a real CUDA operation, and records the resolved environment. Its isolated
+environment inherits Kaggle's compatible PyTorch instead of installing another
+CUDA stack, while the Pydantic/core pair and model libraries are pinned locally.
+Both packagers accept `--suite-name` and `--destination`, so R25 gets a distinct
+bundle and output identity. Do not run the model workload on the laptop. Code,
+model cache, and the isolated environment live under Kaggle's temporary
+filesystem; only the small report directory is placed under `/kaggle/working`
+for artifact download.
 
 The completed R4 development audit used Qwen2.5-3B-Instruct on a Tesla T4 and
 returned eight `pass` verdicts and two `needs_revision` verdicts. All eight
@@ -590,6 +602,13 @@ checksum-pinned PDFs, including the relevant tables and surrounding text. All
 eight were retained without content changes, and suite v0.1.3 records one
 reviewer and adjudication for all ten cases. The suite is still development-only:
 review completion does not make tuned data held-out or publishable.
+
+R25 judge A2 ran the same advisory contract over the expanded suite: 22 answer
+cases passed and the three intentional abstentions were the only
+`needs_revision` results. The new LoRA partial-evidence case was retained after
+source review because its missing numerical latency factor is deliberate. A1
+revealed a Pydantic/core mismatch before suite loading; A2 pins the compatible
+core while continuing to inherit Kaggle's CUDA/PyTorch runtime.
 
 Render a human-readable review page by combining the committed suite with an
 ignored judge report:
