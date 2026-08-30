@@ -1,7 +1,7 @@
 {
   "schema_version": "1.1.0",
   "suite_id": "v0_5_development_10",
-  "dataset_version": "0.1.2",
+  "dataset_version": "0.1.3",
   "benchmark_status": "development",
   "description": "Ten-case development suite for retrieval, evidence sufficiency, abstention, and multi-paper coverage. LLM judge output is advisory and does not make this suite held-out or publishable.",
   "cases": [
@@ -23,9 +23,9 @@
       "annotation": {
         "source": "repo_authored",
         "annotator_count": 1,
-        "reviewer_count": 0,
-        "adjudicated": false,
-        "notes": "LLM judge review is advisory and is not counted as independent human review."
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned Transformer v7 page 4; the question, answer criteria, reference answer, and evidence anchor were retained without change. The automated judge remains advisory."
       },
       "papers": [
         {
@@ -93,9 +93,9 @@
       "annotation": {
         "source": "repo_authored",
         "annotator_count": 1,
-        "reviewer_count": 0,
-        "adjudicated": false,
-        "notes": "LLM judge review is advisory and is not counted as independent human review."
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned Transformer v7 page 6; the question, answer criteria, reference answer, and evidence anchor were retained without change. The automated judge remains advisory."
       },
       "papers": [
         {
@@ -158,9 +158,9 @@
       "annotation": {
         "source": "repo_authored",
         "annotator_count": 1,
-        "reviewer_count": 0,
-        "adjudicated": false,
-        "notes": "LLM judge review is advisory and is not counted as independent human review."
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned Transformer v7 page 8, including Table 2 and its surrounding text; the annotation was retained without change. The automated judge remains advisory."
       },
       "papers": [
         {
@@ -223,9 +223,9 @@
       "annotation": {
         "source": "repo_authored",
         "annotator_count": 1,
-        "reviewer_count": 0,
-        "adjudicated": false,
-        "notes": "LLM judge review is advisory and is not counted as independent human review."
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned BERT v2 page 4; the masked-LM mechanism, answer criteria, and evidence anchor were retained without change. The automated judge remains advisory."
       },
       "papers": [
         {
@@ -293,9 +293,9 @@
       "annotation": {
         "source": "repo_authored",
         "annotator_count": 1,
-        "reviewer_count": 0,
-        "adjudicated": false,
-        "notes": "LLM judge review is advisory and is not counted as independent human review."
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned BERT v2 page 5; the corpus names, word counts, and evidence anchor were retained without change. The automated judge remains advisory."
       },
       "papers": [
         {
@@ -358,9 +358,9 @@
       "annotation": {
         "source": "repo_authored",
         "annotator_count": 1,
-        "reviewer_count": 0,
-        "adjudicated": false,
-        "notes": "LLM judge review is advisory and is not counted as independent human review."
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against the checksum-pinned BERT v2 abstract; both reported scores and absolute improvements were retained without change. The automated judge remains advisory."
       },
       "papers": [
         {
@@ -423,9 +423,9 @@
       "annotation": {
         "source": "repo_authored",
         "annotator_count": 1,
-        "reviewer_count": 0,
-        "adjudicated": false,
-        "notes": "LLM judge review is advisory and is not counted as independent human review."
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against both checksum-pinned abstracts; the two-paper comparison and required-paper coverage were retained without change. The automated judge remains advisory."
       },
       "papers": [
         {
@@ -618,9 +618,9 @@
       "annotation": {
         "source": "repo_authored",
         "annotator_count": 1,
-        "reviewer_count": 0,
-        "adjudicated": false,
-          "notes": "Corrected after a full-source audit found the reported 0.9 BLEU comparison on page 9. LLM judge review remains advisory and is not counted as independent human review."
+        "reviewer_count": 1,
+        "adjudicated": true,
+        "notes": "Independently source-audited on 2026-08-30 against checksum-pinned Transformer v7 page 9, including Table 3 and its surrounding text; the corrected 0.9 BLEU comparison was retained. The automated judge remains advisory."
       },
       "papers": [
         {

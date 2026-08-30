@@ -397,6 +397,8 @@ python -m scripts.prepare_end_to_end_kaggle_job
 For an immutable rerun, pass the final Kaggle identity before the manifest is
 hashed, for example `--kernel-slug owner/project-r8 --title "Project R8"`.
 Editing `kernel-metadata.json` afterward makes its recorded provenance hash stale.
+The packager rejects malformed identities and Kaggle kernel slugs or titles over
+50 characters before a Control Plane submission can consume a job slot.
 
 The committed template lives in `evaluation/kaggle/end_to_end_v0_5/`. It creates
 an isolated system-site-aware runtime without replacing Kaggle Torch, pins the
@@ -452,8 +454,13 @@ verifier, citation-safety, execution, and tool-error rates were all `0.0000`.
 The comparison case verified on its first attempt with no answer revision. Mean
 case latency was 51.9 seconds with 32 graph LLM calls. Retrieval did not change:
 Recall@5 remained `0.6667` and MRR `0.5556`. R9 is therefore a clean development
-checkpoint, not a publishable score or frozen baseline; the eight answer cases
-still require independent review.
+checkpoint, not a publishable score or frozen baseline. The eight answer cases
+were subsequently source-audited against the checksum-pinned PDFs on 2026-08-30
+and retained as suite v0.1.3. Because the cases remain tuned development data,
+R10 repeated the R9 configuration under the new exact suite identity. It
+completed with identical quality metrics and 32 graph calls;
+its aggregate is the first local development regression baseline. It remains
+Git-ignored and must not be presented as held-out accuracy.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

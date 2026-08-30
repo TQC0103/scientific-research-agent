@@ -47,19 +47,9 @@ def test_development_suite_has_required_case_mix_and_is_not_publishable() -> Non
         "unsupported_question",
     }
     assert all(case.evaluation_split.value == "development" for case in suite.cases)
-    reviewed = {
-        case.case_id
-        for case in suite.cases
-        if case.annotation.reviewer_count == 1 and case.annotation.adjudicated
-    }
-    assert reviewed == {
-        "transformer_training_energy_missing_dev",
-        "transformer_imagenet_unsupported_dev",
-    }
     assert all(
-        (case.annotation.reviewer_count or 0) == 0 and not case.annotation.adjudicated
+        case.annotation.reviewer_count == 1 and case.annotation.adjudicated
         for case in suite.cases
-        if case.case_id not in reviewed
     )
     assert any(
         case.challenge and "partial_evidence" in {kind.value for kind in case.challenge.kinds}

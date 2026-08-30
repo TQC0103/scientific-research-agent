@@ -14,8 +14,9 @@ outputs and reports belong under `data/evaluations/` and remain Git-ignored.
 - `suites/v0_5/schema_fixtures.json`: four illustrative cases; these are schema
   fixtures, not a reported benchmark.
 - `suites/v0_5/development_10.json`: eight answer and two abstention cases over
-  exact Transformer v7 and BERT v2 sources; this is a tunable development suite,
-  not held-out evidence.
+  exact Transformer v7 and BERT v2 sources. Suite v0.1.3 records a completed
+  independent source audit of every case, but remains a tunable development
+  suite rather than held-out evidence.
 - `suites/v0_5/development_10_sources.json`: source URLs, PDF hashes, and page
   counts used while checking the committed quotes and page anchors.
 - `suites/v0_5/verifier_development.json`: 22 controlled initial/recovery
@@ -399,7 +400,12 @@ was 51.9 seconds, graph accounting was 32 LLM calls, and adapter accounting
 including smoke was 35 physical LLM calls, two document-embedding calls, and 14
 query-embedding calls. The comparison produced two atomic Transformer claims
 bound to the same exact `[1]` citation scope and verified without revision. R9
-remains an ignored, tunable development checkpoint pending independent review.
+remains the ignored v0.1.2 development checkpoint. After independent source
+review, R10 (`job_9f37ffbd7cb245fea6519d69d29da32e`) ran the same configuration
+on v0.1.3 and reproduced every quality metric and call count exactly; mean
+latency was 51.4 seconds. Its aggregate is saved locally under the ignored
+`data/evaluations/baselines/v0_5/metrics.json` path as the first development
+regression baseline. It is not a held-out or publishable benchmark score.
 
 ## Retrieval matching contract
 
@@ -570,10 +576,12 @@ and 4.8 challenge validity. These are annotation-lint signals from one small
 judge model, not benchmark accuracy.
 
 The repository owner subsequently human-reviewed and retained the two
-abstention cases on 2026-08-27 after a full-paper audit. Their annotation
-metadata records that adjudication in suite v0.1.2. The other eight cases remain
-unreviewed development annotations, so the suite is still neither frozen nor
-publishable.
+abstention cases on 2026-08-27 after a full-paper audit. On 2026-08-30, the
+remaining eight answer annotations were independently checked against the two
+checksum-pinned PDFs, including the relevant tables and surrounding text. All
+eight were retained without content changes, and suite v0.1.3 records one
+reviewer and adjudication for all ten cases. The suite is still development-only:
+review completion does not make tuned data held-out or publishable.
 
 Render a human-readable review page by combining the committed suite with an
 ignored judge report:

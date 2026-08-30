@@ -8,6 +8,10 @@ Last updated: 2026-08-30
 - Release status: v0.5 evaluation/grounding work is in progress on `main`;
   `v0.5.0` is not tagged yet.
 - Branch: `main`
+- Evaluation regression baseline: reviewed development suite v0.1.3, fingerprint
+  `0939bd12b4ffb2e4b4906368a33a4aad8f0b5b963659ae6985b517353c4ec051`,
+  R10 job `job_9f37ffbd7cb245fea6519d69d29da32e`; aggregate stored locally in
+  ignored `data/evaluations/baselines/v0_5/metrics.json`.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -17,7 +21,7 @@ Last updated: 2026-08-30
 - Verification: JSON Schema 1.1.0, four fixtures, the ten-case development
   suite, the 22-case controlled verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 153
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 156
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -53,9 +57,11 @@ Last updated: 2026-08-30
   held-out access, and JSONL/metric outputs
 - Archived self-contained QASPER R11 source with a pinned isolated T4 runtime,
   verified public-dataset download, source manifest, and recorded dev metrics
-- Ten-case internal development suite v0.1.2 over pinned Transformer v7 and
+- Ten-case internal development suite v0.1.3 over pinned Transformer v7 and
   BERT v2 sources: eight answer cases, two abstentions, multi-paper coverage,
-  missing and unsupported evidence, a numeric ablation, and partial evidence
+  missing and unsupported evidence, a numeric ablation, and partial evidence.
+  All ten annotations now record one reviewer and adjudication; the eight answer
+  cases were source-audited against the checksum-pinned PDFs on 2026-08-30.
 - Structured advisory LLM judge, separate report aggregation, and an isolated
   deterministic T4 package; judge output cannot change human-review/publication
   metadata
@@ -315,8 +321,12 @@ safety, execution, and tool-error rates were all `0.0000`. The comparison case
 verified in one claim attempt with no answer revision. The run used 32 graph LLM
 calls, 35 physical calls including smoke, two document-embedding calls, 14 query-
 embedding calls, and 518.5 graph seconds (51.9 seconds/case). R9 is the first
-technically clean full-graph checkpoint, but is not frozen because the eight
-answer cases remain repo-authored development data without independent review.
+technically clean full-graph checkpoint for suite v0.1.2. The eight answer cases
+were independently source-audited on 2026-08-30 and retained in v0.1.3, whose
+fingerprint is `0939bd12b4ffb2e4b4906368a33a4aad8f0b5b963659ae6985b517353c4ec051`.
+R9 cannot be relabeled as a v0.1.3 result. R10 repeated its configuration on
+that reviewed identity and reproduced every quality metric exactly, so the R10
+aggregate is now the first ignored development regression baseline.
 
 ## Known issues
 
@@ -356,8 +366,8 @@ answer cases remain repo-authored development data without independent review.
 - CLI `--trace` and Gradio expose the final answer but do not yet render Task 10
   claim assessments, revision history, or claim-verifier errors. The state exists
   for Task 11 and future UI diagnostics.
-- R6's eight-passage bound removed the R5 CUDA OOM; R7-R9 retained zero tool
-  errors. R9 also validated citation-scoped spans with no structural or claim-
+- R6's eight-passage bound removed the R5 CUDA OOM; R7-R10 retained zero tool
+  errors. R9/R10 also validated citation-scoped spans with no structural or claim-
   grounding abstentions on the ten development cases. This closes the observed
   failure mode, not the independent-quality or generalization question.
 - End-to-end `answer_f1` is lexical overlap with the committed reference, not a
@@ -367,7 +377,7 @@ answer cases remain repo-authored development data without independent review.
   `null` because the retriever does not expose a reliable counter yet.
 - Baseline comparison requires exact suite identity and reports any directional
   delta; it is informational and intentionally has no regression threshold until
-  real baseline variance is observed.
+  broader reviewed-suite variance is observed.
 - Exact source-span scoring is sensitive to punctuation boundaries in compound
   sentences, and the partial-versus-unsupported distinction needs independent
   annotation guidance before it becomes a regression threshold.
@@ -398,9 +408,9 @@ answer cases remain repo-authored development data without independent review.
   the comparison. Nine eligible development cases are insufficient for fusion
   selection, statistical testing, or parameter optimization.
 - The ten internal cases are repo-authored and tuned development data. The two
-  negative cases were human-adjudicated after a full-paper audit on 2026-08-27,
-  but the other eight cases still lack independent review and the suite remains
-  development-only.
+  negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
+  the eight answer cases were independently source-audited on 2026-08-30. The
+  completed review improves annotation trust but does not make the suite held-out.
 - Control Plane currently reports source-root validation failures as a generic
   offline error because its plugin catches HTTP 4xx as `URLError`; packages must
   be staged beneath the configured KCP experiments root until that UI/plugin
@@ -414,15 +424,12 @@ answer cases remain repo-authored development data without independent review.
 
 ## Next priorities
 
-1. Independently review the remaining eight answer cases before freezing any
-   benchmark snapshot. R9 is clean but still tuned development evidence.
-2. Repeat the exact reviewed R9 identity to observe variance, then freeze a
-   regression candidate without inventing thresholds from a single run.
-3. Expand the reviewed end-to-end suite from 10 to 25 cases before 50.
-4. Instrument embedding calls at the production retriever boundary; the Kaggle
+1. Expand the reviewed end-to-end suite from 10 to 25 cases before 50, keeping
+   the current ten-case slice and R10 baseline identity immutable.
+2. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
-5. Independently review and expand the seven Task 8 development cases, then
+3. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-6. Calibrate Task 10 repair versus immediate
+4. Calibrate Task 10 repair versus immediate
    abstention, including distinct incomplete-evidence and contradiction reasons.
-7. Fix section boundaries and table-associated metadata.
+5. Fix section boundaries and table-associated metadata.

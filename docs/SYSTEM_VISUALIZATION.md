@@ -370,7 +370,8 @@ flowchart TD
     E2E --> NODETRACE["Ordered LangGraph node updates + final state"]
     NODETRACE --> E2EMETRICS["Registered decision / retrieval / claim / latency metrics"]
     E2EMETRICS --> E2EOUTPUTS["Ignored full/aggregate JSON + per-case JSONL + Markdown"]
-    E2E --> E2EPACKAGE["Narrow T4 Kaggle package; dual-GPU or CPU-embedding fallback"]
+    E2E --> E2EIDENTITY["Validate owner/slug + 50-char Kaggle limits"]
+    E2EIDENTITY --> E2EPACKAGE["Narrow T4 Kaggle package; dual-GPU or CPU-embedding fallback"]
     E2EPACKAGE --> E2ESMOKE["1-case production-graph smoke gate"]
     E2ESMOKE --> E2EFULL["10-case live development run"]
     E2EFULL --> E2EOUTPUTS
@@ -472,8 +473,8 @@ start. R4 completed this path without runtime/tool errors, but its two negative
 cases were false positives and four claim-verifier outputs failed the strict
 contract. R5 added semantic anchors and a one-shot structure repair: both
 negative cases abstained, but none of the four malformed claim bundles recovered
-and one final verifier call exhausted T4 memory. No regression baseline is
-frozen. R6 added exact answer-span binding and an eight-passage cap; the cap
+and one final verifier call exhausted T4 memory. R6 added exact answer-span
+binding and an eight-passage cap; the cap
 removed tool errors, but model-authored top-level fields still caused three
 claim failures. R7 moved those fields into code and recovered three cases,
 leaving one comparison failure caused by a copied assessment citation label.
@@ -481,12 +482,15 @@ R8 confirmed zero structural claim failures after v3, then exposed a semantic
 scope boundary: a factual lead sentence shared the citation placed at the end
 of the following sentence. Production v4 groups uncited lead sentences with the
 next cited sentence into one exact span; claims remain atomic and receive
-separate relationship judgments. Production embedding-call instrumentation and
-an independently reviewed baseline remain future work. R9 validated this path on
+separate relationship judgments. Production embedding-call instrumentation
+remains future work. R9 validated this path on
 all ten development cases with no claim-structure, citation-safety, execution,
 or tool errors and no answer revisions. Retrieval Recall@5 remained `0.6667`, so
 the clean graph decision checkpoint does not imply complete annotated-evidence
-retrieval or held-out quality.
+retrieval or held-out quality. After independent source review, R10 repeated the
+R9 configuration on suite v0.1.3 and reproduced every quality metric exactly;
+its ignored aggregate is the first development regression baseline. Kaggle
+identity length is validated before packaging so invalid metadata fails locally.
 
 ## Maintenance rule
 

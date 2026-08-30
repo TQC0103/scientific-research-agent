@@ -1273,3 +1273,49 @@ hashes; all current embedded source-file hashes matched the submitted archive.
 Runtime ZIPs, reports, and logs remain ignored under the corresponding
 `data/evaluations/runs/end_to_end_v0_5_kaggle_r6/` through `..._r9/` directories.
 Final local verification passed Ruff and all 153 pytest tests.
+
+## 2026-08-30 — Independent source audit of all answer annotations
+
+The remaining eight answer cases in the internal ten-case suite were checked
+directly against the checksum-pinned Transformer v7 and BERT v2 PDFs. The audit
+covered the cited pages or abstracts, section labels, relevant Table 2 and Table
+3 rows, and surrounding prose. All eight questions, expected answers, required
+paper sets, criteria, and evidence anchors were supported and retained without
+content changes. In particular, the Transformer single-head ablation explicitly
+reports a 0.9 BLEU deficit, and the BERT abstract explicitly reports the GLUE and
+MultiNLI values plus their stated absolute improvements.
+
+Suite metadata is now v0.1.3 and records one reviewer plus adjudication for all
+ten cases. The source manifest was reverified on 2026-08-30 with unchanged PDF
+hashes and page counts. The normalized suite fingerprint is
+`0939bd12b4ffb2e4b4906368a33a4aad8f0b5b963659ae6985b517353c4ec051`.
+This does not convert tuned development data into held-out evidence, and the R9
+report must remain attached to v0.1.2. Next, repeat the R9 configuration against
+v0.1.3 before freezing any regression candidate or setting thresholds.
+Local verification passed Ruff and all 153 pytest tests; no model workload ran
+on the laptop.
+
+## 2026-08-30 — Reviewed R10 repeat and first development regression baseline
+
+The first R10 submission was rejected by Kaggle `SaveKernel` before remote
+execution because its kernel slug was 53 characters. Control Plane correctly
+kept the failed job separate, although Kaggle's generic HTTP 400 left a terminal
+uncertainty on that account. A new immutable bundle used a short slug and a
+clean account; job `job_9f37ffbd7cb245fea6519d69d29da32e` then completed on
+`NvidiaTeslaT4` in 758 seconds. The packager now validates `owner/slug` shape
+and rejects kernel slugs or titles longer than 50 characters locally.
+
+R10 ran reviewed suite v0.1.3 with fingerprint
+`0939bd12b4ffb2e4b4906368a33a4aad8f0b5b963659ae6985b517353c4ec051`.
+It reproduced every R9 quality metric exactly: decision, answer-case, and
+abstention accuracy `1.0000`; answer F1 `0.4480`; Recall@5 `0.6667`;
+Precision@5 `0.2222`; MRR `0.5556`; and zero claim-verifier, citation-safety,
+execution, or tool failures. Graph accounting remained 32 LLM calls; adapter
+accounting remained 35 physical LLM calls, two document-embedding calls, and 14
+query-embedding calls. Mean case latency was 51.4 seconds, 0.46 seconds below
+R9. The R10 aggregate was copied to the ignored local
+`data/evaluations/baselines/v0_5/metrics.json` path as the first development
+regression baseline. It remains tuned development evidence, not a held-out score.
+
+Final local verification passed Ruff and all 156 pytest tests. No model workload
+ran on the laptop.

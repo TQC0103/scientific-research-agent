@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "evaluation" / "kaggle" / "end_to_end_v0_5"
 DESTINATION = ROOT / "data" / "evaluations" / "kaggle_jobs" / "end_to_end_v0_5"
+KAGGLE_KERNEL_TEXT_LIMIT = 50
 
 
 def _sha256(path: Path) -> str:
@@ -70,8 +71,26 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _validate_kernel_identity(kernel_slug: str | None, title: str | None) -> None:
+    if kernel_slug:
+        owner, separator, slug = kernel_slug.partition("/")
+        if not separator or not owner or not slug:
+            raise ValueError("--kernel-slug must use owner/slug format.")
+        if len(slug) > KAGGLE_KERNEL_TEXT_LIMIT:
+            raise ValueError(
+                "Kaggle kernel slug exceeds the 50-character service limit: "
+                f"{len(slug)} characters."
+            )
+    if title and len(title) > KAGGLE_KERNEL_TEXT_LIMIT:
+        raise ValueError(
+            "Kaggle kernel title exceeds the 50-character service limit: "
+            f"{len(title)} characters."
+        )
+
+
 def main(argv: list[str] | None = None) -> None:
     args = _arguments(argv or [])
+    _validate_kernel_identity(args.kernel_slug, args.title)
     destination = DESTINATION.resolve()
     allowed_root = (ROOT / "data" / "evaluations" / "kaggle_jobs").resolve()
     if not destination.is_relative_to(allowed_root) or destination == allowed_root:

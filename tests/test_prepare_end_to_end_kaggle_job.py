@@ -6,6 +6,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from scripts import prepare_end_to_end_kaggle_job as package
 
 
@@ -79,6 +81,25 @@ def test_entrypoint_smokes_before_full_and_preserves_system_torch() -> None:
     assert 'attn_implementation="sdpa"' in runner
     assert "self.torch.cuda.empty_cache()" in runner
     assert "torch==" not in requirements
+
+
+@pytest.mark.parametrize(
+    ("kernel_slug", "title", "message"),
+    [
+        (f"owner/{'s' * 51}", "Valid title", "slug exceeds"),
+        ("owner/valid-slug", "T" * 51, "title exceeds"),
+    ],
+)
+def test_packager_rejects_kaggle_identity_over_service_limit(
+    kernel_slug: str, title: str, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        package._validate_kernel_identity(kernel_slug, title)
+
+
+def test_packager_rejects_kernel_slug_without_owner() -> None:
+    with pytest.raises(ValueError, match="owner/slug"):
+        package._validate_kernel_identity("missing-owner", "Valid title")
 
 
 def test_real_embedded_archive_imports_metrics_dependency_in_isolation(tmp_path: Path) -> None:
