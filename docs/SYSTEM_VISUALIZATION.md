@@ -63,10 +63,11 @@ flowchart TD
     INDEX --> RETRIEVE["retrieve_evidence"]
     RETRIEVE --> CHECK["check_evidence"]
 
-    CHECK -->|"coverage policy satisfied"| SYNTH["synthesize answer"]
-    CHECK -->|"paper insufficient + rewrite available"| RETRIEVE
-    CHECK -->|"required paper not processed"| INDEX
-    CHECK -->|"a required paper exhausts retries"| SYNTH
+    CHECK --> COMPLETE{"Verification internally complete?"}
+    COMPLETE -->|"yes: support IDs present; missing list empty"| SYNTH["synthesize answer"]
+    COMPLETE -->|"no; rewrite available"| RETRIEVE
+    COMPLETE -->|"required paper not processed"| INDEX
+    COMPLETE -->|"no; retries exhausted"| SYNTH
 
     SYNTH --> ENOUGH{"Evidence sufficient?"}
     ENOUGH -->|"no"| COVERAGE_GAP["paper-specific coverage gaps"]
@@ -177,7 +178,7 @@ flowchart TD
     SCOPE --> QWEN["Qwen3 4B verifier; temperature 0; fixed seed"]
     QWEN --> JSON["Per-paper JSON: sufficient, reason, missing, query, supported IDs"]
     JSON --> VALIDATE["Parse schema and validate passage IDs"]
-    VALIDATE --> CONSISTENCY["Repair one defined boolean/list contradiction"]
+    VALIDATE --> CONSISTENCY["Fail closed on contradictory sufficient / missing / support fields"]
     CONSISTENCY --> ANCHOR["Semantic anchor guard for requested metric / benchmark"]
     ANCHOR --> DIMENSIONS{"Every requested dimension covered for this paper?"}
 
@@ -203,8 +204,13 @@ enough scope; silence in a few passages is not accepted as proof. For a
 multi-paper question, each paper must cover every requested comparison
 dimension on its own side. Missing evidence about another paper is ignored
 during that paper's check, but missing dimensions within the paper are not.
-The post-parse semantic guard is deterministic and fail-closed for explicitly
-registered high-risk anchors: electrical-energy questions need an energy/power
+The post-parse completeness invariant is deterministic: a paper is covered only
+when `sufficient=true`, at least one valid supporting passage is selected, and
+`missing_information` is empty. A false decision is never upgraded merely
+because it selected passages, since partial support commonly does that. The
+synthesis node recomputes the same invariant before invoking its model, so stale
+or contradictory graph state also abstains. The semantic guard remains
+fail-closed for explicitly registered high-risk anchors: electrical-energy questions need an energy/power
 measurement anchor, and ImageNet/top-1 questions need those benchmark/metric
 anchors in a verifier-selected passage. This guard narrows a positive model
 decision; it never upgrades insufficient evidence.

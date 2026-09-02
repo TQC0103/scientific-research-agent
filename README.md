@@ -57,6 +57,10 @@ retrieved passages actually cover the question, identifies supported passages,
 and proposes a focused retrieval query when information is missing. Only verified
 passages reach answer synthesis. After two rewrites, unresolved questions return
 an explicit insufficient-evidence response instead of a guessed answer.
+The verifier-to-synthesis boundary also requires an internally complete result:
+`sufficient=true`, at least one valid supporting passage, and no remaining
+`missing_information`. Partial support may guide retrieval, but cannot authorize
+synthesis.
 For high-risk metric questions, a deterministic semantic-anchor guard also
 rejects a positive verifier decision when its selected passages do not mention
 the requested metric or benchmark (for example, training time is not electrical
@@ -88,7 +92,7 @@ question
   -> discover papers
   -> index/download as needed
   -> hybrid retrieve per paper (max 8 accumulated passages per paper)
-  -> evidence sufficiency check + semantic metric anchors
+  -> evidence sufficiency check + completeness invariant + semantic metric anchors
        (up to 2 query rewrites per paper)
   -> synthesize from approved passages only
   -> validate citation labels and restore trusted source metadata
@@ -446,6 +450,19 @@ python -m scripts.prepare_end_to_end_kaggle_job `
   --destination data/evaluations/kaggle_jobs/end_to_end_v0_5_r25_rrf
 ```
 
+For a focused GPU regression, repeat `--case-id` to select only named suite
+cases. The smoke gate and measured run use the same filtered set, and the bundle
+manifest records the selection:
+
+```powershell
+python -m scripts.prepare_end_to_end_kaggle_job `
+  --suite-name development_25 `
+  --case-id lora_all_resource_reduction_factors_missing `
+  --kernel-slug owner/sra-e2e-lora-guard-r14 `
+  --title "SRA LoRA coverage guard R14" `
+  --destination data/evaluations/kaggle_jobs/sra-e2e-lora-guard-r14
+```
+
 `--retrieval-mode windowed_rerank` enables the pinned cross-encoder candidate;
 `rrf` remains the production default. Bundle manifests record suite, config,
 retrieval mode, model revisions, and exact source hashes.
@@ -532,6 +549,15 @@ R13 improved Recall@5 to `0.8542` and MRR to `0.6719`, but decision accuracy
 fell to `0.8400`, answer F1 to `0.4015`, claim-verifier failure rose to `0.1200`,
 and mean latency increased by 5.7 seconds/case. RRF therefore remains the
 production default. Both are development diagnostics, not held-out scores.
+
+Focused R14 (`job_79e3fe9372784af88b7aa5ba7ae4e3dc`) ran only the adversarial
+LoRA missing-factor case. It abstained correctly with retrieval Recall@5 `1.0`
+and made zero synthesis or claim-verifier calls. The clean smoke trace preserved
+partial evidence while reporting the missing numerical latency factor on all
+three bounded checks. The duplicate measured path also abstained but hit CUDA
+OOM on its third verifier call, so this validates the safety boundary rather
+than establishing a clean performance baseline; bounding verifier context is
+the next runtime fix.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

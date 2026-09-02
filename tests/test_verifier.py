@@ -40,7 +40,7 @@ def test_extract_json_accepts_fenced_or_prefixed_model_output() -> None:
     assert payload == {"sufficient": False, "reason": "missing"}
 
 
-def test_verifier_repairs_contradictory_false_with_no_missing_information(monkeypatch) -> None:
+def test_verifier_preserves_false_decision_with_partial_support(monkeypatch) -> None:
     class FakeModel:
         def invoke(self, prompt):
             return type(
@@ -57,8 +57,69 @@ def test_verifier_repairs_contradictory_false_with_no_missing_information(monkey
 
     monkeypatch.setattr(verifier, "get_llm", lambda **kwargs: FakeModel())
     result = verifier.verify_evidence("Question", [_chunk(0)])
-    assert result.sufficient is True
-    assert result.suggested_query is None
+    assert result.sufficient is False
+    assert result.missing_information == ["At least one requested element remains unsupported."]
+    assert result.suggested_query == "Question"
+
+
+def test_verifier_rejects_true_decision_with_explicit_missing_requirement(
+    monkeypatch,
+) -> None:
+    class FakeModel:
+        def invoke(self, prompt):
+            return type(
+                "Response",
+                (),
+                {
+                    "content": (
+                        '{"sufficient": true, "reason": "Two of three factors are present", '
+                        '"missing_information": ["inference latency reduction factor"], '
+                        '"suggested_query": "inference latency numerical factor", '
+                        '"supported_evidence": [1]}'
+                    )
+                },
+            )()
+
+    monkeypatch.setattr(verifier, "get_llm", lambda **kwargs: FakeModel())
+    result = verifier.verify_evidence(
+        "By what factors were parameters, memory, and latency reduced?", [_chunk(0)]
+    )
+
+    assert result.sufficient is False
+    assert result.missing_information == ["inference latency reduction factor"]
+    assert result.supported_evidence == [1]
+    assert result.suggested_query == "inference latency numerical factor"
+
+
+def test_synthesis_fails_closed_on_internally_inconsistent_verification(
+    monkeypatch,
+) -> None:
+    def fail_answer(*args, **kwargs):
+        raise AssertionError("Synthesis model must not run")
+
+    monkeypatch.setattr(graph, "answer_from_evidence", fail_answer)
+    result = graph.synthesize(
+        {
+            "user_query": "By what factors were parameters, memory, and latency reduced?",
+            "candidate_papers": [{"arxiv_id": "1706.03762", "title": "Paper"}],
+            "selected_papers": ["1706.03762"],
+            "retrieved_chunks_by_paper": {"1706.03762": [_chunk(0)]},
+            "evidence_sufficient": True,
+            "evidence_verifications": {
+                "1706.03762": {
+                    "sufficient": True,
+                    "reason": "Only two of three requested factors are present.",
+                    "missing_information": ["inference latency reduction factor"],
+                    "supported_evidence": [1],
+                }
+            },
+            "tool_errors": [],
+        }
+    )
+
+    assert result["evidence_sufficient"] is False
+    assert result["verified_evidence"] == []
+    assert "inference latency reduction factor" in result["answer"]
 
 
 @pytest.mark.parametrize(
@@ -284,12 +345,10 @@ def test_multi_paper_verification_retries_only_the_missing_paper(monkeypatch) ->
     assert result["evidence_verifications"][paper_a]["sufficient"] is True
     assert result["evidence_verifications"][paper_b]["sufficient"] is False
     assert all(
-        "Ignore all missing information about other papers" in item[0]
-        for item in scoped_questions
+        "Ignore all missing information about other papers" in item[0] for item in scoped_questions
     )
     assert all(
-        "Do not require passages about the other papers" in item[1]
-        for item in scoped_questions
+        "Do not require passages about the other papers" in item[1] for item in scoped_questions
     )
 
 

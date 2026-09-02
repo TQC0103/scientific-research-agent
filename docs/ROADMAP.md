@@ -41,8 +41,10 @@ Continue in this order:
 3. The paired 25-case production-graph run is complete. RRF reached decision
    accuracy `0.9200`; reranking improved Recall@5 from `0.8333` to `0.8542` but
    reduced decision accuracy to `0.8400` and tripled claim-verifier failures.
-   Retain RRF. Next fix the shared LoRA missing-factor false positive and analyze
-   reranker's additional fail-closed claim errors before any rerun.
+   Retain RRF. The shared LoRA missing-factor false positive is now protected by
+   a fail-closed verifier completeness invariant and synthesis-side regression;
+   next analyze reranker's additional fail-closed claim errors before another
+   full-suite rerun.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

@@ -137,11 +137,15 @@ class CrossEncoderRuntime:
 
     def score(self, query: str, texts: list[str]) -> list[float]:
         self.calls += 1
-        return self.model.predict(
-            [(query, text) for text in texts],
-            batch_size=self.batch_size,
-            show_progress_bar=False,
-        ).reshape(-1).tolist()
+        return (
+            self.model.predict(
+                [(query, text) for text in texts],
+                batch_size=self.batch_size,
+                show_progress_bar=False,
+            )
+            .reshape(-1)
+            .tolist()
+        )
 
 
 def _install_adapters(
@@ -186,9 +190,7 @@ def _install_adapters(
             reranker=reranker.score,
         )
     settings.ollama_model = f"hf:{DEFAULT_LLM_MODEL}@{DEFAULT_LLM_REVISION}"
-    settings.ollama_embed_model = (
-        f"hf:{DEFAULT_EMBEDDING_MODEL}@{DEFAULT_EMBEDDING_REVISION}"
-    )
+    settings.ollama_embed_model = f"hf:{DEFAULT_EMBEDDING_MODEL}@{DEFAULT_EMBEDDING_REVISION}"
     return graph_module.research_graph
 
 
@@ -213,8 +215,17 @@ def _run_suite(
     *,
     config_name: str,
     limit: int = 0,
+    case_ids: list[str] | None = None,
 ) -> Any:
     suite = load_suite(suite_path)
+    if case_ids:
+        requested = set(case_ids)
+        cases = [case for case in suite.cases if case.case_id in requested]
+        found = {case.case_id for case in cases}
+        missing = requested - found
+        if missing:
+            raise ValueError(f"Unknown requested case IDs: {sorted(missing)}")
+        suite = suite.model_copy(update={"cases": cases})
     if limit:
         suite = suite.model_copy(update={"cases": suite.cases[:limit]})
     report = run_end_to_end(
@@ -237,9 +248,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--embedding-revision", default=DEFAULT_EMBEDDING_REVISION)
     parser.add_argument("--embedding-batch-size", type=int, default=8)
-    parser.add_argument(
-        "--retrieval-mode", choices=("rrf", "windowed_rerank"), default="rrf"
-    )
+    parser.add_argument("--retrieval-mode", choices=("rrf", "windowed_rerank"), default="rrf")
     parser.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
     parser.add_argument("--reranker-revision", default=DEFAULT_RERANKER_REVISION)
     parser.add_argument("--reranker-batch-size", type=int, default=32)
@@ -248,6 +257,12 @@ def _parse_args() -> argparse.Namespace:
         default="hybrid_verified_citation_scoped_v4_qwen3_4b_fp16",
     )
     parser.add_argument("--smoke-cases", type=int, default=1)
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        default=[],
+        help="Run only this case ID; repeat to select multiple cases.",
+    )
     return parser.parse_args()
 
 
@@ -256,9 +271,7 @@ def main() -> None:
     settings.data_dir = args.data_dir
     settings.ensure_directories()
     sources = json.loads(args.sources.read_text(encoding="utf-8"))["sources"]
-    expected = {
-        item["versioned_id"].rsplit("v", 1)[0]: item["versioned_id"] for item in sources
-    }
+    expected = {item["versioned_id"].rsplit("v", 1)[0]: item["versioned_id"] for item in sources}
     llm = TransformersRuntime(args.llm_model, args.llm_revision)
     embeddings = SentenceTransformerEmbeddings(
         args.embedding_model,
@@ -282,11 +295,16 @@ def main() -> None:
         graph,
         config_name=args.config_name,
         limit=args.smoke_cases,
+        case_ids=args.case_id,
     )
     if smoke.aggregate.execution_failures:
         raise RuntimeError("End-to-end smoke failed; the full suite was not started.")
     full = _run_suite(
-        args.suite, args.output_dir / "full", graph, config_name=args.config_name
+        args.suite,
+        args.output_dir / "full",
+        graph,
+        config_name=args.config_name,
+        case_ids=args.case_id,
     )
     runtime = {
         "llm_physical_calls": llm.calls,

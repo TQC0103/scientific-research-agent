@@ -50,9 +50,7 @@ def _group_evidence(evidence: list[dict]) -> dict[str, list[dict]]:
 def _merge_passages(
     new: list[dict], previous: list[dict], *, limit: int | None = None
 ) -> list[dict]:
-    effective_limit = (
-        settings.max_accumulated_passages_per_paper if limit is None else limit
-    )
+    effective_limit = settings.max_accumulated_passages_per_paper if limit is None else limit
     unique = []
     seen = set()
     for item in new[:8] + previous:
@@ -64,17 +62,21 @@ def _merge_passages(
 
 
 def _coverage_sufficient(state: AgentState, verifications: dict[str, dict]) -> bool:
+    def complete(paper_id: str) -> bool:
+        verification = verifications.get(paper_id, {})
+        return bool(
+            verification.get("sufficient")
+            and verification.get("supported_evidence")
+            and not verification.get("missing_information")
+        )
+
     if state.get("coverage_mode") == "all":
         required = state.get("required_paper_ids", [])
         required_count = state.get("required_paper_count", len(required))
         return bool(
-            len(required) >= required_count
-            and all(verifications.get(paper_id, {}).get("sufficient") for paper_id in required)
+            len(required) >= required_count and all(complete(paper_id) for paper_id in required)
         )
-    return any(
-        verifications.get(paper_id, {}).get("sufficient")
-        for paper_id in state.get("selected_papers", [])
-    )
+    return any(complete(paper_id) for paper_id in state.get("selected_papers", []))
 
 
 def discover(state: AgentState) -> dict:
@@ -96,9 +98,7 @@ def discover(state: AgentState) -> dict:
             source = "sqlite_fts5+arxiv" if local else "arxiv"
         if _requires_multi_paper(state["user_query"]):
             coverage_mode = "all"
-            required_paper_ids = [
-                paper["arxiv_id"] for paper in candidates[:AUTO_INDEX_LIMIT]
-            ]
+            required_paper_ids = [paper["arxiv_id"] for paper in candidates[:AUTO_INDEX_LIMIT]]
             required_paper_count = AUTO_INDEX_LIMIT
         else:
             coverage_mode = "any"
@@ -139,9 +139,7 @@ def index_next(state: AgentState) -> dict:
     failed = list(state.get("failed_papers", []))
     errors = list(state.get("tool_errors", []))
     required_remaining = [
-        paper_id
-        for paper_id in state.get("required_paper_ids", [])
-        if paper_id not in selected
+        paper_id for paper_id in state.get("required_paper_ids", []) if paper_id not in selected
     ]
     all_remaining = [
         paper["arxiv_id"]
@@ -156,8 +154,7 @@ def index_next(state: AgentState) -> dict:
     try:
         paper = get_arxiv_metadata(paper_id)
         candidates = [
-            paper if item["arxiv_id"] == paper_id else item
-            for item in state["candidate_papers"]
+            paper if item["arxiv_id"] == paper_id else item for item in state["candidate_papers"]
         ]
         if not index_is_current(paper):
             index_paper(paper_id, paper=paper)
@@ -211,9 +208,7 @@ def retrieve_evidence(state: AgentState) -> dict:
         queries.setdefault(paper_id, query)
 
     flattened = [
-        item
-        for paper_id in state.get("selected_papers", [])
-        for item in by_paper.get(paper_id, [])
+        item for paper_id in state.get("selected_papers", []) for item in by_paper.get(paper_id, [])
     ]
     last_query = queries.get(targets[-1], state["user_query"]) if targets else state["user_query"]
     return {
@@ -235,9 +230,7 @@ def check_evidence(state: AgentState) -> dict:
     errors = list(state.get("tool_errors", []))
     retry_papers = []
     papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
-    multi_paper = state.get("coverage_mode") == "all" and state.get(
-        "required_paper_count", 1
-    ) > 1
+    multi_paper = state.get("coverage_mode") == "all" and state.get("required_paper_count", 1) > 1
 
     for paper_id in targets:
         evidence = by_paper.get(paper_id, [])
@@ -275,6 +268,17 @@ def check_evidence(state: AgentState) -> dict:
                 "supported_evidence": [],
             }
             errors.append(f"verifier {paper_id}: {exc}")
+
+        if verification.get("sufficient") and (
+            verification.get("missing_information") or not verification.get("supported_evidence")
+        ):
+            verification["sufficient"] = False
+            verification["missing_information"] = verification.get("missing_information") or [
+                "A directly supporting passage."
+            ]
+            verification["suggested_query"] = (
+                verification.get("suggested_query") or state["user_query"]
+            )
 
         proposed = (verification.get("suggested_query") or "").strip()
         if not verification["sufficient"] and (
@@ -332,9 +336,7 @@ def route_after_check(state: AgentState) -> str:
 
     selected = set(state.get("selected_papers", []))
     required_remaining = [
-        paper_id
-        for paper_id in state.get("required_paper_ids", [])
-        if paper_id not in selected
+        paper_id for paper_id in state.get("required_paper_ids", []) if paper_id not in selected
     ]
     within_tool_limit = state.get("iteration_count", 0) < settings.max_tool_loops
     if required_remaining and within_tool_limit:
@@ -361,7 +363,10 @@ def synthesize(state: AgentState) -> dict:
         state.get("retrieved_chunks", [])
     )
     verified_evidence = []
-    if not state.get("evidence_sufficient"):
+    evidence_sufficient = bool(
+        state.get("evidence_sufficient") and _coverage_sufficient(state, verifications)
+    )
+    if not evidence_sufficient:
         answer = "Insufficient evidence to answer without guessing."
         details = []
         relevant = state.get("required_paper_ids") or state.get("selected_papers", [])
@@ -376,7 +381,11 @@ def synthesize(state: AgentState) -> dict:
             if not verification:
                 details.append(f"arXiv:{paper_id}: evidence was not verified.")
                 continue
-            if verification.get("sufficient"):
+            if (
+                verification.get("sufficient")
+                and verification.get("supported_evidence")
+                and not verification.get("missing_information")
+            ):
                 continue
             missing = verification.get("missing_information") or ["Direct supporting evidence."]
             details.append(
@@ -389,7 +398,11 @@ def synthesize(state: AgentState) -> dict:
     else:
         for paper_id in state.get("selected_papers", []):
             verification = verifications.get(paper_id, {})
-            if not verification.get("sufficient"):
+            if not (
+                verification.get("sufficient")
+                and verification.get("supported_evidence")
+                and not verification.get("missing_information")
+            ):
                 continue
             evidence = by_paper.get(paper_id, [])
             verified_evidence.extend(
@@ -400,12 +413,9 @@ def synthesize(state: AgentState) -> dict:
         answer = answer_from_evidence(state["user_query"], verified_evidence, papers)
     if state.get("tool_errors"):
         answer += "\n\nRetrieval notes:\n- " + "\n- ".join(state["tool_errors"])
-    citation_valid = bool(
-        state.get("evidence_sufficient")
-        and verified_evidence
-        and "\n\nSources:\n" in answer
-    )
+    citation_valid = bool(evidence_sufficient and verified_evidence and "\n\nSources:\n" in answer)
     return {
+        "evidence_sufficient": evidence_sufficient,
         "answer": answer,
         "verified_evidence": verified_evidence,
         "synthesis_citation_valid": citation_valid,
@@ -414,7 +424,7 @@ def synthesize(state: AgentState) -> dict:
         "claim_verification_error": None,
         "claim_verification_attempt_count": 0,
         "claim_revision_count": 0,
-        "claim_revision_history": [answer] if state.get("evidence_sufficient") else [],
+        "claim_revision_history": [answer] if evidence_sufficient else [],
     }
 
 
@@ -450,9 +460,7 @@ def verify_claims(state: AgentState) -> dict:
         attempts += run.model_calls
         bundle = run.bundle
     except (ValueError, OSError) as exc:
-        attempts += (
-            exc.model_calls if isinstance(exc, ClaimVerificationRunError) else 1
-        )
+        attempts += exc.model_calls if isinstance(exc, ClaimVerificationRunError) else 1
         return {
             "claim_verification": {},
             "claim_verification_status": "invalid",
@@ -471,10 +479,7 @@ def route_after_claim_verification(state: AgentState) -> str:
     status = state.get("claim_verification_status")
     if status == "verified":
         return "end"
-    if (
-        status == "repairable"
-        and state.get("claim_revision_count", 0) < MAX_CLAIM_REVISIONS
-    ):
+    if status == "repairable" and state.get("claim_revision_count", 0) < MAX_CLAIM_REVISIONS:
         return "revise"
     return "abstain"
 
@@ -484,9 +489,7 @@ def revise_answer(state: AgentState) -> dict:
     history = list(state.get("claim_revision_history", []))
     papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
     try:
-        verification = ClaimVerificationBundle.model_validate(
-            state.get("claim_verification", {})
-        )
+        verification = ClaimVerificationBundle.model_validate(state.get("claim_verification", {}))
         answer = repair_answer_claims(
             state["user_query"],
             state["answer"],
@@ -513,9 +516,8 @@ def revise_answer(state: AgentState) -> dict:
 
 
 def route_after_revision(state: AgentState) -> str:
-    if (
-        state.get("claim_verification_status") == "invalid"
-        or not state.get("synthesis_citation_valid")
+    if state.get("claim_verification_status") == "invalid" or not state.get(
+        "synthesis_citation_valid"
     ):
         return "abstain"
     return "verify_claims"

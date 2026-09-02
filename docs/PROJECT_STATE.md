@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-08-31
+Last updated: 2026-09-03
 
 ## Current baseline
 
@@ -28,7 +28,7 @@ Last updated: 2026-08-31
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 166
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 168
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -42,6 +42,9 @@ Last updated: 2026-08-31
 - Page/section-aware chunking and identity-checked per-paper FAISS indexes
 - Hybrid dense + lexical retrieval with reciprocal-rank fusion
 - Structured LLM evidence verifier, bounded query rewrite, and fail-closed stop
+- Verifier completeness invariant at aggregation and synthesis boundaries: a
+  positive decision requires valid supporting passage IDs and no missing
+  requested elements; partial support can never be upgraded into synthesis
 - Deterministic post-verifier semantic-anchor guard for electrical-energy,
   ImageNet, and top-1 metric requests; mismatched selected passages can only be
   downgraded to insufficient evidence
@@ -114,6 +117,8 @@ Last updated: 2026-08-31
   CPU embedding placement, exact arXiv source
   checks, deterministic left-padded generation, one-case smoke gate, and ignored
   result collection
+- Repeatable `--case-id` selection for narrow end-to-end GPU regressions; smoke
+  and measured runs share the selected cases and manifests record the selection
 - Seven-case Task 8 synthetic development benchmark using the production
   prompt/parser, structural extraction/verdict/relationship metrics, fail-closed
   citation accounting, raw-response diagnostics, and a narrow pinned Qwen3-4B
@@ -131,9 +136,12 @@ Last updated: 2026-08-31
 2. Reuse current indexes or lazily download, validate, parse, chunk, embed, and
    index selected revisions; fall back to labeled abstract evidence on failure.
 3. Run hybrid retrieval separately per paper, retain at most eight accumulated
-   passages per paper, apply deterministic semantic anchors to positive verifier
-   decisions, and retry with at most two focused query rewrites per paper.
-4. If coverage remains insufficient, return paper-specific gaps without synthesis.
+   passages per paper, apply deterministic semantic anchors, and require every
+   positive verification to have valid supporting IDs with no missing elements;
+   retry with at most two focused query rewrites per paper.
+4. Recompute that completeness invariant at synthesis entry. If coverage remains
+   insufficient or internally contradictory, return paper-specific gaps without
+   invoking synthesis.
 5. Otherwise synthesize only from approved passages, validate every numeric label,
    and construct source metadata from trusted records.
 6. Split the answer into immutable citation-scoped spans and verify atomic claims
@@ -239,6 +247,17 @@ F1 to `0.4015`, claim-verifier failure rose to `0.1200`, and mean latency rose
 from 56.2 to 61.9 seconds/case. On the unchanged first-ten slice, RRF retained
 decision accuracy `1.0000` versus reranker's `0.9000`. Production RRF remains
 the selected configuration.
+
+Focused LoRA guard R14 (`job_79e3fe9372784af88b7aa5ba7ae4e3dc`)
+then ran only `lora_all_resource_reduction_factors_missing` with production RRF
+on Tesla T4. Both the smoke and measured paths abstained correctly; the clean
+smoke trace made three insufficient decisions that retained partial supporting
+passage IDs while consistently reporting the missing numerical latency factor.
+It invoked synthesis and claim verification zero times. The measured duplicate
+also abstained, but its third verifier call exhausted GPU memory after two clean
+insufficient decisions, so R14 is safety evidence rather than a clean runtime
+baseline. Retrieval Recall@5 was `1.0000`; one case is not an aggregate quality
+estimate.
 
 The R25 advisory judge A2 (`job_12b1e882b15d4e778a12ca9d82bbbc8f`)
 returned 22 `pass` and three `needs_revision` verdicts with 25 schema-valid
@@ -466,6 +485,10 @@ aggregate is now the first ignored development regression baseline.
   fail-closed claim-verifier abstentions (sinusoidal position reasoning and LoRA
   no-latency) and did not fix the shared LoRA false-positive abstention case.
   Keep selection based on full-pipeline metrics, not Recall@K alone.
+- Focused R14 proves that the shared LoRA false positive is now blocked before
+  synthesis, including when partial passages remain selected. Its measured path
+  also exposed a third-rewrite CUDA OOM with eight accumulated passages; keep
+  fail-closed behavior and separately bound verifier context before a full rerun.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -483,10 +506,8 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Diagnose and fix the shared false-positive
-   `lora_all_resource_reduction_factors_missing` outcome: both RRF and reranker
-   converted absent numerical latency evidence into an answer. Add a verifier/
-   synthesis regression before another end-to-end run.
+1. Bound verifier prompt growth across retrieval rewrites so the R14 third-call
+   CUDA OOM does not depend on fail-closed recovery for correctness.
 2. Diagnose the three claim-verifier structure/grounding failures in R13 without
    tuning retrieval further on R25. RRF remains production default.
 3. Instrument embedding calls at the production retriever boundary; the Kaggle

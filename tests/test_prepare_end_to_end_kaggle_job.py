@@ -18,7 +18,9 @@ def test_prepared_end_to_end_bundle_is_narrow(tmp_path: Path, monkeypatch) -> No
     template.mkdir(parents=True)
     (template / "main.py").write_text(
         'APP_ARCHIVE_B64 = "__APP_ARCHIVE_B64__"\n'
-        'REQUIREMENTS_B64 = "__KAGGLE_REQUIREMENTS_B64__"\n', encoding="utf-8"
+        'REQUIREMENTS_B64 = "__KAGGLE_REQUIREMENTS_B64__"\n'
+        "CASE_ID_ARGS = json.loads('__CASE_ID_ARGS__')\n",
+        encoding="utf-8",
     )
     (template / "kernel-metadata.json").write_text("{}\n", encoding="utf-8")
     (template / "requirements-kaggle.txt").write_text("wrapt==1.17.3\n", encoding="utf-8")
@@ -38,6 +40,8 @@ def test_prepared_end_to_end_bundle_is_narrow(tmp_path: Path, monkeypatch) -> No
             "owner/scientific-research-agent-r8",
             "--title",
             "Scientific Research Agent R8",
+            "--case-id",
+            "lora_all_resource_reduction_factors_missing",
         ]
     )
     generated = (destination / "main.py").read_text(encoding="utf-8")
@@ -57,6 +61,11 @@ def test_prepared_end_to_end_bundle_is_narrow(tmp_path: Path, monkeypatch) -> No
         "title": "Scientific Research Agent R8",
     }
     assert manifest["llm_revision"].startswith("1cfa9a")
+    assert manifest["case_ids"] == ["lora_all_resource_reduction_factors_missing"]
+    assert (
+        'CASE_ID_ARGS = json.loads(\'["--case-id", '
+        '"lora_all_resource_reduction_factors_missing"]\')' in generated
+    )
     assert set(manifest["files"]) == {"kernel-metadata.json", "main.py"}
     assert manifest["files"]["kernel-metadata.json"] == package._sha256(
         destination / "kernel-metadata.json"
@@ -65,13 +74,12 @@ def test_prepared_end_to_end_bundle_is_narrow(tmp_path: Path, monkeypatch) -> No
 
 def test_entrypoint_smokes_before_full_and_preserves_system_torch() -> None:
     entrypoint = (package.TEMPLATE / "main.py").read_text(encoding="utf-8")
-    runner = (package.ROOT / "scripts/run_end_to_end_transformers.py").read_text(
-        encoding="utf-8"
-    )
+    runner = (package.ROOT / "scripts/run_end_to_end_transformers.py").read_text(encoding="utf-8")
     requirements = (package.TEMPLATE / "requirements-kaggle.txt").read_text(encoding="utf-8")
     assert '"--system-site-packages"' in entrypoint
     assert '"--no-deps"' in entrypoint
     assert '"--smoke-cases", "1"' in entrypoint
+    assert "*CASE_ID_ARGS" in entrypoint
     assert "smoke.aggregate.execution_failures" in runner
     assert 'self.tokenizer.padding_side = "left"' in runner
     assert "enable_thinking=False" in runner

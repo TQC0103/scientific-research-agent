@@ -143,7 +143,9 @@ Return exactly one JSON object with this schema:
 }}
 
 supported_evidence contains only passage numbers that directly support answering the
-question. If sufficient is false, suggested_query must be a materially different,
+question. The fields must be internally consistent: sufficient=true requires an empty
+missing_information list, while any missing requested fact requires sufficient=false even
+when other passages provide partial support. If sufficient is false, suggested_query must be a materially different,
 keyword-focused search (use likely terminology, section/table names, entities, and metrics),
 not a restatement of the current retrieval query.
 """
@@ -176,9 +178,7 @@ def apply_semantic_anchor_guard(
         + "; ".join(descriptions)
         + ". Related compute, duration, task, or metric evidence cannot substitute for them."
     )
-    result.missing_information = list(
-        dict.fromkeys([*result.missing_information, *descriptions])
-    )
+    result.missing_information = list(dict.fromkeys([*result.missing_information, *descriptions]))
     result.suggested_query = (
         f"{question} explicit {' '.join(query_terms for _, query_terms in missing)}"
     )
@@ -199,13 +199,17 @@ def parse_verifier_response(
         {number for number in result.supported_evidence if 1 <= number <= evidence_count}
     )
     result.supported_evidence = valid
-    if not result.sufficient and not result.missing_information and valid:
-        result.sufficient = True
-        result.suggested_query = None
+    if result.sufficient and result.missing_information:
+        result.sufficient = False
+        result.suggested_query = result.suggested_query or fallback_query
     if result.sufficient and not valid:
         result.sufficient = False
         result.reason = "Verifier marked evidence sufficient but identified no supporting passage."
         result.missing_information = ["A directly supporting passage."]
+        result.suggested_query = result.suggested_query or fallback_query
+    if not result.sufficient:
+        if not result.missing_information:
+            result.missing_information = ["At least one requested element remains unsupported."]
         result.suggested_query = result.suggested_query or fallback_query
     return result
 

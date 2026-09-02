@@ -7,6 +7,7 @@ import base64
 import hashlib
 import io
 import json
+import re
 import shutil
 import zipfile
 from pathlib import Path
@@ -30,18 +31,36 @@ def _sha256(path: Path) -> str:
 
 def _source_files(suite_name: str = DEFAULT_SUITE_NAME) -> dict[Path, str]:
     relative = [
-        "app/__init__.py", "app/config.py", "app/agent/__init__.py", "app/agent/graph.py",
-        "app/agent/state.py", "app/db/__init__.py", "app/db/database.py",
-        "app/ingestion/__init__.py", "app/ingestion/chunking.py",
-        "app/ingestion/indexing.py", "app/ingestion/pdf_parser.py",
-        "app/models/__init__.py", "app/models/claim_verifier.py", "app/models/claims.py",
-        "app/models/llm.py", "app/models/verifier.py", "app/retrieval/__init__.py",
-        "app/retrieval/vector_store.py", "app/tools/__init__.py", "app/tools/arxiv_search.py",
-        "app/tools/paper_download.py", "app/evaluation/__init__.py",
-        "app/evaluation/citations.py", "app/evaluation/end_to_end.py",
+        "app/__init__.py",
+        "app/config.py",
+        "app/agent/__init__.py",
+        "app/agent/graph.py",
+        "app/agent/state.py",
+        "app/db/__init__.py",
+        "app/db/database.py",
+        "app/ingestion/__init__.py",
+        "app/ingestion/chunking.py",
+        "app/ingestion/indexing.py",
+        "app/ingestion/pdf_parser.py",
+        "app/models/__init__.py",
+        "app/models/claim_verifier.py",
+        "app/models/claims.py",
+        "app/models/llm.py",
+        "app/models/verifier.py",
+        "app/retrieval/__init__.py",
+        "app/retrieval/vector_store.py",
+        "app/tools/__init__.py",
+        "app/tools/arxiv_search.py",
+        "app/tools/paper_download.py",
+        "app/evaluation/__init__.py",
+        "app/evaluation/citations.py",
+        "app/evaluation/end_to_end.py",
         "app/evaluation/external.py",
-        "app/evaluation/loader.py", "app/evaluation/metrics.py", "app/evaluation/models.py",
-        "app/evaluation/retrieval.py", "scripts/run_end_to_end_transformers.py",
+        "app/evaluation/loader.py",
+        "app/evaluation/metrics.py",
+        "app/evaluation/models.py",
+        "app/evaluation/retrieval.py",
+        "scripts/run_end_to_end_transformers.py",
         f"evaluation/suites/v0_5/{suite_name}.json",
         f"evaluation/suites/v0_5/{suite_name}_sources.json",
     ]
@@ -51,9 +70,7 @@ def _source_files(suite_name: str = DEFAULT_SUITE_NAME) -> dict[Path, str]:
 def _embedded_source(suite_name: str = DEFAULT_SUITE_NAME) -> str:
     payload = io.BytesIO()
     with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for source, target in sorted(
-            _source_files(suite_name).items(), key=lambda item: item[1]
-        ):
+        for source, target in sorted(_source_files(suite_name).items(), key=lambda item: item[1]):
             info = zipfile.ZipInfo(target, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o100644 << 16
@@ -80,6 +97,12 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         default=DEFAULT_RETRIEVAL_MODE,
     )
     parser.add_argument("--config-name")
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        default=[],
+        help="Run only this suite case; repeat to select multiple cases.",
+    )
     parser.add_argument("--destination", type=Path)
     return parser.parse_args(argv)
 
@@ -96,19 +119,19 @@ def _validate_kernel_identity(kernel_slug: str | None, title: str | None) -> Non
             )
     if title and len(title) > KAGGLE_KERNEL_TEXT_LIMIT:
         raise ValueError(
-            "Kaggle kernel title exceeds the 50-character service limit: "
-            f"{len(title)} characters."
+            f"Kaggle kernel title exceeds the 50-character service limit: {len(title)} characters."
         )
 
 
 def main(argv: list[str] | None = None) -> None:
     args = _arguments(argv or [])
     _validate_kernel_identity(args.kernel_slug, args.title)
-    if not args.suite_name.isidentifier() or not args.suite_name.startswith(
-        "development_"
-    ):
+    if not args.suite_name.isidentifier() or not args.suite_name.startswith("development_"):
         raise ValueError(f"Unsafe suite name: {args.suite_name}")
     config_name = args.config_name or DEFAULT_CONFIG_NAME
+    if any(not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", case_id) for case_id in args.case_id):
+        raise ValueError(f"Unsafe case ID selection: {args.case_id}")
+    case_id_args = [value for case_id in args.case_id for value in ("--case-id", case_id)]
     destination = (args.destination or DESTINATION).resolve()
     allowed_root = (ROOT / "data" / "evaluations" / "kaggle_jobs").resolve()
     if not destination.is_relative_to(allowed_root) or destination == allowed_root:
@@ -116,9 +139,9 @@ def main(argv: list[str] | None = None) -> None:
     if destination.exists():
         shutil.rmtree(destination)
     destination.mkdir(parents=True)
-    requirements = base64.b64encode(
-        (TEMPLATE / "requirements-kaggle.txt").read_bytes()
-    ).decode("ascii")
+    requirements = base64.b64encode((TEMPLATE / "requirements-kaggle.txt").read_bytes()).decode(
+        "ascii"
+    )
     for source in TEMPLATE.iterdir():
         if not source.is_file() or source.name == "requirements-kaggle.txt":
             continue
@@ -128,10 +151,9 @@ def main(argv: list[str] | None = None) -> None:
                 source.read_text(encoding="utf-8")
                 .replace("__APP_ARCHIVE_B64__", _embedded_source(args.suite_name))
                 .replace("__KAGGLE_REQUIREMENTS_B64__", requirements)
+                .replace("__CASE_ID_ARGS__", json.dumps(case_id_args))
                 .replace("__SUITE_FILENAME__", f"{args.suite_name}.json")
-                .replace(
-                    "__SOURCES_FILENAME__", f"{args.suite_name}_sources.json"
-                )
+                .replace("__SOURCES_FILENAME__", f"{args.suite_name}_sources.json")
                 .replace("__OUTPUT_DIRNAME__", destination.name)
                 .replace("__RETRIEVAL_MODE__", args.retrieval_mode)
                 .replace(
@@ -140,9 +162,7 @@ def main(argv: list[str] | None = None) -> None:
                 ),
                 encoding="utf-8",
             )
-        elif source.name == "kernel-metadata.json" and (
-            args.kernel_slug or args.title
-        ):
+        elif source.name == "kernel-metadata.json" and (args.kernel_slug or args.title):
             metadata = json.loads(source.read_text(encoding="utf-8"))
             if args.kernel_slug:
                 metadata["id"] = args.kernel_slug
@@ -152,13 +172,9 @@ def main(argv: list[str] | None = None) -> None:
         else:
             shutil.copy2(source, target)
     sources = json.loads(
-        (
-            ROOT
-            / "evaluation"
-            / "suites"
-            / "v0_5"
-            / f"{args.suite_name}_sources.json"
-        ).read_text(encoding="utf-8")
+        (ROOT / "evaluation" / "suites" / "v0_5" / f"{args.suite_name}_sources.json").read_text(
+            encoding="utf-8"
+        )
     )["sources"]
     files = sorted(path for path in destination.rglob("*") if path.is_file())
     manifest = {
@@ -170,6 +186,7 @@ def main(argv: list[str] | None = None) -> None:
         "suite_name": args.suite_name,
         "retrieval_mode": args.retrieval_mode,
         "config_name": config_name,
+        "case_ids": args.case_id,
         "reranker_model": (
             "cross-encoder/ms-marco-MiniLM-L-6-v2"
             if args.retrieval_mode == "windowed_rerank"
@@ -182,8 +199,7 @@ def main(argv: list[str] | None = None) -> None:
         ),
         "public_sources": sources,
         "files": {
-            str(path.relative_to(destination)).replace("\\", "/"): _sha256(path)
-            for path in files
+            str(path.relative_to(destination)).replace("\\", "/"): _sha256(path) for path in files
         },
     }
     (destination / "source_manifest.json").write_text(

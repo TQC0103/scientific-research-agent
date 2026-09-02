@@ -23,6 +23,7 @@ VIRTUALENV_BOOTSTRAP = Path("/tmp/end-to-end-v0-5-virtualenv")
 VIRTUALENV_VERSION = "20.36.1"
 APP_ARCHIVE_B64 = "__APP_ARCHIVE_B64__"
 REQUIREMENTS_B64 = "__KAGGLE_REQUIREMENTS_B64__"
+CASE_ID_ARGS = json.loads('__CASE_ID_ARGS__')
 
 
 def _extract_app() -> None:
@@ -110,7 +111,7 @@ def _run_benchmark() -> None:
          "--data-dir", str(DATA_ROOT),
          "--retrieval-mode", "__RETRIEVAL_MODE__",
          "--config-name", "__CONFIG_NAME__",
-         "--smoke-cases", "1"],
+         "--smoke-cases", "1", *CASE_ID_ARGS],
         check=True,
         cwd=CODE_ROOT,
     )

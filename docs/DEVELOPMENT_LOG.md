@@ -1475,3 +1475,36 @@ Artifacts remain ignored under `data/evaluations/runs/r25_e2e_rrf_r12` and
 `data/evaluations/runs/r25_e2e_rerank_r13`. No model ran on the laptop. The
 implementation added two local tests; final verification passed Ruff and all
 166 pytest tests.
+
+## 2026-09-03 — Fail-closed verifier completeness boundary
+
+RRF R12 and reranker R13 shared one false positive on
+`lora_all_resource_reduction_factors_missing`. Trace inspection showed that the
+verifier selected partial passages and explicitly named the missing numerical
+inference-latency factor, yet its boolean remained `sufficient=true`; graph
+aggregation trusted that boolean and allowed synthesis to invent a factor.
+
+The verifier contract now treats its fields as an invariant rather than
+independent hints. A positive decision requires at least one valid supporting
+passage and an empty missing-information list. False decisions are no longer
+upgraded just because they retain partial-support IDs. Graph aggregation applies
+the same condition, and synthesis recomputes it immediately before any model
+call, providing a second fail-closed boundary for stale or contradictory state.
+Unit regressions cover both inconsistent output shapes and prove that synthesis
+is not invoked. The end-to-end packager/runner also gained repeatable
+`--case-id` selection so focused GPU regressions do not require all 25 cases;
+the manifest records the selected IDs.
+
+Focused R14 used account `acct_d321057bf0954d048b448711e0efed7f`, exact
+`NvidiaTeslaT4` shape, bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-lora-guard-r14`,
+kernel `tqc0103/sra-e2e-lora-guard-r14`, and job
+`job_79e3fe9372784af88b7aa5ba7ae4e3dc`. It succeeded in 314 seconds and its
+artifact is ignored under `data/evaluations/runs/lora_guard_r14`. Both smoke and
+measured results made the correct abstention with zero synthesis and claim-
+verifier calls. The clean smoke trace made three insufficient decisions, each
+retaining partial evidence while naming the missing numerical latency factor.
+The measured duplicate made two equivalent decisions, then its third verifier
+call hit CUDA OOM and failed closed. Thus the original safety regression is
+fixed, while accumulated verifier-context memory remains a separate next issue;
+R14 is not recorded as a clean aggregate baseline. All model work ran on Kaggle.
