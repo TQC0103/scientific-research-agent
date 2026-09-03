@@ -28,7 +28,7 @@ Last updated: 2026-09-03
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 168
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 169
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -45,6 +45,9 @@ Last updated: 2026-09-03
 - Verifier completeness invariant at aggregation and synthesis boundaries: a
   positive decision requires valid supporting passage IDs and no missing
   requested elements; partial support can never be upgraded into synthesis
+- Independent verifier prompt cap: retrieval retains up to eight passages per
+  paper, but each verifier call receives only the first six ranked passages;
+  prefix selection preserves one-based support IDs used by synthesis
 - Deterministic post-verifier semantic-anchor guard for electrical-energy,
   ImageNet, and top-1 metric requests; mismatched selected passages can only be
   downgraded to insufficient evidence
@@ -136,7 +139,8 @@ Last updated: 2026-09-03
 2. Reuse current indexes or lazily download, validate, parse, chunk, embed, and
    index selected revisions; fall back to labeled abstract evidence on failure.
 3. Run hybrid retrieval separately per paper, retain at most eight accumulated
-   passages per paper, apply deterministic semantic anchors, and require every
+   passages per paper, send at most six ranked passages to each verifier call,
+   apply deterministic semantic anchors, and require every
    positive verification to have valid supporting IDs with no missing elements;
    retry with at most two focused query rewrites per paper.
 4. Recompute that completeness invariant at synthesis entry. If coverage remains
@@ -506,8 +510,9 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Bound verifier prompt growth across retrieval rewrites so the R14 third-call
-   CUDA OOM does not depend on fail-closed recovery for correctness.
+1. Validate the new six-passage verifier cap with focused LoRA R15 once Kaggle
+   Control Plane is online; R15 must finish all three verifier decisions without
+   a tool error before this becomes a clean runtime checkpoint.
 2. Diagnose the three claim-verifier structure/grounding failures in R13 without
    tuning retrieval further on R25. RRF remains production default.
 3. Instrument embedding calls at the production retriever boundary; the Kaggle

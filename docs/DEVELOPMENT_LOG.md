@@ -1508,3 +1508,13 @@ The measured duplicate made two equivalent decisions, then its third verifier
 call hit CUDA OOM and failed closed. Thus the original safety regression is
 fixed, while accumulated verifier-context memory remains a separate next issue;
 R14 is not recorded as a clean aggregate baseline. All model work ran on Kaggle.
+
+The immediate follow-up separates retained retrieval state from verifier prompt
+size. `MAX_ACCUMULATED_PASSAGES_PER_PAPER` remains eight, while the new
+`MAX_VERIFIER_PASSAGES_PER_PAPER` default sends only the first six ranked
+passages to a verification call. Prefix selection is deliberate: verifier
+passage IDs still index the same retained list later consumed by synthesis.
+Runtime metadata and the end-to-end report schema record the new cap, and a
+regression verifies both the bound and index stability. Focused R15 was not
+submitted in this session because Control Plane remained offline after its one
+allowed open-and-retry cycle; no model fallback ran on the laptop.

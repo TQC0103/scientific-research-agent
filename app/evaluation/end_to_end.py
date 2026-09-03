@@ -119,6 +119,7 @@ class RuntimeMetadata(StrictModel):
     embedding_model: str
     max_retrieval_rewrites: int
     max_accumulated_passages_per_paper: int | None = None
+    max_verifier_passages_per_paper: int | None = None
     max_claim_revisions: int
 
 
@@ -245,6 +246,7 @@ def _runtime_metadata() -> RuntimeMetadata:
         max_accumulated_passages_per_paper=(
             settings.max_accumulated_passages_per_paper
         ),
+        max_verifier_passages_per_paper=(settings.max_verifier_passages_per_paper),
         max_claim_revisions=MAX_CLAIM_REVISIONS,
     )
 

@@ -174,7 +174,8 @@ Implementation: `app/models/verifier.py`, `app/agent/graph.py`.
 ```mermaid
 flowchart TD
     INPUT["Question + required paper set"] --> LOOP["For each required paper"]
-    LOOP --> SCOPE["Paper-scoped question + that paper's passages"]
+    LOOP --> CAP["Keep ranked prefix; default verifier cap = 6 passages"]
+    CAP --> SCOPE["Paper-scoped question + bounded passages"]
     SCOPE --> QWEN["Qwen3 4B verifier; temperature 0; fixed seed"]
     QWEN --> JSON["Per-paper JSON: sufficient, reason, missing, query, supported IDs"]
     JSON --> VALIDATE["Parse schema and validate passage IDs"]
@@ -214,6 +215,11 @@ fail-closed for explicitly registered high-risk anchors: electrical-energy quest
 measurement anchor, and ImageNet/top-1 questions need those benchmark/metric
 anchors in a verifier-selected passage. This guard narrows a positive model
 decision; it never upgrades insufficient evidence.
+
+Retrieval state retains up to eight passages per paper across rewrites, while a
+separate default cap of six limits each verifier prompt. Because the verifier
+receives a prefix rather than a reordered sample, its one-based supporting IDs
+remain valid against the retained per-paper list used by synthesis.
 
 ## 7. Answer and citation module
 

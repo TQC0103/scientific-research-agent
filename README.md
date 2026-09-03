@@ -113,6 +113,10 @@ score.
 `MAX_ACCUMULATED_PASSAGES_PER_PAPER` defaults to `8` in `.env.example`. It
 bounds the verifier prompt across retrieval rewrites; increasing it raises
 context and accelerator-memory cost and requires a new benchmark config label.
+`MAX_VERIFIER_PASSAGES_PER_PAPER` defaults to `6` and independently caps the
+ranked prefix sent to each verifier call. The graph may still retain eight
+passages for later retrieval/synthesis bookkeeping; keeping a prefix preserves
+the verifier's one-based passage IDs against that stored list.
 
 Repeated `--paper-id` options activate required coverage for every supplied
 paper. Comparison-style questions without explicit IDs require the first two

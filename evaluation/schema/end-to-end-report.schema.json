@@ -671,6 +671,18 @@
           "default": null,
           "title": "Max Accumulated Passages Per Paper"
         },
+        "max_verifier_passages_per_paper": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Verifier Passages Per Paper"
+        },
         "max_claim_revisions": {
           "title": "Max Claim Revisions",
           "type": "integer"

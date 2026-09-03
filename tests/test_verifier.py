@@ -219,6 +219,40 @@ def test_check_rewrites_query_when_llm_verifier_finds_a_gap(monkeypatch) -> None
     assert result["papers_to_retrieve"] == ["1706.03762"]
 
 
+def test_check_bounds_verifier_context_without_changing_passage_indices(
+    monkeypatch,
+) -> None:
+    captured = {}
+    monkeypatch.setattr(graph.settings, "max_verifier_passages_per_paper", 2)
+
+    def fake_verify(question, evidence, current_query, scope):
+        captured["evidence"] = evidence
+        return EvidenceVerification(
+            sufficient=True,
+            reason="The second passage supports the complete answer.",
+            supported_evidence=[2],
+        )
+
+    monkeypatch.setattr(graph, "verify_evidence", fake_verify)
+    evidence = [_chunk(index, f"passage {index}") for index in range(4)]
+    state = {
+        "user_query": "Question",
+        "selected_papers": ["1706.03762"],
+        "coverage_mode": "any",
+        "papers_to_retrieve": ["1706.03762"],
+        "retrieved_chunks_by_paper": {"1706.03762": evidence},
+        "retrieval_queries": {},
+        "retrieval_attempt_counts": {},
+        "tool_errors": [],
+    }
+
+    result = graph.check_evidence(state)
+
+    assert captured["evidence"] == evidence[:2]
+    assert result["evidence_sufficient"] is True
+    assert result["evidence_verifications"]["1706.03762"]["supported_evidence"] == [2]
+
+
 def test_synthesis_uses_only_passages_approved_by_verifier(monkeypatch) -> None:
     captured = {}
 

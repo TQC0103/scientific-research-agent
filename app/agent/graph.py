@@ -234,6 +234,7 @@ def check_evidence(state: AgentState) -> dict:
 
     for paper_id in targets:
         evidence = by_paper.get(paper_id, [])
+        verifier_evidence = evidence[: settings.max_verifier_passages_per_paper]
         current = queries.get(paper_id, state["user_query"]).strip()
         attempts = attempts_by_paper.get(paper_id, 0) + 1
         verifier_failed = False
@@ -256,7 +257,9 @@ def check_evidence(state: AgentState) -> dict:
         else:
             verification_question = state["user_query"]
         try:
-            result = verify_evidence(verification_question, evidence, current, scope)
+            result = verify_evidence(
+                verification_question, verifier_evidence, current, scope
+            )
             verification = result.model_dump()
         except (ValueError, OSError) as exc:
             verifier_failed = True

@@ -43,8 +43,9 @@ Continue in this order:
    reduced decision accuracy to `0.8400` and tripled claim-verifier failures.
    Retain RRF. The shared LoRA missing-factor false positive is now protected by
    a fail-closed verifier completeness invariant and synthesis-side regression;
-   next analyze reranker's additional fail-closed claim errors before another
-   full-suite rerun.
+   a separate six-passage verifier cap now bounds rewrite prompt growth. Validate
+   that cap on the focused LoRA case, then analyze reranker's additional
+   fail-closed claim errors before another full-suite rerun.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.
