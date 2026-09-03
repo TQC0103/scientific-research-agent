@@ -128,6 +128,8 @@ def test_end_to_end_runner_uses_graph_state_and_preserves_unknown_trace_fields()
                 "claim_verification_status": "verified",
                 "claim_verification": bundle.model_dump(mode="json"),
                 "claim_verification_attempt_count": 1,
+                "claim_verification_output_repaired": True,
+                "claim_verification_output_normalized": False,
                 "claim_revision_count": 0,
                 "retrieval_attempt_counts": {evidence.paper_id: 1},
                 "retrieved_chunks_by_paper": {evidence.paper_id: [chunk]},
@@ -174,6 +176,8 @@ def test_end_to_end_runner_uses_graph_state_and_preserves_unknown_trace_fields()
     ]
     assert NODE_TRACE_KEY not in report.cases[0].trace
     assert report.cases[0].llm_calls.total == 3
+    assert report.cases[0].claim_verification_output_repaired is True
+    assert report.cases[0].claim_verification_output_normalized is False
     assert report.cases[1].llm_calls.total == 1
     assert report.cases[1].retrieval.recall_at_k is None
     assert report.cases[1].failure_reasons == []

@@ -298,11 +298,13 @@ The validated aggregate verdicts drive a fixed policy:
 - no supported factual claim, invalid verifier output, unsafe repaired citations,
   repair failure, or any unresolved post-repair claim: abstain.
 
-The graph state records approved evidence, claim-verifier attempt count, validated
-bundle, status/error, revision count, and revision history. The maximum revision
-count is one. Existing deterministic citation metrics and the Task 8 benchmark
-remain separate diagnostics; Task 11 now observes their production state through a versioned
-end-to-end report without changing their native contracts.
+The graph state records approved evidence, claim-verifier attempt count, whether
+the model output needed a second-call structure repair or a deterministic narrow
+normalization, validated bundle, status/error, revision count, and revision
+history. The maximum revision count is one. Existing deterministic citation
+metrics and the Task 8 benchmark remain separate diagnostics; Task 11 observes
+their production state through a versioned end-to-end report without changing
+their native contracts.
 
 ## End-to-end report contract
 

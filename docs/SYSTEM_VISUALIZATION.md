@@ -245,12 +245,19 @@ flowchart TD
 
     FINAL --> SPANS["Code-owned exact citation-scoped answer spans"]
     SPANS --> CLAIMPROMPT["Atomic extraction + verification; model selects span IDs"]
-    CLAIMPROMPT --> CLAIMQWEN["Qwen3 4B structured JSON"]
-    CLAIMQWEN --> BIND["Code binds claim ID + source + labels; derives verdict"]
+    CLAIMPROMPT --> CLAIMQWEN["Qwen3 4B flat claims-root JSON"]
+    CLAIMQWEN --> ROOT{"Valid claims root?"}
+    ROOT -->|"yes"| BIND["Code binds claim ID + source + labels; derives verdict"]
+    ROOT -->|"one judgment + exactly one span/label"| NORMALIZE["Deterministic narrow normalization"]
+    NORMALIZE --> BIND
+    ROOT -->|"other malformed shape"| FORMATRETRY
     BIND --> CLAIMGUARD{"Lock inputs + Task 7 validation"}
     CLAIMGUARD -->|"valid"| CLAIMBUNDLE["Ordered claims + evidence links + derived verdicts"]
     CLAIMGUARD -->|"invalid; no output retry yet"| FORMATRETRY["One compact structure-only retry; no repeated evidence"]
-    FORMATRETRY --> CLAIMQWEN
+    FORMATRETRY --> REPAIRED["Qwen3 repaired structure"]
+    REPAIRED --> RECHECK{"Valid or unambiguous?"}
+    RECHECK -->|"yes"| BIND
+    RECHECK -->|"no"| CLAIMFAIL
     CLAIMGUARD -->|"invalid after retry"| CLAIMFAIL["Explicit claim-grounding abstention"]
     CLAIMBUNDLE -->|"all supported"| VERIFIED_FINAL["Return answer"]
     CLAIMBUNDLE -->|"partial or mixed; no prior revision"| REPAIR["One evidence-only revision"]
@@ -268,6 +275,12 @@ checks atomic claims against only approved passages, and permits at most one
 answer repair. Production claim extraction cannot author claim IDs, source text,
 visible labels, or verdicts: it selects a code-owned exact span and returns
 ordered semantic relationships, then code reconstructs those redundant fields.
+The model sees one flat `claims`-root template rather than a nested schema with
+competing object definitions. If it nevertheless returns a standalone evidence
+judgment, code can normalize it only when exactly one source span and one visible
+citation make the binding unambiguous. The report records successful structure
+repair and narrow normalization separately; multi-span or multi-label ambiguity
+continues to fail closed.
 Separately, one malformed response may receive one compact
 structure-only retry against immutable spans; a second invalid response abstains.
 The answer-repair model cannot author source metadata; code restores

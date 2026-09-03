@@ -28,7 +28,7 @@ Last updated: 2026-09-03
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 171
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 175
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -280,6 +280,20 @@ seconds. Its final retrieval snapshot did not contain the annotated partial
 gold passage, so its retrieval metrics were zero; that does not invalidate the
 decision regression and must not be read as an aggregate retrieval score.
 
+R13's three claim-verifier failures were all malformed output structures rather
+than unsupported answers. R17 (`job_c9174c933c6c45e19952ba4903a83dd2`)
+replaced the model-facing nested JSON Schema with one flat root template and
+explicit per-span judgment counts. The Transformer sinusoidal and LoRA latency
+cases then verified in one call each. The LoRA equation case still returned only
+the example's nested evidence judgment as its root object. A deterministic
+normalizer now recovers that shape only for exactly one immutable answer span
+with exactly one visible citation; all ambiguous shapes remain fail-closed. R19
+(`job_99ff1bbd316946b6bfa740fbe64afd2d`) proved the measured equation path used
+that normalizer (`output_normalized=true`, `output_repaired=false`) and verified
+correctly in one claim call with zero tool/execution errors. Its smoke path
+stopped earlier at evidence verification, so it is not counted as a smoke claim
+pass. These focused runs do not replace an aggregate R25 checkpoint.
+
 The R25 advisory judge A2 (`job_12b1e882b15d4e778a12ca9d82bbbc8f`)
 returned 22 `pass` and three `needs_revision` verdicts with 25 schema-valid
 outputs. All 22 answer cases passed. The three flags were exactly the three
@@ -515,6 +529,10 @@ aggregate is now the first ignored development regression baseline.
   no-overhead and adapter/GPT-2 latency evidence were accepted as a numerical
   GPT-3 LoRA factor. R16 blocks that substitution deterministically and passes
   both focused paths; neither single-case run is a new aggregate baseline.
+- R17/R19 resolve the three observed R13 claim-output structures without
+  loosening multi-span or multi-label validation. The one-span normalization is
+  now observable per case; a current full R25 production-RRF run is still needed
+  before claiming an aggregate improvement.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -532,8 +550,9 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Diagnose the three claim-verifier structure/grounding failures in R13 without
-   tuning retrieval further on R25. RRF remains production default.
+1. Run the current graph once over all 25 development cases with production RRF
+   to validate the R16 evidence guard and R17/R19 claim-structure fixes together.
+   Do not promote the result to held-out or release accuracy.
 2. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
 3. Independently review and expand the seven Task 8 development cases, then

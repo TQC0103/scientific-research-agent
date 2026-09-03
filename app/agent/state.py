@@ -27,6 +27,8 @@ class AgentState(TypedDict, total=False):
     claim_verification_status: str
     claim_verification_error: str | None
     claim_verification_attempt_count: int
+    claim_verification_output_repaired: bool
+    claim_verification_output_normalized: bool
     claim_revision_count: int
     claim_revision_history: list[str]
     iteration_count: int

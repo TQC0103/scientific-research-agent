@@ -572,6 +572,18 @@ numeric-latency anchor and passed both paths: each made three verifier calls,
 abstained correctly, and made zero synthesis or claim-verifier calls. These are
 single-case safety regressions, not aggregate performance estimates.
 
+The three R13 claim-structure failures were then isolated. R17
+(`job_c9174c933c6c45e19952ba4903a83dd2`) replaced the nested Pydantic schema in
+the model prompt with one flat root template and fixed two of the three cases in
+one claim-verifier call each. The remaining one-span LoRA equation case copied
+only the nested evidence-judgment object. Production now normalizes that exact
+shape only when there is one immutable answer span and one visible citation;
+ambiguous multi-span/multi-label output still fails closed. R19
+(`job_99ff1bbd316946b6bfa740fbe64afd2d`) recorded
+`claim_verification_output_normalized=true` and returned the correct verified
+answer in one call. R17/R19 are focused structure regressions, not aggregate
+quality estimates.
+
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.
 Versioned IDs such as `1706.03762v7` are preserved in citations, and a new

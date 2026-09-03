@@ -127,6 +127,8 @@ def discover(state: AgentState) -> dict:
         "claim_verification_status": "not_run",
         "claim_verification_error": None,
         "claim_verification_attempt_count": 0,
+        "claim_verification_output_repaired": False,
+        "claim_verification_output_normalized": False,
         "claim_revision_count": 0,
         "claim_revision_history": [],
         "papers_to_retrieve": [],
@@ -426,6 +428,8 @@ def synthesize(state: AgentState) -> dict:
         "claim_verification_status": "not_run",
         "claim_verification_error": None,
         "claim_verification_attempt_count": 0,
+        "claim_verification_output_repaired": False,
+        "claim_verification_output_normalized": False,
         "claim_revision_count": 0,
         "claim_revision_history": [answer] if evidence_sufficient else [],
     }
@@ -469,12 +473,16 @@ def verify_claims(state: AgentState) -> dict:
             "claim_verification_status": "invalid",
             "claim_verification_error": str(exc),
             "claim_verification_attempt_count": attempts,
+            "claim_verification_output_repaired": False,
+            "claim_verification_output_normalized": False,
         }
     return {
         "claim_verification": bundle.model_dump(mode="json"),
         "claim_verification_status": _claim_verification_status(bundle),
         "claim_verification_error": None,
         "claim_verification_attempt_count": attempts,
+        "claim_verification_output_repaired": run.output_repaired,
+        "claim_verification_output_normalized": run.output_normalized,
     }
 
 
@@ -508,6 +516,8 @@ def revise_answer(state: AgentState) -> dict:
             "claim_revision_history": history,
             "claim_verification_status": "not_run",
             "claim_verification_error": None,
+            "claim_verification_output_repaired": False,
+            "claim_verification_output_normalized": False,
         }
     except (ValueError, OSError) as exc:
         return {

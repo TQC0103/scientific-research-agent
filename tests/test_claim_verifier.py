@@ -194,6 +194,28 @@ def test_bounded_verifier_repairs_invalid_source_and_citation_structure(monkeypa
     assert "Verifier-approved evidence" not in prompts[1]
 
 
+def test_span_bound_prompts_use_one_flat_root_template_and_judgment_counts() -> None:
+    payload = _payload()
+    prompt = claim_verifier.build_span_bound_claim_verifier_prompt(
+        payload["answer"], _evidence()
+    )
+    repair = claim_verifier.build_claim_output_repair_prompt(
+        payload["answer"],
+        4,
+        {"relationship": "entails", "reason": "wrong root"},
+        ValueError("claims field required"),
+    )
+
+    for value in (prompt, repair):
+        normalized = " ".join(value.split())
+        assert '"claims": [' in value
+        assert '"assessment_reason":' in value
+        assert '"relationship": "entails"' in value
+        assert "$defs" not in value
+        assert "Never return a single claim or evidence judgment as the root object" in normalized
+        assert "judgment_count=" in value
+
+
 def test_bounded_verifier_fails_after_exactly_one_invalid_output_repair(monkeypatch) -> None:
     payload = _payload()
     invalid = _span_payload(payload)
@@ -289,6 +311,63 @@ def test_span_bound_parser_binds_judgments_to_visible_labels_by_position() -> No
             json.dumps(span_payload),
             expected_answer=payload["answer"],
             evidence_count=4,
+        )
+
+
+def test_span_bound_parser_recovers_single_judgment_for_one_span_and_label() -> None:
+    answer = "The update is parameterized as W = W0 + BA, while W0 stays frozen [1]."
+    bundle = claim_verifier.parse_span_bound_claim_response(
+        json.dumps(
+            {
+                "relationship": "entails",
+                "reason": "The passage directly supports the complete cited span.",
+            }
+        ),
+        expected_answer=answer,
+        evidence_count=1,
+    )
+
+    assert len(bundle.claims) == 1
+    assert bundle.claims[0].source_text == answer
+    assert bundle.claims[0].citation_labels == [1]
+    assert bundle.claims[0].claim_text == answer.removesuffix(" [1].") + "."
+    assert bundle.assessments[0].verdict == ClaimVerdict.SUPPORTED
+
+
+def test_bounded_verifier_records_single_span_output_normalization(monkeypatch) -> None:
+    answer = "The update is parameterized as W = W0 + BA [1]."
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> SimpleNamespace:
+            return SimpleNamespace(
+                content=json.dumps(
+                    {
+                        "relationship": "entails",
+                        "reason": "The passage directly supports the cited span.",
+                    }
+                )
+            )
+
+    monkeypatch.setattr(claim_verifier, "get_llm", lambda **kwargs: FakeModel())
+    run = claim_verifier.verify_answer_claims_bounded(answer, _evidence()[:1])
+
+    assert run.model_calls == 1
+    assert run.output_repaired is False
+    assert run.output_normalized is True
+
+
+def test_span_bound_parser_does_not_recover_single_judgment_for_ambiguous_answer() -> None:
+    answer = "First supported statement [1]. Second supported statement [2]."
+    with pytest.raises(ValueError, match="claims"):
+        claim_verifier.parse_span_bound_claim_response(
+            json.dumps(
+                {
+                    "relationship": "entails",
+                    "reason": "Ambiguous standalone judgment.",
+                }
+            ),
+            expected_answer=answer,
+            evidence_count=2,
         )
 
 

@@ -98,6 +98,8 @@ class EndToEndCaseResult(StrictModel):
     synthesis_citation_valid: bool
     claim_verification_status: str
     claim_verification_attempt_count: int = Field(ge=0)
+    claim_verification_output_repaired: bool = False
+    claim_verification_output_normalized: bool = False
     claim_revision_count: int = Field(ge=0)
     claim_metrics: dict[str, float | int | None]
     retrieval: RetrievalCaseMetrics
@@ -488,6 +490,12 @@ def evaluate_end_to_end_case(
         claim_verification_status=claim_status,
         claim_verification_attempt_count=int(
             state.get("claim_verification_attempt_count", 0) or 0
+        ),
+        claim_verification_output_repaired=bool(
+            state.get("claim_verification_output_repaired", False)
+        ),
+        claim_verification_output_normalized=bool(
+            state.get("claim_verification_output_normalized", False)
         ),
         claim_revision_count=int(state.get("claim_revision_count", 0) or 0),
         claim_metrics=_claim_metrics(state),

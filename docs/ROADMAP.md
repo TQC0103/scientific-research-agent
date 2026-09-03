@@ -46,8 +46,9 @@ Continue in this order:
    a separate six-passage verifier cap now bounds rewrite prompt growth. Focused
    R15 validated the memory bound and exposed a metric/scope substitution;
    focused R16 added and validated a deterministic numerical-latency anchor.
-   Analyze reranker's additional fail-closed claim errors before another
-   full-suite rerun.
+   R17/R19 then isolated and resolved the reranker's three observed malformed
+   claim outputs with a flat model contract plus a strictly one-span/one-label
+   normalizer. Run one current full-suite production-RRF checkpoint next.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

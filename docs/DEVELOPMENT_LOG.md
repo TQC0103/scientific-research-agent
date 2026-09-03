@@ -1549,3 +1549,41 @@ tool errors were zero; the adapter recorded six physical LLM calls across the
 two paths. The measured case took 79.1 seconds. Its final retrieval snapshot had
 zero annotated-gold coverage after rewrites, so R16 is recorded only as a focused
 decision/safety regression, not a retrieval or aggregate quality baseline.
+
+## 2026-09-03 — R13 claim-output diagnosis and focused R17–R19 regressions
+
+Artifact review showed that all three R13 claim-verifier failures were structural,
+not evidence-grounding verdicts. The Transformer sinusoidal case omitted a
+positional judgment for a visible label. The LoRA latency case returned a complete
+claim object without the required `claims` root and its repair omitted required
+fields. The LoRA equation case returned only a nested evidence-judgment object.
+Strict validation correctly abstained, but the common shape failures showed that
+embedding the full Pydantic JSON Schema exposed too many competing `$defs` to the
+4B model.
+
+The production prompt now presents one flat `claims`-root JSON template and each
+immutable source span states its required judgment count. Parsers remain strict.
+R17 used account `acct_d321057bf0954d048b448711e0efed7f`, exact
+`NvidiaTeslaT4`, bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-claim-flat-r17`,
+kernel `tqc0103/sra-e2e-claim-flat-r17`, and job
+`job_c9174c933c6c45e19952ba4903a83dd2`. It succeeded in 412 seconds. The
+Transformer sinusoidal and LoRA latency cases verified in one claim call each;
+the equation case repeated the standalone-judgment root and remained the sole
+claim failure. The ignored artifact is under `data/evaluations/runs/claim_flat_r17`.
+
+A narrow parser normalization was then added for a standalone valid evidence
+judgment only when the answer has exactly one immutable span and exactly one
+visible citation. Code binds that only possible span/label, derives the verdict,
+and leaves every ambiguous multi-span/multi-label shape fail-closed. Per-case
+reports now distinguish successful second-call output repair from this first-call
+normalization. R18 first verified the equation full path but lacked the new trace
+field. R19 added the observation using the same account and exact T4, bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-claim-observable-r19`,
+kernel `tqc0103/sra-e2e-claim-observable-r19`, and job
+`job_99ff1bbd316946b6bfa740fbe64afd2d`. It succeeded in 320 seconds. The measured
+case answered correctly, verified in one claim call, recorded
+`output_normalized=true` and `output_repaired=false`, and had zero tool/execution
+errors at 43.0 seconds. Its smoke path stopped at evidence verification and did
+not exercise claim normalization. R17–R19 remain focused development diagnostics;
+a full current RRF checkpoint is still required. All artifacts remain ignored.

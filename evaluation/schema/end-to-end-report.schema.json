@@ -275,6 +275,16 @@
           "title": "Claim Verification Attempt Count",
           "type": "integer"
         },
+        "claim_verification_output_repaired": {
+          "default": false,
+          "title": "Claim Verification Output Repaired",
+          "type": "boolean"
+        },
+        "claim_verification_output_normalized": {
+          "default": false,
+          "title": "Claim Verification Output Normalized",
+          "type": "boolean"
+        },
         "claim_revision_count": {
           "minimum": 0,
           "title": "Claim Revision Count",
