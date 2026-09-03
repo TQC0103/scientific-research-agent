@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -24,6 +26,7 @@ class TransformersRuntime:
     """One shared deterministic decoder-only model with LangChain-like wrappers."""
 
     def __init__(self, model_name: str, revision: str | None) -> None:
+        os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -45,11 +48,21 @@ class TransformersRuntime:
         self.model.generation_config.top_p = None
         self.model.generation_config.top_k = None
         self.calls = 0
+        self.successful_calls = 0
+        self.oom_calls = 0
+        self.peak_allocated_bytes = 0
+        self.peak_reserved_bytes = 0
+        self.post_call_allocated_max_bytes = 0
+        self.post_call_reserved_max_bytes = 0
 
     def wrapper(self, *, num_predict: int = 1000, **_: Any) -> TransformersChat:
         return TransformersChat(self, max_new_tokens=num_predict)
 
     def generate(self, prompt: str, *, max_new_tokens: int) -> str:
+        self.calls += 1
+        gc.collect()
+        self.torch.cuda.empty_cache()
+        self.torch.cuda.reset_peak_memory_stats(0)
         messages = [{"role": "user", "content": prompt}]
         rendered = self.tokenizer.apply_chat_template(
             messages,
@@ -57,21 +70,46 @@ class TransformersRuntime:
             add_generation_prompt=True,
             enable_thinking=False,
         )
-        inputs = self.tokenizer(rendered, return_tensors="pt", padding=True).to("cuda:0")
-        with self.torch.inference_mode():
-            output = self.model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
+        inputs = None
+        output = None
+        generated = None
+        try:
+            inputs = self.tokenizer(rendered, return_tensors="pt", padding=True).to("cuda:0")
+            with self.torch.inference_mode():
+                output = self.model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                )
+            generated = output[0, inputs["input_ids"].shape[1] :]
+            text = self.tokenizer.decode(generated, skip_special_tokens=True).strip()
+            self.successful_calls += 1
+            return text
+        except self.torch.OutOfMemoryError:
+            self.oom_calls += 1
+            raise
+        finally:
+            self.peak_allocated_bytes = max(
+                self.peak_allocated_bytes,
+                self.torch.cuda.max_memory_allocated(0),
             )
-        self.calls += 1
-        generated = output[0, inputs["input_ids"].shape[1] :]
-        text = self.tokenizer.decode(generated, skip_special_tokens=True).strip()
-        del generated, output, inputs
-        self.torch.cuda.empty_cache()
-        return text
+            self.peak_reserved_bytes = max(
+                self.peak_reserved_bytes,
+                self.torch.cuda.max_memory_reserved(0),
+            )
+            del generated, output, inputs
+            gc.collect()
+            self.torch.cuda.empty_cache()
+            self.post_call_allocated_max_bytes = max(
+                self.post_call_allocated_max_bytes,
+                self.torch.cuda.memory_allocated(0),
+            )
+            self.post_call_reserved_max_bytes = max(
+                self.post_call_reserved_max_bytes,
+                self.torch.cuda.memory_reserved(0),
+            )
 
 
 class TransformersChat:
@@ -308,6 +346,12 @@ def main() -> None:
     )
     runtime = {
         "llm_physical_calls": llm.calls,
+        "llm_successful_calls": llm.successful_calls,
+        "llm_oom_calls": llm.oom_calls,
+        "llm_peak_allocated_bytes": llm.peak_allocated_bytes,
+        "llm_peak_reserved_bytes": llm.peak_reserved_bytes,
+        "llm_post_call_allocated_max_bytes": llm.post_call_allocated_max_bytes,
+        "llm_post_call_reserved_max_bytes": llm.post_call_reserved_max_bytes,
         "embedding_document_calls": embeddings.document_calls,
         "embedding_query_calls": embeddings.query_calls,
         "embedding_device": embeddings.device,

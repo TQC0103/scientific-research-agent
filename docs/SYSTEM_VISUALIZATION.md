@@ -82,7 +82,7 @@ flowchart TD
     COVERAGE_GAP --> END
     CLAIM_ABSTAIN --> END
 
-    LIMITS["Limits: 2 query rewrites; 2 auto-indexed papers; 6 tool loops; 1 claim revision"] -.-> CHECK
+    LIMITS["Limits: 2 query rewrites; retain 8 passages/paper; verify top 5; 2 auto-indexed papers; 6 tool loops; 1 claim revision"] -.-> CHECK
 ```
 
 The state carries the original question, coverage mode, required paper IDs,
@@ -415,13 +415,16 @@ flowchart TD
     E2EMETRICS --> E2EOUTPUTS["Ignored full/aggregate JSON + per-case JSONL + Markdown"]
     E2E --> E2EIDENTITY["Validate owner/slug + 50-char Kaggle limits"]
     E2EIDENTITY --> E2EPACKAGE["Narrow T4 Kaggle package; dual-GPU or CPU-embedding fallback"]
-    E2EPACKAGE --> E2ESMOKE["1-case production-graph smoke gate"]
+    E2EPACKAGE --> GPUMEM["Per-call GC/cache cleanup + CUDA peak/post-call telemetry"]
+    GPUMEM --> E2ESMOKE
+    E2ESMOKE["1-case production-graph smoke gate"]
     E2ESMOKE --> E2ER10["10-case live development baseline"]
     E2ER10 --> E2EOUTPUTS
     R25 --> E2ER25["R25 paired E2E: production RRF vs opt-in reranker"]
     E2ER25 --> E2ERRF["R12 RRF: 0.92 decision accuracy"]
     E2ER25 --> E2ERERANK["R13 rerank: higher retrieval, 0.84 decision accuracy"]
-    E2ERRF --> E2EOUTPUTS
+    E2ERRF --> E2ER23["R23 RRF runtime: 25/25; zero OOM/tool/execution errors"]
+    E2ER23 --> E2EOUTPUTS
     E2ERERANK --> E2EOUTPUTS
     E2EBASELINE["Prior exact-suite metrics.json"] --> E2ECOMPARE["Directional deltas; no threshold"]
     E2EMETRICS --> E2ECOMPARE
@@ -516,7 +519,12 @@ Comparison is informational and has no hard-coded pass threshold. Outputs remain
 ignored JSONL/JSON/Markdown runtime artifacts. The Kaggle adapter keeps the
 compiled graph and swaps only the Ollama transports: deterministic Qwen3-4B FP16
 runs on T4 device 0 while the pinned SentenceTransformer runs on device 1 when
-available, otherwise on CPU. A
+available, otherwise on CPU. Each generation attempt performs host garbage
+collection and CUDA-cache release before and after the call, including the OOM
+path, and records attempted/successful/OOM calls plus peak and post-call CUDA
+allocation. Retrieval state may retain eight passages per paper, while evidence
+verification receives only the first five ranked passages to bound prefill
+memory without changing retrieval metrics. A
 one-case smoke must finish without execution failure before the full ten cases
 start. R4 completed this path without runtime/tool errors, but its two negative
 cases were false positives and four claim-verifier outputs failed the strict
@@ -540,6 +548,12 @@ retrieval or held-out quality. After independent source review, R10 repeated the
 R9 configuration on suite v0.1.3 and reproduced every quality metric exactly;
 its ignored aggregate is the first development regression baseline. Kaggle
 identity length is validated before packaging so invalid metadata fails locally.
+On R25, R20/R21 separated leaked post-OOM state from a genuine single-call T4
+peak. The five-passage verifier prefix and unconditional adapter cleanup passed
+focused R22 and full R23; R23 completed all 25 cases and 86 physical calls with
+zero OOM/tool/execution errors. Its remaining retrieval, answer-completeness,
+and claim-grounding failures stay in their respective graph/report layers and
+are not collapsed into the runtime-success edge.
 
 ## Maintenance rule
 

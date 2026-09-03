@@ -48,7 +48,12 @@ Continue in this order:
    focused R16 added and validated a deterministic numerical-latency anchor.
    R17/R19 then isolated and resolved the reranker's three observed malformed
    claim outputs with a flat model contract plus a strictly one-span/one-label
-   normalizer. Run one current full-suite production-RRF checkpoint next.
+   normalizer. Full R20/R21 isolated chained versus true-peak CUDA OOMs. A
+   five-passage verifier prefix plus unconditional per-call cleanup then passed
+   focused R22 and full R23 with zero OOM/tool/execution errors. R23 remains a
+   development runtime checkpoint: decision accuracy was `0.8400`, and the next
+   quality work is the ResNet numeric/absence false verification plus three LoRA
+   claim-grounding/structure abstentions.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.
@@ -70,8 +75,8 @@ Continue in this order:
    evidence-sufficiency verifier, retrieval, and Task 8 `partial` relationship.
    The 300-case dev R3 checkpoint is complete; CONTRADICT is the weakest class
    and joint label+rationale exact match is `0.5266`.
-7. Correct section-boundary metadata around tables and mid-page headings.
-8. Benchmark 1.7B/4B/8B on identical reviewed evidence and traces, preferring Kaggle GPU
+8. Correct section-boundary metadata around tables and mid-page headings.
+9. Benchmark 1.7B/4B/8B on identical reviewed evidence and traces, preferring Kaggle GPU
    for batch runs over the 4 GB laptop GPU.
 
 ## Deferred

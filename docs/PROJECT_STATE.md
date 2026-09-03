@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 ## Current baseline
 
@@ -18,6 +18,12 @@ Last updated: 2026-09-03
   `54b62586dc9a51e6c88f7c7738807ba6ccedeeed3050ab45a2b19f4b1cee8494`.
   It is committed development data with advisory-judge, retrieval-only, and
   paired RRF/reranker end-to-end development diagnostics.
+- Current clean R25 runtime checkpoint: production-RRF R23 job
+  `job_20f471013106409db5117b477ab793c2`, with all 25 cases and all 86 physical
+  LLM calls completed, zero OOM/tool/execution errors, decision accuracy
+  `0.8400`, answer F1 `0.3699`, Recall@5 `0.8333`, and claim-verifier failure
+  `0.0400`. It is diagnostic development data, not the frozen R10 baseline or
+  held-out accuracy.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -28,7 +34,7 @@ Last updated: 2026-09-03
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 175
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 176
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -46,8 +52,11 @@ Last updated: 2026-09-03
   positive decision requires valid supporting passage IDs and no missing
   requested elements; partial support can never be upgraded into synthesis
 - Independent verifier prompt cap: retrieval retains up to eight passages per
-  paper, but each verifier call receives only the first six ranked passages;
+  paper, but each verifier call receives only the first five ranked passages;
   prefix selection preserves one-based support IDs used by synthesis
+- Kaggle Transformers adapter with unconditional pre/post-call garbage
+  collection and CUDA-cache cleanup, including OOM attempts, plus separate
+  attempted/successful/OOM call counts and peak/post-call allocation telemetry
 - Deterministic post-verifier semantic-anchor guard for electrical-energy,
   ImageNet, and top-1 metric requests; mismatched selected passages can only be
   downgraded to insufficient evidence
@@ -294,6 +303,27 @@ correctly in one claim call with zero tool/execution errors. Its smoke path
 stopped earlier at evidence verification, so it is not counted as a smoke claim
 pass. These focused runs do not replace an aggregate R25 checkpoint.
 
+Full production-RRF R20 (`job_143239d38ee3439eefe90f6613d626b`)
+validated the current evidence and claim fixes together, but one true verifier
+OOM left live CUDA state that caused a second ResNet OOM. R21
+(`job_5f1b9c6e3b99469dbf7f3f1f8e51bfc8`) added unconditional per-call cleanup
+and removed that chained failure: all 25 cases completed, but one six-passage
+verifier prompt still hit a genuine T4 peak. It reached decision accuracy
+`0.8400`, abstention accuracy `1.0000`, and one tool-error case.
+
+Focused R22 (`job_bc67458a75314211b66f31d0c99c0700`) reduced only the
+verifier prefix to five passages. The former OOM path completed with zero OOMs
+and peak allocation fell from 15,243,183,104 bytes in R21 to 13,755,910,656
+bytes. Full R23 (`job_20f471013106409db5117b477ab793c2`) then completed every
+case and all 86 physical calls with zero OOM/tool/execution errors. It scored
+decision accuracy `0.8400`, answer-case accuracy `0.8182`, abstention accuracy
+`1.0000`, answer F1 `0.3699`, Recall@5 `0.8333`, MRR `0.6090`, and claim-
+verifier failure `0.0400`. Four answer cases abstained. Separately, the recovered
+ResNet-152 path produced an incomplete answer that omitted a requested value
+visible in approved evidence, then incorrectly passed claim verification. R23
+is the current clean runtime checkpoint, not a frozen or held-out quality
+baseline.
+
 The R25 advisory judge A2 (`job_12b1e882b15d4e778a12ca9d82bbbc8f`)
 returned 22 `pass` and three `needs_revision` verdicts with 25 schema-valid
 outputs. All 22 answer cases passed. The three flags were exactly the three
@@ -520,19 +550,21 @@ aggregate is now the first ignored development regression baseline.
   fail-closed claim-verifier abstentions (sinusoidal position reasoning and LoRA
   no-latency) and did not fix the shared LoRA false-positive abstention case.
   Keep selection based on full-pipeline metrics, not Recall@K alone.
-- Focused R14 proves that the shared LoRA false positive is now blocked before
-  synthesis, including when partial passages remain selected. Its measured path
-  also exposed a third-rewrite CUDA OOM with eight accumulated passages; keep
-  fail-closed behavior and separately bound verifier context before a full rerun.
-- Focused R15 proves the six-passage verifier cap removes the R14 OOM, but its
-  completed third check exposed a different semantic substitution: categorical
-  no-overhead and adapter/GPT-2 latency evidence were accepted as a numerical
-  GPT-3 LoRA factor. R16 blocks that substitution deterministically and passes
-  both focused paths; neither single-case run is a new aggregate baseline.
+- R14-R16 closed the LoRA missing-factor false positive and isolated bounded
+  verifier context. R20/R21 then distinguished a cleanup leak from one genuine
+  six-passage T4 peak. The five-passage prefix and unconditional cleanup passed
+  focused R22 and full R23 with zero OOM/tool/execution errors. This establishes
+  runtime safety for the observed suite, not a universal memory guarantee.
 - R17/R19 resolve the three observed R13 claim-output structures without
-  loosening multi-span or multi-label validation. The one-span normalization is
-  now observable per case; a current full R25 production-RRF run is still needed
-  before claiming an aggregate improvement.
+  loosening multi-span or multi-label validation, but R23 still produced one
+  different malformed LoRA comparison bundle. Small-model structured output
+  remains a measured reliability issue rather than a closed class of shapes.
+- R23 has three distinct quality clusters: one ResNet retrieval/evidence miss;
+  three LoRA fail-closed claim-grounding/structure outcomes; and a ResNet-152
+  answer that omitted a requested numeric value present in approved evidence
+  while claim verification falsely accepted its absence assertion. Decision
+  accuracy alone hides the last failure, so answer and claim traces remain
+  mandatory for evaluation.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -550,13 +582,17 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Run the current graph once over all 25 development cases with production RRF
-   to validate the R16 evidence guard and R17/R19 claim-structure fixes together.
-   Do not promote the result to held-out or release accuracy.
-2. Instrument embedding calls at the production retriever boundary; the Kaggle
+1. Add and test a narrow claim-level completeness rule for requested numeric
+   fields and evidence-absence assertions, starting with the R23 ResNet-152
+   trace. Do not infer general semantic correctness from answer/abstain decisions.
+2. Diagnose the three R23 LoRA claim-grounding/structure abstentions and prefer
+   prompt/contract fixes over adding broad parser normalizations.
+3. Analyze `resnet_degradation_problem` as a retrieval/evidence miss separately
+   from generation and claim verification.
+4. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
-3. Independently review and expand the seven Task 8 development cases, then
+5. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-4. Calibrate Task 10 repair versus immediate
+6. Calibrate Task 10 repair versus immediate
    abstention, including distinct incomplete-evidence and contradiction reasons.
-5. Fix section boundaries and table-associated metadata.
+7. Fix section boundaries and table-associated metadata.

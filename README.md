@@ -113,7 +113,7 @@ score.
 `MAX_ACCUMULATED_PASSAGES_PER_PAPER` defaults to `8` in `.env.example`. It
 bounds the verifier prompt across retrieval rewrites; increasing it raises
 context and accelerator-memory cost and requires a new benchmark config label.
-`MAX_VERIFIER_PASSAGES_PER_PAPER` defaults to `6` and independently caps the
+`MAX_VERIFIER_PASSAGES_PER_PAPER` defaults to `5` and independently caps the
 ranked prefix sent to each verifier call. The graph may still retain eight
 passages for later retrieval/synthesis bookkeeping; keeping a prefix preserves
 the verifier's one-based passage IDs against that stored list.
@@ -583,6 +583,24 @@ ambiguous multi-span/multi-label output still fails closed. R19
 `claim_verification_output_normalized=true` and returned the correct verified
 answer in one call. R17/R19 are focused structure regressions, not aggregate
 quality estimates.
+
+The next full production-RRF checks isolated a CUDA-memory issue in the Kaggle
+Transformers adapter. R20 completed all 25 cases but one verifier OOM leaked
+enough live state to trigger a second OOM. R21 added unconditional per-call
+tensor/cache cleanup and CUDA telemetry; the chained failure disappeared, while
+one six-passage verifier call still reached the T4's true peak-memory limit.
+Production now verifies only the top five ranked passages per paper while still
+retaining eight for retrieval/synthesis bookkeeping. Focused R22 completed the
+previously OOMing ResNet path with zero OOMs and reduced peak allocation from
+about 15.24 GB to 13.76 GB. It still produced a semantically incomplete answer,
+so memory safety and answer quality remain separate evaluation dimensions.
+Full R23 completed all 25 cases with all 86 physical calls successful and zero
+OOM/tool/execution errors. It reached decision accuracy `0.8400`, answer-case
+accuracy `0.8182`, abstention accuracy `1.0000`, answer F1 `0.3699`, Recall@5
+`0.8333`, and claim-verifier failure `0.0400`. This is the current clean T4
+runtime checkpoint, not a new frozen baseline: one ResNet answer omitted a
+visible requested value, and four answer cases failed closed across one
+retrieval miss and three LoRA claim-grounding/structure failures.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

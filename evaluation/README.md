@@ -430,6 +430,26 @@ latency was 51.4 seconds. Its aggregate is saved locally under the ignored
 `data/evaluations/baselines/v0_5/metrics.json` path as the first development
 regression baseline. It is not a held-out or publishable benchmark score.
 
+R20-R23 are the current R25 production-RRF runtime series. R20
+(`job_143239d38ee3439eefe90f6613d626b`) exposed one true verifier CUDA OOM and
+one chained OOM because failed-call tensors were not unconditionally released.
+R21 (`job_5f1b9c6e3b99469dbf7f3f1f8e51bfc8`) added pre/post-call cleanup and
+memory telemetry, removed the chained failure, and isolated one genuine
+six-passage peak. The evaluator adapter now reports attempted/successful/OOM
+physical calls and peak/post-call allocated/reserved CUDA bytes.
+
+Focused R22 (`job_bc67458a75314211b66f31d0c99c0700`) reduced only the
+verifier prefix to five passages while retrieval retained eight. The former OOM
+case completed with zero OOM and peak allocation fell to 13,755,910,656 bytes.
+Full R23 (`job_20f471013106409db5117b477ab793c2`) completed all 25 cases and
+all 86 physical calls with zero OOM/tool/execution errors. It reported decision
+accuracy `0.8400`, answer-case accuracy `0.8182`, abstention accuracy `1.0000`,
+answer F1 `0.3699`, Recall@5 `0.8333`, MRR `0.6090`, and claim-verifier failure
+`0.0400`. R23 is a clean runtime checkpoint, not a replacement for the R10
+baseline: four answer cases abstained, and one additional ResNet answer omitted
+a requested value present in its approved evidence while still passing claim
+verification. Runtime outputs remain ignored.
+
 ## Retrieval matching contract
 
 The internal evaluator implements the following rules:

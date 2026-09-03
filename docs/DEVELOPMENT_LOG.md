@@ -1587,3 +1587,78 @@ case answered correctly, verified in one claim call, recorded
 errors at 43.0 seconds. Its smoke path stopped at evidence verification and did
 not exercise claim normalization. R17–R19 remain focused development diagnostics;
 a full current RRF checkpoint is still required. All artifacts remain ignored.
+
+## 2026-09-04 — Full RRF checkpoint and CUDA-memory isolation
+
+R20 ran the current production RRF graph over all 25 development cases after
+the evidence guard and claim-output fixes. It used account
+`acct_d321057bf0954d048b448711e0efed7f`, exact `NvidiaTeslaT4`, bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-r25-rrf-r20`,
+kernel `tqc0103/sra-e2e-r25-rrf-r20`, and job
+`job_143239d38ee3439eefe90f6613d626b`. The job succeeded in 1,763 seconds and
+completed every case with zero execution failures. Decision accuracy was
+`0.8000`, answer-case accuracy `0.7727`, abstention accuracy `1.0000`, answer F1
+`0.3647`, Recall@5 `0.7917`, and MRR `0.6090`. Claim-verifier and citation-safety
+failure rates were both zero. Two ResNet cases hit CUDA OOM in the evidence
+verifier; because the adapter cleaned CUDA tensors only after successful calls,
+the first OOM contaminated the following case. The ignored artifact is under
+`data/evaluations/runs/r25_rrf_current_r20`.
+
+The Transformers graph adapter now performs garbage collection, cache release,
+and peak-memory reset before each generation attempt and releases input/output
+tensors in a `finally` block. It separately records attempted, successful, and
+OOM calls plus peak and post-call allocated/reserved CUDA bytes. A CPU-only fake
+CUDA regression proves that the OOM path still executes cleanup and records its
+telemetry.
+
+R21 tested that lifecycle fix over the same full suite with bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-r25-rrf-r21`,
+kernel `tqc0103/sra-e2e-r25-rrf-r21`, and job
+`job_5f1b9c6e3b99469dbf7f3f1f8e51bfc8`. It succeeded in 1,838 seconds with all
+25 cases completed and zero execution failures. The chained OOM disappeared and
+`resnet1202_cifar_overfitting` recovered, raising decision accuracy to `0.8400`
+and answer-case accuracy to `0.8182`; abstention accuracy remained `1.0000`.
+The adapter observed 86 attempts, 85 successes, one OOM, peak allocated/reserved
+memory of 15,243,183,104/15,481,176,064 bytes, and maximum post-call
+allocated/reserved memory of 8,658,287,616/8,873,050,112 bytes. The remaining
+`resnet152_imagenet_single_model_error` failure was a genuine single-call prefill
+peak with only about 657 MiB free, not accumulated leaked memory. The ignored
+artifact is under `data/evaluations/runs/r25_rrf_cuda_cleanup_r21`.
+
+The verifier-only ranked prefix was therefore reduced from six passages to five;
+retrieval still retains eight passages per paper, so retrieval output and its
+metrics are unchanged. Focused R22 used bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-resnet-context-r22`,
+kernel `tqc0103/sra-e2e-resnet-context-r22`, and job
+`job_bc67458a75314211b66f31d0c99c0700`. It succeeded in 360 seconds with seven
+successful physical calls, zero OOM/tool/execution errors, peak allocated memory
+13,755,910,656 bytes, and post-call allocated memory 8,053,474,816 bytes. The
+case reached synthesis, but the generated answer still omitted the visible
+19.38% top-1 value and scored answer F1 `0.4000`. R22 therefore validates the
+memory bound only; it also exposes a separate semantic answer/claim-verification
+failure that must not be described as correct merely because its answer/abstain
+decision matched.
+
+Full R23 then used the same account and exact T4 with bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-r25-rrf-r23`,
+kernel `tqc0103/sra-e2e-r25-rrf-r23`, and job
+`job_20f471013106409db5117b477ab793c2`. It succeeded in 1,791 seconds and
+completed all 25 cases with zero OOM, tool, or execution errors. All 86 physical
+LLM attempts succeeded. Peak allocated/reserved memory remained
+13,755,910,656/14,036,238,336 bytes, and maximum post-call allocated/reserved
+memory remained 8,053,474,816/8,222,932,992 bytes. Decision accuracy was
+`0.8400`, answer-case accuracy `0.8182`, abstention accuracy `1.0000`, answer F1
+`0.3699`, Recall@5 `0.8333`, MRR `0.6090`, and claim-verifier failure `0.0400`.
+The ignored artifact is under
+`data/evaluations/runs/r25_rrf_context5_cleanup_r23`.
+
+R23 establishes the five-passage limit as a clean T4 runtime checkpoint, not a
+quality baseline. Four answer cases abstained: one ResNet retrieval/evidence
+miss and three LoRA claim-grounding/structure failures. The recovered ResNet-152
+case reached an answer decision but omitted the top-1 value visibly present in
+its approved table passage; claim verification incorrectly accepted the answer's
+absence assertion. Also, R21's answer to the LoRA no-latency case was decision-
+correct but itself weakly grounded, so R23's stricter abstention is not evidence
+that the six-passage output was semantically preferable. Next work should target
+claim-level absence/numeric completeness and the remaining LoRA claim failures,
+while treating retrieval misses separately.
