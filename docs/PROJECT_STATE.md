@@ -28,7 +28,7 @@ Last updated: 2026-09-03
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 169
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 171
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -263,6 +263,23 @@ insufficient decisions, so R14 is safety evidence rather than a clean runtime
 baseline. Retrieval Recall@5 was `1.0000`; one case is not an aggregate quality
 estimate.
 
+Focused R15 (`job_19d0fd52c6b14ec894bd4b7104f314e5`) then validated the
+six-passage verifier context cap on the same case. Both smoke and measured paths
+completed all verifier work with zero execution failures and zero tool errors,
+so the R14 CUDA OOM is resolved. The measured path nevertheless produced a
+semantic false positive after its third rewrite: it conflated adapter/GPT-2
+latency measurements and LoRA's categorical no-overhead statement with the
+requested numerical GPT-3 LoRA latency-reduction factor.
+
+Focused R16 (`job_65ad48dd20954a52b7d3147c34a20218`) tested the resulting
+deterministic numeric-latency anchor. Smoke and measured paths both abstained
+correctly, each completed three verifier calls, and both skipped synthesis and
+claim verification. There were zero execution failures and zero tool errors;
+the adapter recorded six physical calls total. The measured path took 79.1
+seconds. Its final retrieval snapshot did not contain the annotated partial
+gold passage, so its retrieval metrics were zero; that does not invalidate the
+decision regression and must not be read as an aggregate retrieval score.
+
 The R25 advisory judge A2 (`job_12b1e882b15d4e778a12ca9d82bbbc8f`)
 returned 22 `pass` and three `needs_revision` verdicts with 25 schema-valid
 outputs. All 22 answer cases passed. The three flags were exactly the three
@@ -493,6 +510,11 @@ aggregate is now the first ignored development regression baseline.
   synthesis, including when partial passages remain selected. Its measured path
   also exposed a third-rewrite CUDA OOM with eight accumulated passages; keep
   fail-closed behavior and separately bound verifier context before a full rerun.
+- Focused R15 proves the six-passage verifier cap removes the R14 OOM, but its
+  completed third check exposed a different semantic substitution: categorical
+  no-overhead and adapter/GPT-2 latency evidence were accepted as a numerical
+  GPT-3 LoRA factor. R16 blocks that substitution deterministically and passes
+  both focused paths; neither single-case run is a new aggregate baseline.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -510,15 +532,12 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Validate the new six-passage verifier cap with focused LoRA R15 once Kaggle
-   Control Plane is online; R15 must finish all three verifier decisions without
-   a tool error before this becomes a clean runtime checkpoint.
-2. Diagnose the three claim-verifier structure/grounding failures in R13 without
+1. Diagnose the three claim-verifier structure/grounding failures in R13 without
    tuning retrieval further on R25. RRF remains production default.
-3. Instrument embedding calls at the production retriever boundary; the Kaggle
+2. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
-4. Independently review and expand the seven Task 8 development cases, then
+3. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-5. Calibrate Task 10 repair versus immediate
+4. Calibrate Task 10 repair versus immediate
    abstention, including distinct incomplete-evidence and contradiction reasons.
-6. Fix section boundaries and table-associated metadata.
+5. Fix section boundaries and table-associated metadata.

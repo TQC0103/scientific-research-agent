@@ -213,8 +213,12 @@ synthesis node recomputes the same invariant before invoking its model, so stale
 or contradictory graph state also abstains. The semantic guard remains
 fail-closed for explicitly registered high-risk anchors: electrical-energy questions need an energy/power
 measurement anchor, and ImageNet/top-1 questions need those benchmark/metric
-anchors in a verifier-selected passage. This guard narrows a positive model
-decision; it never upgrades insufficient evidence.
+anchors in a verifier-selected passage. A question explicitly requesting a
+numerical inference-latency reduction factor also needs a verifier-selected
+passage that directly links the latency reduction to a number; categorical
+"no additional latency" language and numbers for other metrics cannot satisfy
+it. This guard narrows a positive model decision; it never upgrades insufficient
+evidence.
 
 Retrieval state retains up to eight passages per paper across rewrites, while a
 separate default cap of six limits each verifier prompt. Because the verifier

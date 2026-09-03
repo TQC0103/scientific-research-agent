@@ -1515,6 +1515,37 @@ size. `MAX_ACCUMULATED_PASSAGES_PER_PAPER` remains eight, while the new
 passages to a verification call. Prefix selection is deliberate: verifier
 passage IDs still index the same retained list later consumed by synthesis.
 Runtime metadata and the end-to-end report schema record the new cap, and a
-regression verifies both the bound and index stability. Focused R15 was not
-submitted in this session because Control Plane remained offline after its one
-allowed open-and-retry cycle; no model fallback ran on the laptop.
+regression verifies both the bound and index stability. Control Plane was later
+restored and all subsequent model work remained on Kaggle rather than the laptop.
+
+Focused R15 used account `acct_d321057bf0954d048b448711e0efed7f`, exact
+`NvidiaTeslaT4` shape, bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-lora-context-r15`,
+kernel `tqc0103/sra-e2e-lora-context-r15`, and job
+`job_19d0fd52c6b14ec894bd4b7104f314e5`. It succeeded in 400 seconds and its
+artifact is ignored under `data/evaluations/runs/lora_context_r15`. Both paths
+completed without execution or tool errors, proving that the six-passage cap
+removes the R14 OOM. The measured path then answered incorrectly after its third
+verifier call: the model treated adapter/GPT-2 slowdown material and LoRA's "no
+additional inference latency" statement as the requested numerical GPT-3 LoRA
+latency factor. R15 is therefore a clean runtime checkpoint but a failed
+semantic decision regression.
+
+The follow-up adds a deterministic semantic anchor for questions that explicitly
+request a numerical inference-latency reduction factor. Such a positive decision
+now requires a verifier-selected passage that directly links inference-latency
+reduction to a number; a categorical no-overhead statement is insufficient. The
+prompt includes the same calibration, and regressions cover both the R15
+substitution and a genuinely numeric latency factor.
+
+Focused R16 used the same account and exact T4 shape, bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-lora-numeric-guard-r16`,
+kernel `tqc0103/sra-e2e-lora-numeric-guard-r16`, and job
+`job_65ad48dd20954a52b7d3147c34a20218`. It succeeded in 339 seconds; its
+artifact is ignored under `data/evaluations/runs/lora_numeric_guard_r16`. Smoke
+and measured paths both abstained correctly, each completed three verifier calls,
+and both made zero synthesis and claim-verifier calls. Execution failures and
+tool errors were zero; the adapter recorded six physical LLM calls across the
+two paths. The measured case took 79.1 seconds. Its final retrieval snapshot had
+zero annotated-gold coverage after rewrites, so R16 is recorded only as a focused
+decision/safety regression, not a retrieval or aggregate quality baseline.

@@ -560,8 +560,17 @@ and made zero synthesis or claim-verifier calls. The clean smoke trace preserved
 partial evidence while reporting the missing numerical latency factor on all
 three bounded checks. The duplicate measured path also abstained but hit CUDA
 OOM on its third verifier call, so this validates the safety boundary rather
-than establishing a clean performance baseline; bounding verifier context is
-the next runtime fix.
+than establishing a clean performance baseline.
+
+Focused R15 (`job_19d0fd52c6b14ec894bd4b7104f314e5`) confirmed that the
+six-passage verifier cap removes that OOM: both paths completed without tool or
+execution errors. It also exposed a remaining semantic false positive: the
+model treated adapter/GPT-2 latency material and LoRA's categorical "no
+additional latency" statement as a numerical GPT-3 LoRA reduction factor.
+Focused R16 (`job_65ad48dd20954a52b7d3147c34a20218`) added a deterministic
+numeric-latency anchor and passed both paths: each made three verifier calls,
+abstained correctly, and made zero synthesis or claim-verifier calls. These are
+single-case safety regressions, not aggregate performance estimates.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

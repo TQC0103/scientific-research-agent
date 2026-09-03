@@ -186,6 +186,79 @@ def test_semantic_anchor_guard_accepts_explicit_requested_metric(monkeypatch) ->
     assert result.supported_evidence == [1]
 
 
+def test_semantic_anchor_guard_rejects_categorical_latency_as_numeric_factor(
+    monkeypatch,
+) -> None:
+    class FakeModel:
+        def invoke(self, prompt):
+            return type(
+                "Response",
+                (),
+                {
+                    "content": (
+                        '{"sufficient": true, "reason": "All factors are covered", '
+                        '"missing_information": [], "suggested_query": null, '
+                        '"supported_evidence": [1, 2]}'
+                    )
+                },
+            )()
+
+    monkeypatch.setattr(verifier, "get_llm", lambda **kwargs: FakeModel())
+    evidence = [
+        _chunk(
+            0,
+            "Adapter latency on GPT-2 can show over 30% slowdown in some settings.",
+        ),
+        _chunk(
+            1,
+            "For GPT-3 175B, LoRA uses 10,000 times fewer trainable parameters and "
+            "3 times less GPU memory, with no additional inference latency.",
+        ),
+    ]
+
+    result = verifier.verify_evidence(
+        "For GPT-3 175B, by what numerical factors did LoRA reduce trainable "
+        "parameters, GPU memory, and inference latency?",
+        evidence,
+    )
+
+    assert result.sufficient is False
+    assert result.supported_evidence == []
+    assert "numerical inference-latency reduction factor" in result.reason
+
+
+def test_semantic_anchor_guard_accepts_explicit_numeric_latency_factor(monkeypatch) -> None:
+    class FakeModel:
+        def invoke(self, prompt):
+            return type(
+                "Response",
+                (),
+                {
+                    "content": (
+                        '{"sufficient": true, "reason": "All factors are covered", '
+                        '"missing_information": [], "suggested_query": null, '
+                        '"supported_evidence": [1]}'
+                    )
+                },
+            )()
+
+    monkeypatch.setattr(verifier, "get_llm", lambda **kwargs: FakeModel())
+    result = verifier.verify_evidence(
+        "For Model X, by what numerical factors did the method reduce trainable "
+        "parameters, GPU memory, and inference latency?",
+        [
+            _chunk(
+                0,
+                "For Model X, the method reduced parameters by 10x, memory by 3x, "
+                "and inference latency was reduced by 2x.",
+            )
+        ],
+    )
+
+    assert result.sufficient is True
+    assert result.supported_evidence == [1]
+
+
 def test_check_rewrites_query_when_llm_verifier_finds_a_gap(monkeypatch) -> None:
     monkeypatch.setattr(
         graph,

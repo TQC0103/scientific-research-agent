@@ -41,6 +41,30 @@ SEMANTIC_ANCHOR_RULES = (
     ),
 )
 
+NUMERIC_INFERENCE_LATENCY_QUESTION = re.compile(
+    r"(?=.*\b(?:numeric|numerical)\b)(?=.*\bfactors?\b)(?=.*\binference latency\b)",
+    re.IGNORECASE,
+)
+NUMERIC_INFERENCE_LATENCY_EVIDENCE = (
+    re.compile(
+        r"\binference latency\b[^.!?\n]{0,100}"
+        r"\b(?:reduc(?:e[ds]?|tion)|speedup|faster|lower)\b[^.!?\n]{0,40}"
+        r"\b\d+(?:\.\d+)?\s*(?:x|×|times?|%|percent)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b\d+(?:\.\d+)?\s*(?:x|×|times?|%|percent)\b[^.!?\n]{0,40}"
+        r"\b(?:reduc(?:e[ds]?|tion)|speedup|faster|lower)\b[^.!?\n]{0,40}"
+        r"\binference latency\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\binference latency\b[^.!?\n]{0,60}\bfrom\s+\d+(?:\.\d+)?\s*"
+        r"(?:ms|milliseconds?)?\s+to\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?)?\b",
+        re.IGNORECASE,
+    ),
+)
+
 
 def get_llm(**kwargs: Any) -> Any:
     """Load the local Ollama adapter only on the production invocation path."""
@@ -116,6 +140,10 @@ Calibration examples:
 - Question: "What ImageNet top-1 accuracy is reported?" Evidence reports BLEU on WMT translation.
   Decision: sufficient=false. Explaining that BLEU is a different metric does not supply the
   requested benchmark result and does not prove document-wide absence.
+- Question asks for a numerical inference-latency reduction factor. Evidence says "no additional
+  inference latency" or reports adapter/GPT-2 slowdown percentages. Decision: sufficient=false.
+  A categorical no-overhead statement and measurements for another method or model do not supply
+  the requested numerical factor for the named method and model.
 
 First identify exactly what the question requests without strengthening it. Then check whether
 each requested element can be stated as a faithful paraphrase of one or more passages. Mark
@@ -169,6 +197,18 @@ def apply_semantic_anchor_guard(
         for description, question_pattern, evidence_pattern, query_terms in SEMANTIC_ANCHOR_RULES
         if question_pattern.search(question) and not evidence_pattern.search(supported_text)
     ]
+    if NUMERIC_INFERENCE_LATENCY_QUESTION.search(question) and not any(
+        pattern.search(str(evidence[number - 1].get("text", "")))
+        for number in result.supported_evidence
+        if 1 <= number <= len(evidence)
+        for pattern in NUMERIC_INFERENCE_LATENCY_EVIDENCE
+    ):
+        missing.append(
+            (
+                "a numerical inference-latency reduction factor",
+                "inference latency reduction factor numeric times percent milliseconds",
+            )
+        )
     if not missing:
         return result
     descriptions = [description for description, _ in missing]
