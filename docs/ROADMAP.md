@@ -53,9 +53,11 @@ Continue in this order:
    focused R22 and full R23 with zero OOM/tool/execution errors. R23 remains a
    development runtime checkpoint: decision accuracy was `0.8400`. A narrow
    deterministic guard now routes missing requested top-k values and unevidenced
-   paper-wide absence assertions through the existing bounded repair. Complete
-   its focused GPU validation, then address the three LoRA claim-grounding/
-   structure abstentions.
+   paper-wide absence assertions through the existing bounded repair. Focused
+   R26 validated the safe path: it blocked the false approval, attempted one
+   revision, and abstained when the model repeated the incomplete answer. The
+   next quality target is the three LoRA claim-grounding/structure abstentions;
+   table-aware answer recovery remains separate utility work.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

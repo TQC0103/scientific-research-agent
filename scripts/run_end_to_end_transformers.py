@@ -22,6 +22,20 @@ DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 DEFAULT_RERANKER_REVISION = "233902d25c440f23af6f7d6e94d2946bac0bee0a"
 
 
+def _smoke_failure_diagnostics(report: Any) -> list[dict[str, Any]]:
+    """Return bounded case-level diagnostics before a failed Kaggle smoke exits."""
+    return [
+        {
+            "case_id": case.case_id,
+            "execution_error": case.execution_error,
+            "failure_reasons": case.failure_reasons,
+            "claim_verification_status": case.claim_verification_status,
+        }
+        for case in report.cases
+        if case.execution_error or case.failure_reasons
+    ]
+
+
 class TransformersRuntime:
     """One shared deterministic decoder-only model with LangChain-like wrappers."""
 
@@ -336,6 +350,14 @@ def main() -> None:
         case_ids=args.case_id,
     )
     if smoke.aggregate.execution_failures:
+        print(
+            json.dumps(
+                {"end_to_end_smoke_failures": _smoke_failure_diagnostics(smoke)},
+                indent=2,
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
         raise RuntimeError("End-to-end smoke failed; the full suite was not started.")
     full = _run_suite(
         args.suite,

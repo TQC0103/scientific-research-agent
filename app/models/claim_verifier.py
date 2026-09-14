@@ -508,11 +508,10 @@ def claim_completeness_issues(
 
     for claim in verification.claims:
         assessment = assessments[claim.claim_id]
-        claim_text = f"{claim.claim_text} {claim.source_text}"
         if (
             claim.requires_citation
             and assessment.verdict.value == "supported"
-            and ABSENCE_ASSERTION_PATTERN.search(claim_text)
+            and ABSENCE_ASSERTION_PATTERN.search(claim.claim_text)
         ):
             cited_passages = [
                 str(evidence[link.citation_label - 1].get("text", ""))

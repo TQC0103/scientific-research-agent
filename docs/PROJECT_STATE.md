@@ -34,7 +34,7 @@ Last updated: 2026-09-15
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 181
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 182
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -587,13 +587,14 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Complete focused GPU validation of the implemented ResNet-152
-   numeric/absence guard; retain it only if the answer is corrected or safely
-   abstains after the single bounded repair.
-2. Diagnose the three R23 LoRA claim-grounding/structure abstentions and prefer
+1. Diagnose the three R23 LoRA claim-grounding/structure abstentions and prefer
    prompt/contract fixes over adding broad parser normalizations.
-3. Analyze `resnet_degradation_problem` as a retrieval/evidence miss separately
+2. Analyze `resnet_degradation_problem` as a retrieval/evidence miss separately
    from generation and claim verification.
+3. Improve table-aware synthesis/repair without weakening the validated R26
+   fail-closed behavior. R26 blocked the R23 false approval and attempted one
+   revision, but the 4B model repeated the incomplete answer and safely
+   abstained instead of extracting the visible ResNet-152 top-1 value.
 4. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
 5. Independently review and expand the seven Task 8 development cases, then

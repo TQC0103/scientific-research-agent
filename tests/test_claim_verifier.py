@@ -503,6 +503,7 @@ def test_completeness_guard_catches_r23_false_absence_and_missing_top1() -> None
 
     assert any("no cited passage explicitly establishes that absence" in issue for issue in issues)
     assert any("only 1 quantitative result" in issue for issue in issues)
+    assert len(issues) == 2
 
 
 def test_completeness_guard_accepts_both_requested_top_results() -> None:

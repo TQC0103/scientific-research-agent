@@ -3,7 +3,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts.run_end_to_end_transformers import TransformersRuntime
+from scripts.run_end_to_end_transformers import (
+    TransformersRuntime,
+    _smoke_failure_diagnostics,
+)
 
 
 class FakeOutOfMemoryError(RuntimeError):
@@ -48,6 +51,34 @@ class FakeTokenizer:
 
     def __call__(self, *args, **kwargs) -> FakeInputs:
         return FakeInputs(input_ids=SimpleNamespace(shape=(1, 10)))
+
+
+def test_smoke_failure_diagnostics_exposes_case_exception() -> None:
+    report = SimpleNamespace(
+        cases=[
+            SimpleNamespace(
+                case_id="broken_case",
+                execution_error="TypeError: unexpected value",
+                failure_reasons=["execution_error"],
+                claim_verification_status="not_run",
+            ),
+            SimpleNamespace(
+                case_id="healthy_case",
+                execution_error=None,
+                failure_reasons=[],
+                claim_verification_status="verified",
+            ),
+        ]
+    )
+
+    assert _smoke_failure_diagnostics(report) == [
+        {
+            "case_id": "broken_case",
+            "execution_error": "TypeError: unexpected value",
+            "failure_reasons": ["execution_error"],
+            "claim_verification_status": "not_run",
+        }
+    ]
 
 
 def test_transformers_runtime_cleans_cuda_after_oom() -> None:

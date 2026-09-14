@@ -1680,7 +1680,7 @@ and is rechecked after revision. The verifier prompt also makes the
 silence-versus-absence distinction explicit. This does not attempt general
 semantic answer completeness.
 
-Ruff and all 181 pytest tests passed locally. Focused R24 was submitted from
+Ruff and all 182 pytest tests passed locally. Focused R24 was submitted from
 `C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-resnet-completeness-r24`
 to exact T4 as kernel `tqc0103/sra-e2e-resnet-completeness-r24`, job
 `job_129051ee23ef49e58a9906ec660d5e99`. KCP incorrectly marked it succeeded in
@@ -1689,3 +1689,29 @@ to exact T4 as kernel `tqc0103/sra-e2e-resnet-completeness-r24`, job
 the substring `complete` inside the slug word `completeness`. R24's actual
 remote result remains pending and must not be reported as a successful model
 evaluation until non-empty artifacts are recovered.
+
+Because account reconciliation later showed no remote active run and R24 had no
+successful output, the same single case was repackaged under the parser-safe
+slug `tqc0103/sra-e2e-resnet-guard-r25`. R25 job
+`job_b5707672c65f4bffb891ce894e6a6302` used exact T4, reached CUDA preflight with
+two Tesla T4 devices, and failed at the one-case smoke gate after 290 seconds.
+The smoke report correctly prevented the measured run, but the runner printed
+only its aggregate failure and discarded the case exception with the failed
+kernel output. The runner now emits a bounded JSON diagnostic containing case
+ID, execution error, failure reasons, and claim status before raising. This is
+an observability fix; R25 produced no quality result and is not evidence for or
+against the completeness guard.
+
+Focused R26 repackaged the diagnostic runner under kernel
+`tqc0103/sra-e2e-resnet-guard-r26`, job
+`job_743de0bf712e44d7919f9128d336f9a2`, and completed successfully on exact T4
+in 484 seconds. The smoke and measured run both completed without execution or
+tool errors. In the measured case, retrieval Recall@5 was `1.0000`, the initial
+answer again omitted 19.38, and the new guard produced one absence issue plus
+one missing-numeric-field issue. The graph performed exactly one bounded
+revision; Qwen repeated the incomplete answer, the second check rejected it
+again, and the graph safely abstained. The resulting decision accuracy and
+answer F1 are both `0.0000` for this one positive case, with seven counted LLM
+calls. R26 therefore closes the unsafe false approval observed in R23 but does
+not solve table-value extraction or answer utility. Its ignored artifact is at
+`data/evaluations/runs/resnet_guard_r26`.
