@@ -8,6 +8,7 @@ from app.db.database import search_local
 from app.ingestion.indexing import index_paper
 from app.models.claim_verifier import (
     ClaimVerificationRunError,
+    claim_completeness_issues,
     repair_answer_claims,
     verify_answer_claims_bounded,
 )
@@ -129,6 +130,7 @@ def discover(state: AgentState) -> dict:
         "claim_verification_attempt_count": 0,
         "claim_verification_output_repaired": False,
         "claim_verification_output_normalized": False,
+        "claim_completeness_issues": [],
         "claim_revision_count": 0,
         "claim_revision_history": [],
         "papers_to_retrieve": [],
@@ -430,6 +432,7 @@ def synthesize(state: AgentState) -> dict:
         "claim_verification_attempt_count": 0,
         "claim_verification_output_repaired": False,
         "claim_verification_output_normalized": False,
+        "claim_completeness_issues": [],
         "claim_revision_count": 0,
         "claim_revision_history": [answer] if evidence_sufficient else [],
     }
@@ -475,14 +478,25 @@ def verify_claims(state: AgentState) -> dict:
             "claim_verification_attempt_count": attempts,
             "claim_verification_output_repaired": False,
             "claim_verification_output_normalized": False,
+            "claim_completeness_issues": [],
         }
+    completeness_issues = claim_completeness_issues(
+        state["user_query"],
+        state["answer"],
+        state.get("verified_evidence", []),
+        bundle,
+    )
+    status = _claim_verification_status(bundle)
+    if completeness_issues and status == "verified":
+        status = "repairable"
     return {
         "claim_verification": bundle.model_dump(mode="json"),
-        "claim_verification_status": _claim_verification_status(bundle),
+        "claim_verification_status": status,
         "claim_verification_error": None,
         "claim_verification_attempt_count": attempts,
         "claim_verification_output_repaired": run.output_repaired,
         "claim_verification_output_normalized": run.output_normalized,
+        "claim_completeness_issues": completeness_issues,
     }
 
 
@@ -507,6 +521,7 @@ def revise_answer(state: AgentState) -> dict:
             state.get("verified_evidence", []),
             papers,
             verification,
+            state.get("claim_completeness_issues", []),
         )
         history.append(answer)
         return {
@@ -518,6 +533,7 @@ def revise_answer(state: AgentState) -> dict:
             "claim_verification_error": None,
             "claim_verification_output_repaired": False,
             "claim_verification_output_normalized": False,
+            "claim_completeness_issues": [],
         }
     except (ValueError, OSError) as exc:
         return {

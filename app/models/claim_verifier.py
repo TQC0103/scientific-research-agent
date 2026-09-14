@@ -84,6 +84,14 @@ SPAN_BOUND_OUTPUT_EXAMPLE = """{
   ]
 }"""
 
+ABSENCE_ASSERTION_PATTERN = re.compile(
+    r"\b(?:not|never)\s+(?:explicitly\s+)?(?:report(?:ed)?|mention(?:ed)?|provide(?:d)?|"
+    r"state(?:d)?|show(?:n|ed)?)\b|\b(?:absent|missing)\s+from\b",
+    re.IGNORECASE,
+)
+TOP_K_RESULT_PATTERN = re.compile(r"\btop[\s-]?(\d+)\b", re.IGNORECASE)
+QUANTITATIVE_RESULT_PATTERN = re.compile(r"\b\d+\.\d+\s*%?|\b\d+\s*%")
+
 
 def answer_body(answer: str) -> str:
     """Remove the deterministic metadata block before claim extraction."""
@@ -280,7 +288,10 @@ span, in the same order; do not include the label number. Use entails when that 
 establishes the atomic claim, partial when it establishes only a qualified part, and
 does_not_support for a topical, contradictory, or wrong citation. A required claim in a span with
 no labels has an empty evidence_judgments list. Verdicts are derived by code and are intentionally
-absent. Do not use outside knowledge.
+absent. Treat an assertion that a paper does not report, mention, or provide information as a
+substantive factual claim. Silence in a selected passage does not entail a paper-wide absence;
+such a claim is supported only when its cited passage explicitly establishes the absence. Do not
+use outside knowledge.
 
 The answer, evidence count, contract version, exact source text, and visible citation labels are
 owned by code and intentionally absent from your output. The root object must contain exactly one
@@ -485,11 +496,56 @@ def verify_answer_claims_bounded(
         ) from repair_error
 
 
+def claim_completeness_issues(
+    question: str,
+    answer: str,
+    evidence: list[dict[str, Any]],
+    verification: ClaimVerificationBundle,
+) -> list[str]:
+    """Find narrow answer-completeness failures that passage entailment cannot prove."""
+    issues: list[str] = []
+    assessments = {item.claim_id: item for item in verification.assessments}
+
+    for claim in verification.claims:
+        assessment = assessments[claim.claim_id]
+        claim_text = f"{claim.claim_text} {claim.source_text}"
+        if (
+            claim.requires_citation
+            and assessment.verdict.value == "supported"
+            and ABSENCE_ASSERTION_PATTERN.search(claim_text)
+        ):
+            cited_passages = [
+                str(evidence[link.citation_label - 1].get("text", ""))
+                for link in assessment.cited_evidence
+                if 1 <= link.citation_label <= len(evidence)
+            ]
+            if not any(ABSENCE_ASSERTION_PATTERN.search(text) for text in cited_passages):
+                issues.append(
+                    f"{claim.claim_id}: the answer asserts that information is absent or not "
+                    "reported, but no cited passage explicitly establishes that absence."
+                )
+
+    requested_top_results = list(dict.fromkeys(TOP_K_RESULT_PATTERN.findall(question)))
+    if requested_top_results:
+        body = re.sub(r"\[[1-9][0-9]*\]", "", answer_body(answer))
+        body = TOP_K_RESULT_PATTERN.sub("", body)
+        supplied_values = QUANTITATIVE_RESULT_PATTERN.findall(body)
+        if len(supplied_values) < len(requested_top_results):
+            requested = " and ".join(f"top-{value}" for value in requested_top_results)
+            issues.append(
+                f"The question requests numeric results for {requested}, but the answer supplies "
+                f"only {len(supplied_values)} quantitative result(s)."
+            )
+
+    return list(dict.fromkeys(issues))
+
+
 def build_claim_repair_prompt(
     question: str,
     answer: str,
     evidence: list[dict[str, Any]],
     verification: ClaimVerificationBundle,
+    completeness_issues: list[str] | None = None,
 ) -> str:
     """Build one bounded answer-repair prompt from validated claim failures."""
     body = answer_body(answer)
@@ -504,8 +560,14 @@ def build_claim_repair_prompt(
         issues.append(
             f"- {claim.claim_id} ({assessment.verdict.value}): {assessment.reason}"
         )
+    issues.extend(
+        f"- deterministic completeness check: {issue}"
+        for issue in completeness_issues or []
+    )
     if not issues:
-        raise ValueError("Claim repair requires at least one partial or unsupported claim.")
+        raise ValueError(
+            "Claim repair requires a partial, unsupported, or incomplete claim."
+        )
     excerpts = []
     for number, item in enumerate(evidence, start=1):
         source_id = item.get("versioned_id") or item.get("arxiv_id") or "unknown"
@@ -520,8 +582,11 @@ def build_claim_repair_prompt(
 Keep already supported content. Narrow, correct, or remove every listed partial or unsupported
 claim. Do not introduce a new factual claim unless the supplied evidence directly supports it.
 Every substantive scientific claim must end with the matching numeric citation label. Preserve
-the label numbering shown below. If evidence cannot support a requested detail, state only that
-the approved evidence does not establish it; do not guess. Return only the revised concise answer
+the label numbering shown below. Fill every requested numeric field that the approved evidence
+directly reports. Never infer that a paper omits a result merely because a selected passage is
+silent; remove or correct an absence assertion unless a cited passage explicitly establishes it.
+If evidence cannot support a requested detail, say only that the approved evidence does not
+establish it; do not make a paper-wide absence claim. Return only the revised concise answer
 without a bibliography, Sources block, Markdown fence, or commentary.
 
 Question:
@@ -544,11 +609,18 @@ def repair_answer_claims(
     evidence: list[dict[str, Any]],
     papers: dict[str, dict[str, Any]],
     verification: ClaimVerificationBundle,
+    completeness_issues: list[str] | None = None,
 ) -> str:
     """Perform one repair call and restore trusted deterministic source metadata."""
     from app.models.llm import format_verified_sources
 
-    prompt = build_claim_repair_prompt(question, answer, evidence, verification)
+    prompt = build_claim_repair_prompt(
+        question,
+        answer,
+        evidence,
+        verification,
+        completeness_issues,
+    )
     try:
         response = get_llm(temperature=0, num_predict=1200).invoke(prompt)
         revised = str(response.content).split("\nSources:", 1)[0].strip()

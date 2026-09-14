@@ -130,6 +130,29 @@ def test_claim_verification_counts_bounded_output_repair(monkeypatch) -> None:
     assert result["claim_verification_attempt_count"] == 2
 
 
+def test_completeness_issue_turns_supported_bundle_into_repairable(monkeypatch) -> None:
+    bundle = _bundle("supported")
+    monkeypatch.setattr(
+        graph,
+        "verify_answer_claims_bounded",
+        lambda *args: ClaimVerificationRun(
+            bundle=bundle, model_calls=1, output_repaired=False
+        ),
+    )
+    monkeypatch.setattr(
+        graph,
+        "claim_completeness_issues",
+        lambda *args: ["A requested numeric result is missing."],
+    )
+
+    result = graph.verify_claims(
+        {"answer": "Fact 1 [1].", "verified_evidence": [{}], "user_query": "Question?"}
+    )
+
+    assert result["claim_verification_status"] == "repairable"
+    assert result["claim_completeness_issues"] == ["A requested numeric result is missing."]
+
+
 def test_repair_route_allows_exactly_one_revision() -> None:
     assert (
         graph.route_after_claim_verification(

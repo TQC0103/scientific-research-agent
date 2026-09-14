@@ -5,7 +5,15 @@ from types import SimpleNamespace
 import pytest
 
 from app.models import claim_verifier
-from app.models.claims import ClaimVerdict, EvidenceRelationship
+from app.models.claims import (
+    CLAIM_VERIFICATION_CONTRACT_VERSION,
+    AtomicClaim,
+    ClaimAssessment,
+    ClaimEvidenceLink,
+    ClaimVerdict,
+    ClaimVerificationBundle,
+    EvidenceRelationship,
+)
 
 FIXTURE = Path("evaluation/suites/v0_5/claim_verification_fixtures.json")
 
@@ -439,3 +447,103 @@ def test_claim_repair_without_citation_fails_citation_safety(monkeypatch) -> Non
 
     assert "citation" in answer.casefold()
     assert "\n\nSources:\n" not in answer
+
+
+def _supported_bundle(answer: str, claim_texts: list[str]) -> ClaimVerificationBundle:
+    claims = [
+        AtomicClaim(
+            claim_id=f"claim_{number}",
+            claim_text=claim_text,
+            source_text=answer,
+            requires_citation=True,
+            citation_labels=[1],
+        )
+        for number, claim_text in enumerate(claim_texts, start=1)
+    ]
+    assessments = [
+        ClaimAssessment(
+            claim_id=claim.claim_id,
+            verdict="supported",
+            cited_evidence=[
+                ClaimEvidenceLink(
+                    citation_label=1,
+                    relationship="entails",
+                    reason="The verifier marked this claim supported.",
+                )
+            ],
+            reason="The verifier marked this claim supported.",
+        )
+        for claim in claims
+    ]
+    return ClaimVerificationBundle(
+        contract_version=CLAIM_VERIFICATION_CONTRACT_VERSION,
+        answer=answer,
+        evidence_count=1,
+        claims=claims,
+        assessments=assessments,
+    )
+
+
+def test_completeness_guard_catches_r23_false_absence_and_missing_top1() -> None:
+    answer = (
+        "The top-1 error is not explicitly reported, while the top-5 error is 4.49% [1]."
+    )
+    bundle = _supported_bundle(
+        answer,
+        ["The top-1 error is not explicitly reported.", "The top-5 error is 4.49%."],
+    )
+    evidence = [{"text": "ResNet-152 achieved a top-1 error of 19.38 and top-5 error of 4.49."}]
+
+    issues = claim_verifier.claim_completeness_issues(
+        "What top-1 and top-5 error rates did ResNet-152 report?",
+        answer,
+        evidence,
+        bundle,
+    )
+
+    assert any("no cited passage explicitly establishes that absence" in issue for issue in issues)
+    assert any("only 1 quantitative result" in issue for issue in issues)
+
+
+def test_completeness_guard_accepts_both_requested_top_results() -> None:
+    answer = "ResNet-152 reported top-1 error of 19.38% and top-5 error of 4.49% [1]."
+    bundle = _supported_bundle(answer, ["Top-1 was 19.38%.", "Top-5 was 4.49%."])
+
+    issues = claim_verifier.claim_completeness_issues(
+        "What top-1 and top-5 error rates did ResNet-152 report?",
+        answer,
+        [{"text": "ResNet-152 19.38 4.49"}],
+        bundle,
+    )
+
+    assert issues == []
+
+
+def test_completeness_guard_allows_explicitly_evidenced_absence() -> None:
+    answer = "The appendix states that latency was not reported [1]."
+    bundle = _supported_bundle(answer, ["Latency was not reported."])
+
+    issues = claim_verifier.claim_completeness_issues(
+        "Does the appendix provide latency?",
+        answer,
+        [{"text": "Latency was not reported because the benchmark timed out."}],
+        bundle,
+    )
+
+    assert issues == []
+
+
+def test_claim_repair_can_be_triggered_by_deterministic_completeness_issue() -> None:
+    answer = "Only top-5 error 4.49% was reported [1]."
+    bundle = _supported_bundle(answer, ["Only top-5 error 4.49% was reported."])
+
+    prompt = claim_verifier.build_claim_repair_prompt(
+        "What top-1 and top-5 error rates were reported?",
+        answer,
+        [{"text": "ResNet-152 19.38 4.49"}],
+        bundle,
+        ["The answer supplies only one of two requested numeric results."],
+    )
+
+    assert "deterministic completeness check" in prompt
+    assert "Fill every requested numeric field" in prompt

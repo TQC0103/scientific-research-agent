@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-09-04
+Last updated: 2026-09-15
 
 ## Current baseline
 
@@ -34,7 +34,7 @@ Last updated: 2026-09-04
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 176
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 181
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -119,6 +119,11 @@ Last updated: 2026-09-04
   answer spans; code assigns claim IDs, derives visible labels and verdicts from
   ordered model relationships, and permits exactly one compact structure-only
   retry while counting both calls
+- Narrow post-claim completeness guard for top-k numeric questions and
+  evidence-absence assertions. It turns an otherwise supported but incomplete
+  bundle into the existing bounded repair path, records the deterministic issues
+  in graph state, and requires explicit cited evidence before accepting a claim
+  that a paper omitted information
 - Task 11 end-to-end evaluator and `python -m evaluation.run` command over the
   production node-update stream, with versioned schema, automatic node/final-state
   traces, exact-suite identity, registered metrics, case-level failure isolation,
@@ -582,9 +587,9 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Add and test a narrow claim-level completeness rule for requested numeric
-   fields and evidence-absence assertions, starting with the R23 ResNet-152
-   trace. Do not infer general semantic correctness from answer/abstain decisions.
+1. Complete focused GPU validation of the implemented ResNet-152
+   numeric/absence guard; retain it only if the answer is corrected or safely
+   abstains after the single bounded repair.
 2. Diagnose the three R23 LoRA claim-grounding/structure abstentions and prefer
    prompt/contract fixes over adding broad parser normalizations.
 3. Analyze `resnet_degradation_problem` as a retrieval/evidence miss separately

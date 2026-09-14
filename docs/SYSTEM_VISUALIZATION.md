@@ -74,9 +74,10 @@ flowchart TD
     ENOUGH -->|"yes"| CITES{"Citation-safe answer?"}
     CITES -->|"no"| CLAIM_ABSTAIN["claim-grounding abstention"]
     CITES -->|"yes"| CLAIMS["verify_claims"]
-    CLAIMS -->|"all factual claims supported"| END(["END"])
-    CLAIMS -->|"partial or mixed; revision count = 0"| REVISE["revise once from approved evidence"]
-    CLAIMS -->|"unsupported / invalid / already revised"| CLAIM_ABSTAIN
+    CLAIMS --> COMPLETE_ANSWER{"Claim support + narrow completeness guard?"}
+    COMPLETE_ANSWER -->|"supported; requested top-k values present; no unevidenced absence"| END(["END"])
+    COMPLETE_ANSWER -->|"partial, mixed, or incomplete; revision count = 0"| REVISE["revise once from approved evidence"]
+    COMPLETE_ANSWER -->|"unsupported / invalid / already revised"| CLAIM_ABSTAIN
     REVISE -->|"valid citation-safe revision"| CLAIMS
     REVISE -->|"failure"| CLAIM_ABSTAIN
     COVERAGE_GAP --> END
@@ -88,9 +89,9 @@ flowchart TD
 The state carries the original question, coverage mode, required paper IDs,
 selected/failed papers, and per-paper maps for retrieval queries, accumulated
 chunks, verifier results, and attempt counters. It also preserves approved
-evidence, citation validity, the structured claim bundle, claim-verifier calls,
-one revision count/history, and fail-closed errors. Aggregate fields remain for
-CLI trace and final routing.
+evidence, citation validity, the structured claim bundle, deterministic
+completeness issues, claim-verifier calls, one revision count/history, and
+fail-closed errors. Aggregate fields remain for CLI trace and final routing.
 
 ## 3. Discovery and catalog module
 

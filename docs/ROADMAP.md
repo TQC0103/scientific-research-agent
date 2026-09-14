@@ -51,9 +51,11 @@ Continue in this order:
    normalizer. Full R20/R21 isolated chained versus true-peak CUDA OOMs. A
    five-passage verifier prefix plus unconditional per-call cleanup then passed
    focused R22 and full R23 with zero OOM/tool/execution errors. R23 remains a
-   development runtime checkpoint: decision accuracy was `0.8400`, and the next
-   quality work is the ResNet numeric/absence false verification plus three LoRA
-   claim-grounding/structure abstentions.
+   development runtime checkpoint: decision accuracy was `0.8400`. A narrow
+   deterministic guard now routes missing requested top-k values and unevidenced
+   paper-wide absence assertions through the existing bounded repair. Complete
+   its focused GPU validation, then address the three LoRA claim-grounding/
+   structure abstentions.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

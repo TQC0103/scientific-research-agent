@@ -1662,3 +1662,30 @@ correct but itself weakly grounded, so R23's stricter abstention is not evidence
 that the six-passage output was semantically preferable. Next work should target
 claim-level absence/numeric completeness and the remaining LoRA claim failures,
 while treating retrieval misses separately.
+
+## 2026-09-15 — R23 ResNet-152 claim-completeness guard
+
+The R23 answer for `resnet152_imagenet_single_model_error` asserted that top-1
+was not explicitly reported while its cited approved passage visibly contained
+the table row `ResNet-152 19.38 4.49`. Passage-level entailment alone therefore
+accepted both a false absence assertion and an answer missing one of two
+requested numeric fields.
+
+Production claim routing now applies two narrow deterministic checks after the
+structured claim bundle validates: count requested top-k metric fields against
+quantitative results in the answer, and reject a supported absence assertion
+unless one of its cited passages explicitly states that absence. A detected
+issue uses the existing one-revision boundary, is added to the repair prompt,
+and is rechecked after revision. The verifier prompt also makes the
+silence-versus-absence distinction explicit. This does not attempt general
+semantic answer completeness.
+
+Ruff and all 181 pytest tests passed locally. Focused R24 was submitted from
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-resnet-completeness-r24`
+to exact T4 as kernel `tqc0103/sra-e2e-resnet-completeness-r24`, job
+`job_129051ee23ef49e58a9906ec660d5e99`. KCP incorrectly marked it succeeded in
+22 seconds with zero output while the captured Kaggle status still said
+`KernelWorkerStatus.RUNNING`. The likely trigger is the status parser matching
+the substring `complete` inside the slug word `completeness`. R24's actual
+remote result remains pending and must not be reported as a successful model
+evaluation until non-empty artifacts are recovered.

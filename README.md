@@ -30,6 +30,8 @@ not been tagged yet.
   verdict invariants
 - bounded post-synthesis claim verification with one repair attempt and
   fail-closed abstention
+- deterministic post-claim completeness checks for requested top-k numeric
+  results and unsupported paper-wide absence assertions
 - versioned end-to-end runner over production LangGraph with automatic node/state
   traces, explicit metric registration, and exact-suite baseline comparison
 
@@ -601,6 +603,14 @@ accuracy `0.8182`, abstention accuracy `1.0000`, answer F1 `0.3699`, Recall@5
 runtime checkpoint, not a new frozen baseline: one ResNet answer omitted a
 visible requested value, and four answer cases failed closed across one
 retrieval miss and three LoRA claim-grounding/structure failures.
+
+Production claim routing now supplements the LLM entailment judgment with a
+narrow deterministic completeness check. If a top-1/top-5-style question is
+answered with fewer numeric results than requested, or a supported claim says a
+paper omitted information without an explicit cited absence statement, the
+answer receives the existing single bounded repair and is then re-verified.
+This guard is intentionally narrow; it does not claim general semantic
+completeness.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.
