@@ -4,7 +4,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agent.state import AgentState
 from app.config import settings
-from app.db.database import search_local
+from app.db.database import get_paper, search_local
 from app.ingestion.indexing import index_paper
 from app.models.claim_verifier import (
     ClaimRepairRunError,
@@ -213,11 +213,12 @@ def index_next(state: AgentState) -> dict:
     selected.append(paper_id)
     try:
         paper = get_arxiv_metadata(paper_id)
+        if not index_is_current(paper):
+            index_paper(paper_id, paper=paper)
+            paper = get_paper(paper_id) or paper
         candidates = [
             paper if item["arxiv_id"] == paper_id else item for item in state["candidate_papers"]
         ]
-        if not index_is_current(paper):
-            index_paper(paper_id, paper=paper)
     except (PaperDownloadError, ValueError, OSError) as exc:
         failed.append(paper_id)
         errors.append(f"{paper_id}: {exc}")

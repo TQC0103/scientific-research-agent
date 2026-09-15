@@ -1786,3 +1786,51 @@ focused regression, not a replacement for the full 25-case R23 checkpoint. All
 runtime artifacts remain ignored.
 
 Final local verification passed Ruff and all 189 pytest tests.
+
+## 2026-09-15 — Full R32 diagnosis and corrected R33 checkpoint
+
+Full R32 used account `acct_3e7e9998dec6467f95fb3502422f7914`, exact
+`NvidiaTeslaT4`, bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-r25-ground-r32`,
+kernel `quccngtrng/sra-e2e-r25-ground-r32`, and job
+`job_e40c54b80aa44051933a068de010f18e`. It succeeded in 1,296 seconds with no
+execution failure, but its result was not suitable as a checkpoint: decision
+accuracy was `0.8000`, answer F1 `0.3497`, and Recall@5 `0.7500`. The first case
+for BERT, ResNet, LoRA, and RAG retrieved zero passages even though each PDF and
+index had just been created.
+
+The failure was a persistence-boundary bug exposed by removing the live arXiv
+metadata dependency. `index_next` obtained a pre-download paper object, built
+the PDF/index, and then passed the unchanged object into retrieval. Its missing
+`pdf_sha256` could not match the newly persisted index identity, so
+`index_is_current` returned false. Older arXiv metadata contained an abstract,
+which masked this bug through abstract fallback; pinned benchmark metadata
+intentionally has no unreviewed abstract. The graph now reloads the persisted
+paper record immediately after a successful index build. A regression test
+proves that a fresh index is retrievable without an abstract fallback.
+
+Corrected full R33 used the same account and exact T4 with bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-r25-refresh-r33`,
+kernel `quccngtrng/sra-e2e-r25-refresh-r33`, and job
+`job_46a8595599204d4cad768825a71c6673`. It succeeded in 1,528 seconds. All 25
+cases completed with zero OOM, tool, or execution errors; the adapter recorded
+82 successful physical calls including the three-call smoke run, five document-
+embedding calls, and 34 query-embedding calls. All five first-paper cases now
+retrieved five passages, confirming the lifecycle fix.
+
+R33 reached decision accuracy `0.9200`, answer-case decision accuracy `0.9091`,
+abstention accuracy `1.0000`, answer F1 `0.4043`, Recall@5 `0.7917`, MRR
+`0.5708`, gold evidence coverage `0.7708`, required-paper coverage `0.7917`,
+and total measured latency 1,279.1 seconds. Relative to R23, decision accuracy
+improved by `0.0800` and answer F1 by `0.0344`; Recall@5 declined by `0.0417`
+and MRR by `0.0382`. LoRA no-latency and the LoRA/RAG comparison remained
+recovered, and the comparison's deterministic revision counted zero repair-
+model calls. The two remaining false abstentions were distinct: WMT14 synthesis
+emitted an invalid citation label before claim verification, while LoRA frozen-
+weight produced malformed top-level evidence-judgment objects on both the
+initial and bounded structure-repair calls. Four correct verified answers had
+zero annotated Recall@5, so their retrieved evidence versus gold annotations
+needs review before attributing the coverage decline solely to ranking.
+
+R32 and R33 outputs remain ignored runtime artifacts. Final local verification
+passed Ruff and all 190 pytest tests.

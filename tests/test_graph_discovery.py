@@ -75,3 +75,52 @@ def test_pdf_failure_falls_back_to_abstract(monkeypatch) -> None:
     assert updated["failed_papers"] == ["2501.00001"]
     assert evidence[0]["section"] == "Abstract"
     assert evidence[0]["page"] is None
+
+
+def test_new_index_refreshes_artifact_metadata_before_retrieval(monkeypatch) -> None:
+    stale = {
+        "arxiv_id": "2501.00001",
+        "versioned_id": "2501.00001v2",
+        "title": "Paper",
+        "abstract": "",
+        "pdf_sha256": None,
+    }
+    refreshed = {**stale, "pdf_sha256": "verified-pdf-hash"}
+    monkeypatch.setattr(graph, "get_arxiv_metadata", lambda paper_id: stale)
+    monkeypatch.setattr(graph, "get_paper", lambda paper_id: refreshed)
+    monkeypatch.setattr(graph, "index_paper", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        graph,
+        "index_is_current",
+        lambda paper: paper.get("pdf_sha256") == "verified-pdf-hash",
+    )
+    monkeypatch.setattr(
+        graph,
+        "retrieve",
+        lambda paper_id, query, top_k: [
+            {
+                "arxiv_id": paper_id,
+                "versioned_id": "2501.00001v2",
+                "page": 1,
+                "section": "Method",
+                "chunk_index": 0,
+                "text": "Freshly indexed evidence.",
+                "score": 0.9,
+                "retrieval_score": 0.03,
+            }
+        ],
+    )
+    state = {
+        "user_query": "What does the paper claim?",
+        "candidate_papers": [stale],
+        "selected_papers": [],
+        "failed_papers": [],
+        "tool_errors": [],
+        "iteration_count": 0,
+    }
+
+    updated = graph.index_next(state)
+    evidence = graph.retrieve_evidence({**state, **updated})["retrieved_chunks"]
+
+    assert updated["candidate_papers"][0]["pdf_sha256"] == "verified-pdf-hash"
+    assert evidence[0]["text"] == "Freshly indexed evidence."

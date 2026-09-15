@@ -140,11 +140,15 @@ flowchart TD
     SECTIONS --> CHUNKS["Create overlapping page-aware chunks"]
     CHUNKS --> EMBED["Embed chunks"]
     EMBED --> SAVE["Save FAISS, chunks, and index identity"]
-    SAVE --> READY
+    SAVE --> REFRESH["Reload persisted PDF/index metadata into graph state"]
+    REFRESH --> READY
 ```
 
 An index is reusable only when arXiv revision, exact PDF SHA-256, and embedding
-model all match. A revision change invalidates stale PDF/index metadata.
+model all match. A revision change invalidates stale PDF/index metadata. After
+a new index is built, the graph reloads the database record before retrieval so
+the in-memory paper object contains the PDF hash written during ingestion; this
+prevents a just-created index from being mistaken for stale state.
 
 ## 5. Hybrid retrieval module
 

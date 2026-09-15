@@ -59,9 +59,11 @@ Continue in this order:
    R27 recovered the frozen-weight and no-latency LoRA cases by rejecting
    evidence-derived claim expansion. R30/R31 recovered the LoRA/RAG comparison
    through paper-local verifier subquestions and exact pruning of a wholly
-   unsupported standalone answer span. Run the full 25-case suite again before
-   promoting these focused regressions; table-aware ResNet answer recovery
-   remains a separate utility target.
+   unsupported standalone answer span. Full R33 retained two of those three
+   recoveries and raised decision accuracy to `0.9200`; the frozen-weight case
+   still exposed small-model structure variance. Next isolate that malformed
+   output and the WMT invalid-citation abstention. Table-aware ResNet answer
+   recovery remains a separate utility target.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

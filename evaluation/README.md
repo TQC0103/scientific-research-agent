@@ -450,6 +450,18 @@ baseline: four answer cases abstained, and one additional ResNet answer omitted
 a requested value present in its approved evidence while still passing claim
 verification. Runtime outputs remain ignored.
 
+Full R32 (`job_e40c54b80aa44051933a068de010f18e`) was not promoted: removing
+the live arXiv metadata call exposed stale in-memory metadata immediately after
+first-time indexing, causing the first case for several papers to retrieve zero
+passages. After reloading the persisted paper record at the index/retrieval
+boundary, full R33 (`job_46a8595599204d4cad768825a71c6673`) completed all 25
+cases on exact T4 with zero OOM/tool/execution errors. It reported decision
+accuracy `0.9200`, answer-case accuracy `0.9091`, abstention accuracy `1.0000`,
+answer F1 `0.4043`, Recall@5 `0.7917`, MRR `0.5708`, and both claim-verifier and
+citation-safety failure `0.0400`. Compared with R23, answer decisions improved
+by two net cases while annotated retrieval coverage declined. R33 is the latest
+clean R25 development checkpoint, not the frozen R10 baseline.
+
 ## Retrieval matching contract
 
 The internal evaluator implements the following rules:

@@ -630,8 +630,18 @@ pruned its standalone uncited comparison summary exactly and returned a
 verified answer after one bounded deterministic revision: decision accuracy,
 Recall@K, gold evidence coverage, and required-paper coverage were all `1.0000`
 for that one development case, with answer F1 `0.4386`. These are focused
-regressions, not aggregate quality claims; full R23 remains the latest clean
-25-case checkpoint.
+regressions, not aggregate quality claims.
+
+Full R32 then exposed a lifecycle bug in the new pinned-metadata path: after a
+paper was indexed for the first time, graph state still held the pre-download
+record without its persisted PDF hash, so immediate retrieval treated the new
+index as stale. The graph now reloads the database record after indexing. Full
+R33 completed all 25 cases on exact T4 with zero OOM/tool/execution errors and
+became the latest development checkpoint. Against R23, decision accuracy rose
+from `0.8400` to `0.9200` and answer F1 from `0.3699` to `0.4043`; Recall@5 fell
+from `0.8333` to `0.7917`. The LoRA no-latency and LoRA/RAG comparison cases
+remained recovered, while LoRA frozen-weight still failed closed on malformed
+claim output. R33 is still development data, not a held-out or publishable score.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

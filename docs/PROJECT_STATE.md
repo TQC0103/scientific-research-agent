@@ -18,18 +18,19 @@ Last updated: 2026-09-15
   `54b62586dc9a51e6c88f7c7738807ba6ccedeeed3050ab45a2b19f4b1cee8494`.
   It is committed development data with advisory-judge, retrieval-only, and
   paired RRF/reranker end-to-end development diagnostics.
-- Current clean R25 runtime checkpoint: production-RRF R23 job
-  `job_20f471013106409db5117b477ab793c2`, with all 25 cases and all 86 physical
-  LLM calls completed, zero OOM/tool/execution errors, decision accuracy
-  `0.8400`, answer F1 `0.3699`, Recall@5 `0.8333`, and claim-verifier failure
-  `0.0400`. It is diagnostic development data, not the frozen R10 baseline or
-  held-out accuracy.
-- Latest focused quality regression: LoRA/RAG R31 job
+- Current clean R25 runtime checkpoint: production-RRF R33 job
+  `job_46a8595599204d4cad768825a71c6673`, with all 25 cases completed on exact
+  T4 and zero OOM/tool/execution errors. Decision accuracy was `0.9200`, answer
+  F1 `0.4043`, Recall@5 `0.7917`, and claim-verifier and citation-safety failure
+  were both `0.0400`. It improves R23 decision accuracy by `0.0800` and answer
+  F1 by `0.0344`, while Recall@5 is `0.0417` lower. It is diagnostic development
+  data, not the frozen R10 baseline or held-out accuracy.
+- Latest focused quality regression before that full run: LoRA/RAG R31 job
   `job_5a030a7481b34e5d80048c54441726b4` on exact T4. Its one development
   comparison returned the expected verified answer after one deterministic
   span-pruning revision, with Recall@K, gold coverage, and required-paper
   coverage all `1.0000`, answer F1 `0.4386`, and no execution/tool/OOM error.
-  This does not replace the full R23 checkpoint.
+  Full R33 reproduced its successful bounded comparison repair.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -40,7 +41,7 @@ Last updated: 2026-09-15
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 189
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 190
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -52,6 +53,8 @@ Last updated: 2026-09-15
 - Version-aware arXiv discovery, SQLite metadata, and FTS5 local-first search
 - Lazy validated PDF ingestion with SHA-256 and abstract-only failure fallback
 - Page/section-aware chunking and identity-checked per-paper FAISS indexes
+- Post-index refresh of persisted PDF/index metadata before first retrieval, so
+  a newly built index is immediately reusable even without an abstract fallback
 - Hybrid dense + lexical retrieval with reciprocal-rank fusion
 - Structured LLM evidence verifier, bounded query rewrite, and fail-closed stop
 - Verifier completeness invariant at aggregation and synthesis boundaries: a
@@ -585,9 +588,11 @@ aggregate is now the first ignored development regression baseline.
   answer that omitted a requested numeric value present in approved evidence
   while claim verification falsely accepted its absence assertion. Decision
   accuracy alone hides the last failure, so answer and claim traces remain
-  mandatory for evaluation. Focused R27 and R31 now recover all three observed
-  LoRA cases, but only a new full-suite run can show whether the changes regress
-  other cases.
+  mandatory for evaluation. Focused R27 and R31 recovered all three observed
+  LoRA cases. Full R33 retained the no-latency and LoRA/RAG comparison
+  recoveries, while the frozen-weight case still failed closed on two malformed
+  claim outputs. The full-suite result is a net gain but does not eliminate
+  small-model structure variance.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -605,10 +610,13 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Run the full 25-case suite after the R27-R31 LoRA fixes and compare it with
-   R23 before treating the focused recoveries as a new checkpoint.
-2. Analyze `resnet_degradation_problem` as a retrieval/evidence miss separately
-   from generation and claim verification.
+1. Diagnose the two remaining R33 false abstentions separately: invalid
+   synthesis citation labeling for `transformer_wmt14_en_de_result`, and two
+   malformed top-level claim-verifier outputs for
+   `lora_frozen_low_rank_mechanism`.
+2. Analyze the four R33 answer cases with zero annotated Recall@5 but successful
+   verified answers; distinguish incomplete gold evidence from retrieval drift
+   before changing ranking.
 3. Improve table-aware synthesis/repair without weakening the validated R26
    fail-closed behavior. R26 blocked the R23 false approval and attempted one
    revision, but the 4B model repeated the incomplete answer and safely
