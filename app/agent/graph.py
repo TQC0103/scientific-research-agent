@@ -538,6 +538,14 @@ def _claim_verification_status(bundle: ClaimVerificationBundle) -> str:
         return "repairable"
     if ClaimVerdict.SUPPORTED in verdicts and ClaimVerdict.UNSUPPORTED in verdicts:
         return "repairable"
+    if verdicts and all(verdict == ClaimVerdict.UNSUPPORTED for verdict in verdicts):
+        cited_labels = {
+            link.citation_label
+            for assessment in bundle.assessments
+            for link in assessment.cited_evidence
+        }
+        if cited_labels and len(cited_labels) < bundle.evidence_count:
+            return "repairable"
     return "unsupported"
 
 

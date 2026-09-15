@@ -64,8 +64,15 @@ Continue in this order:
    still exposed small-model structure variance. Focused R34 fixed and validated
    the WMT invalid-citation abstention by masking paper bibliography references
    before synthesis; the bounded citation-only repair remains a fail-closed
-   fallback. Next isolate the frozen-weight malformed claim output. Table-aware
-   ResNet answer recovery remains a separate utility target.
+   fallback. Table-aware ResNet answer recovery remains a separate utility
+   target. R35 proved a second
+   whole-answer prompt still collapsed; R36 recovered the frozen-weight case by
+   independently verifying two single-citation spans. R37 then exposed a valid
+   answer attached to the wrong approved passage, and R38 validated one bounded
+   citation retarget plus re-verification. Full R39 completed all 25 decisions
+   correctly with zero claim/citation/runtime failures. Preserve R39 as the
+   current development checkpoint; next audit the annotation-relative retrieval
+   misses rather than tuning against this now-perfect decision slice.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

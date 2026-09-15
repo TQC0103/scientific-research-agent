@@ -264,6 +264,9 @@ flowchart TD
     ROOT -->|"yes"| BIND["Code binds claim ID + source + labels; derives verdict"]
     ROOT -->|"one judgment + exactly one span/label"| NORMALIZE["Deterministic narrow normalization"]
     NORMALIZE --> BIND
+    ROOT -->|"standalone judgment; 2-4 spans; one label each"| SHARDS["Verify each span once against full approved evidence"]
+    SHARDS --> MERGE["Code renumbers and merges span bundles"]
+    MERGE --> CLAIMGUARD
     ROOT -->|"other malformed shape"| FORMATRETRY
     BIND --> CLAIMGUARD{"Lock inputs + Task 7 validation"}
     CLAIMGUARD -->|"valid"| CLAIMBUNDLE["Ordered claims + evidence links + derived verdicts"]
@@ -275,7 +278,7 @@ flowchart TD
     CLAIMGUARD -->|"invalid after retry"| CLAIMFAIL["Explicit claim-grounding abstention"]
     CLAIMBUNDLE -->|"all supported"| VERIFIED_FINAL["Return answer"]
     CLAIMBUNDLE -->|"only standalone wholly unsupported spans"| PRUNE["Delete exact spans in code; 0 repair model calls"]
-    CLAIMBUNDLE -->|"partial, mixed-span, or completeness issue; no prior revision"| REPAIR["One evidence-only model revision"]
+    CLAIMBUNDLE -->|"partial, mixed, incomplete, or wrong citation with unused evidence"| REPAIR["One evidence-only model revision"]
     PRUNE --> SOURCES
     REPAIR --> SOURCES["Restore trusted Sources block"]
     SOURCES --> CLAIMPROMPT
@@ -298,19 +301,25 @@ visible labels, or verdicts: it selects a code-owned exact span and returns
 ordered semantic relationships, then code reconstructs those redundant fields.
 The model sees one flat `claims`-root template rather than a nested schema with
 competing object definitions. If it nevertheless returns a standalone evidence
-judgment, code can normalize it only when exactly one source span and one visible
-citation make the binding unambiguous. The report records successful structure
-repair and narrow normalization separately; multi-span or multi-label ambiguity
-continues to fail closed.
-Separately, one malformed response may receive one compact
-structure-only retry against immutable spans; a second invalid response abstains.
+judgment, code can normalize it directly only when exactly one source span and
+one visible citation make the binding unambiguous. For a collapsed answer with
+2–4 spans where every span has exactly one label, the bounded fallback verifies
+each span in a separate full-evidence call and merges/renumbers only validated
+bundles. Multi-label spans, more than four spans, and any failed shard remain
+fail-closed. Other malformed responses may receive one compact structure-only
+retry against immutable spans; a second invalid response abstains. The report
+counts every shard call and records structure repair and normalization separately.
 The answer-repair model cannot author source metadata; code restores
 it from trusted passage records before re-verification. Wholly unsupported
 standalone spans can instead be removed exactly without a model call, but only
 when every failed claim is unsupported and occupies a removable whole span;
-partial or mixed spans still use the bounded model repair. Revision count and
+partial or mixed spans still use the bounded model repair. A wholly unsupported
+claim may also use that single revision only when it has a cited label and the
+approved evidence set contains an unused alternative; this permits citation
+retargeting but still requires complete re-verification. Revision count and
 physical claim-repair model-call count are stored separately. Wholly
-unsupported answers and unresolved post-repair claims also abstain.
+unsupported answers without an alternative and unresolved post-repair claims
+also abstain.
 
 ## 8. Persistence module
 

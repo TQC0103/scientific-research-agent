@@ -1862,3 +1862,54 @@ citation-repair count was zero. Deterministic tests cover both a successful
 label replacement, missing-label insertion across punctuation spacing, and
 rejection when repair changes answer text. R34 outputs
 remain under ignored `data/evaluations/runs/wmt_citation_r34`.
+
+## 2026-09-16 — Collapsed-claim recovery, citation retargeting, and R39
+
+R33's remaining frozen-weight failure contained two independently cited answer
+spans but returned one standalone `entails` judgment at the claim-verifier root.
+Automatically applying that judgment to both labels would erase the semantic
+mapping and was rejected. R35 (`job_dbdfa83170914118bf24b8c5efda09a6`), staged
+as `sra-e2e-lora-collapse-r35`, repeated the full evidence prompt with stronger
+shape instructions but the 4B model returned the same standalone judgment twice.
+It safely abstained; prompt-only recovery was not adopted as sufficient.
+
+The replacement fallback requires 2–4 answer spans and exactly one visible
+citation per span. After a collapsed initial response, it verifies each span
+once against the full approved evidence, validates each result independently,
+and merges/renumbers the code-owned bundles. Any failed shard, multi-label span,
+or larger answer remains fail-closed. Focused R36
+(`job_0c473115b965417ea8d4439790fcf4ff`, kernel
+`quccngtrng/sra-e2e-lora-shards-r36`) succeeded on exact T4 in 383 seconds. It
+used three claim-verifier calls and returned two supported claims with distinct
+`[1]`/`[2]` evidence bindings.
+
+Full R37 (`job_3c8e7286585045eba0276817b44e8708`) completed all 25 cases on
+exact T4 with zero OOM/tool/execution error. It recovered WMT and frozen-weight,
+but a deterministic prompt change led the no-latency synthesis to cite topical
+passage `[1]` instead of direct mechanism passage `[2]`; the claim verifier
+correctly rejected it. Decision accuracy was `0.9600`, making R37 an informative
+intermediate rather than the promoted checkpoint.
+
+The graph now treats an all-unsupported bundle as repairable only when its
+claims did cite evidence and at least one other approved passage remains unused.
+The existing single revision may retarget the citation, after which the complete
+answer is verified again. Unsupported answers without an alternative still
+abstain. Focused R38 (`job_1fc656a5701948d8abba633ca7f9d398`) exercised this
+exact trace: `[1]` was replaced by `[2]`, non-citation answer text was preserved,
+and the second claim check returned supported. It used five logical calls and
+completed in 344 seconds without runtime failure.
+
+Full R39 used account `acct_3e7e9998dec6467f95fb3502422f7914`, exact
+`NvidiaTeslaT4`, staged source
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-r25-ground-r39`,
+kernel `quccngtrng/sra-e2e-r25-ground-r39`, and job
+`job_322621f65e94485ca21582b995e94885`. It succeeded in 1,595 seconds with all
+25 cases completed and zero OOM/tool/execution errors. Decision, answer-case,
+and abstention accuracy were `1.0000`; answer F1 `0.4459`; Recall@5 `0.7917`;
+MRR `0.5708`; gold coverage `0.7708`; required-paper coverage `0.7917`;
+supported-claim and citation-completeness rates `1.0000`; and citation-safety and
+claim-verifier failures `0.0000`. It counted 84 logical LLM calls and 1,327.7
+measured seconds. The three targeted cases reproduced their intended branches.
+Four correct answers still lack matched annotated evidence at K=5, so the next
+step is a gold-versus-retrieval audit rather than ranking changes. R35–R39
+artifacts remain ignored runtime data.

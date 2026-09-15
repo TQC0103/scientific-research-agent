@@ -18,13 +18,14 @@ Last updated: 2026-09-16
   `54b62586dc9a51e6c88f7c7738807ba6ccedeeed3050ab45a2b19f4b1cee8494`.
   It is committed development data with advisory-judge, retrieval-only, and
   paired RRF/reranker end-to-end development diagnostics.
-- Current clean R25 runtime checkpoint: production-RRF R33 job
-  `job_46a8595599204d4cad768825a71c6673`, with all 25 cases completed on exact
-  T4 and zero OOM/tool/execution errors. Decision accuracy was `0.9200`, answer
-  F1 `0.4043`, Recall@5 `0.7917`, and claim-verifier and citation-safety failure
-  were both `0.0400`. It improves R23 decision accuracy by `0.0800` and answer
-  F1 by `0.0344`, while Recall@5 is `0.0417` lower. It is diagnostic development
-  data, not the frozen R10 baseline or held-out accuracy.
+- Current clean R25 runtime checkpoint: production-RRF R39 job
+  `job_322621f65e94485ca21582b995e94885`, with all 25 cases completed on exact
+  T4 and zero OOM/tool/execution errors. Decision, answer-case, and abstention
+  accuracy were `1.0000`; answer F1 was `0.4459`, Recall@5 `0.7917`, and both
+  claim-verifier and citation-safety failure were `0.0000`. Compared with R33,
+  it recovers both false abstentions and raises answer F1 by `0.0416` while
+  retrieval metrics remain identical. It is diagnostic development data, not
+  the frozen R10 baseline or held-out accuracy.
 - Latest focused quality regression before that full run: LoRA/RAG R31 job
   `job_5a030a7481b34e5d80048c54441726b4` on exact T4. Its one development
   comparison returned the expected verified answer after one deterministic
@@ -37,6 +38,13 @@ Last updated: 2026-09-16
   and no citation/claim/runtime failure. Masking internal paper references was
   sufficient, so it used one synthesis call and did not invoke the fallback
   citation-only repair.
+- LoRA structure/citation regressions: R35 failed to recover a repeated
+  standalone judgment with another whole-answer prompt. R36
+  (`job_0c473115b965417ea8d4439790fcf4ff`) recovered two independently judged
+  spans. R37 confirmed that fix across 25 cases but exposed a separate wrong-
+  citation abstention; R38 (`job_1fc656a5701948d8abba633ca7f9d398`)
+  retargeted `[1]` to `[2]` once and passed re-verification. Full R39 reproduced
+  all three focused recoveries.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -47,7 +55,7 @@ Last updated: 2026-09-16
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 194
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 198
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -603,6 +611,10 @@ aggregate is now the first ignored development regression baseline.
   recoveries, while the frozen-weight case still failed closed on two malformed
   claim outputs. The full-suite result is a net gain but does not eliminate
   small-model structure variance.
+- R35 confirms prompt repetition alone does not repair every collapsed 4B
+  output. The new per-span fallback is deliberately limited to 2–4 spans with
+  exactly one citation each; R36/R39 validate the observed two-span case, not
+  arbitrary malformed structures. Other shapes remain fail-closed.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -620,20 +632,17 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Diagnose the remaining R33 false abstention: two malformed top-level claim-
-   verifier outputs for `lora_frozen_low_rank_mechanism`. Focused R34 closed the
-   separate WMT invalid-citation regression without weakening fail-closed checks.
-2. Analyze the four R33 answer cases with zero annotated Recall@5 but successful
+1. Analyze the four R39 answer cases with zero annotated Recall@5 but successful
    verified answers; distinguish incomplete gold evidence from retrieval drift
    before changing ranking.
-3. Improve table-aware synthesis/repair without weakening the validated R26
+2. Improve table-aware synthesis/repair without weakening the validated R26
    fail-closed behavior. R26 blocked the R23 false approval and attempted one
    revision, but the 4B model repeated the incomplete answer and safely
    abstained instead of extracting the visible ResNet-152 top-1 value.
-4. Instrument embedding calls at the production retriever boundary; the Kaggle
+3. Instrument embedding calls at the production retriever boundary; the Kaggle
    adapter can count them, but the general Task 11 report still leaves them null.
-5. Independently review and expand the seven Task 8 development cases, then
+4. Independently review and expand the seven Task 8 development cases, then
    calibrate the partial-versus-unsupported boundary before freezing results.
-6. Calibrate Task 10 repair versus immediate
+5. Calibrate Task 10 repair versus immediate
    abstention, including distinct incomplete-evidence and contradiction reasons.
-7. Fix section boundaries and table-associated metadata.
+6. Fix section boundaries and table-associated metadata.

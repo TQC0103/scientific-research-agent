@@ -471,6 +471,25 @@ completeness were all `1.0000`. It used one verifier, one synthesis, and one
 claim-verifier call; the bounded citation-only fallback was not needed. This is
 a focused regression result, not a replacement for the 25-case R33 checkpoint.
 
+R35 (`job_dbdfa83170914118bf24b8c5efda09a6`) demonstrated that repeating the
+whole-answer prompt did not repair the frozen-weight case's standalone evidence
+judgment. R36 (`job_0c473115b965417ea8d4439790fcf4ff`) used the narrow 2–4
+single-citation-span recovery: two independent shard judgments were normalized,
+merged, and verified. Full R37 retained that recovery and WMT, but correctly
+abstained when the no-latency answer cited topical passage `[1]` instead of
+direct passage `[2]`. Focused R38 (`job_1fc656a5701948d8abba633ca7f9d398`)
+validated one bounded citation retarget and re-verification.
+
+Full R39 (`job_322621f65e94485ca21582b995e94885`) is the latest 25-case
+development checkpoint. All 25 cases completed on exact T4; decision,
+answer-case, and abstention accuracy were `1.0000`, answer F1 `0.4459`,
+Recall@5 `0.7917`, MRR `0.5708`, supported-claim and citation-completeness rates
+`1.0000`, with zero citation-safety, claim-verifier, tool, execution, or OOM
+failure. It used 84 logical LLM calls and 1,327.7 measured seconds. Retrieval
+metrics are unchanged from R33, and four verified answers still have no matched
+gold evidence at K=5; R39 remains tuned development evidence, not a held-out
+quality claim.
+
 ## Retrieval matching contract
 
 The internal evaluator implements the following rules:

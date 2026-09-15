@@ -75,6 +75,13 @@ def test_claim_status_distinguishes_verified_repairable_and_unsupported() -> Non
         == "repairable"
     )
     assert graph._claim_verification_status(_bundle("unsupported")) == "unsupported"
+    wrong_citation_with_unused_evidence = _bundle("unsupported").model_copy(
+        update={"evidence_count": 2}
+    )
+    assert (
+        graph._claim_verification_status(wrong_citation_with_unused_evidence)
+        == "repairable"
+    )
 
 
 def test_claim_verification_stores_validated_result(monkeypatch) -> None:

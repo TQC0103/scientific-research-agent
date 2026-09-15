@@ -84,11 +84,15 @@ unsupported claims, may be revised once using only approved evidence and are the
 verified again. Code first splits the answer into immutable citation-scoped
 spans; the model selects `span_#` IDs and returns evidence relationships in source order,
 while code assigns claim IDs, restores `source_text`/citation labels, and derives
-verdicts. A malformed response receives exactly one compact structure-
-only retry without repeating the long evidence prompt; a second invalid response
-fails closed. Wholly unsupported answers, citation failures, repair
-failures, and unresolved claims after that one revision all produce an explicit
-abstention. Both bounds are fixed, not open-ended agent loops.
+verdicts. A malformed response normally receives one compact structure-only
+retry. One narrow exception handles a standalone judgment that collapsed 2–4
+single-citation spans: each span is rechecked independently against the approved
+evidence and code merges the resulting bundles. Other ambiguous shapes fail
+closed. A wholly unsupported claim may be revised only when it cited evidence
+and another approved passage remains available—for example, to retarget a wrong
+citation—and the result must pass claim verification again. Other unsupported
+answers, citation failures, repair failures, and unresolved claims after one
+revision abstain. Every recovery path has a fixed bound, not an agent loop.
 
 ## Current production flow
 
@@ -653,6 +657,17 @@ claim verification without revision, and required only one synthesis call. The
 single-case decision, Recall@5, gold coverage, required-paper coverage, supported-
 claim rate, and citation completeness were all `1.0000`; this is a regression
 check for one observed failure, not an aggregate score.
+
+R35 showed that another full-context prompt could not recover the LoRA frozen-
+weight model's collapsed standalone judgment. R36 instead verified its two
+citation scopes independently and merged the code-owned bundle; both claims
+passed. Full R37 recovered WMT and frozen-weight but correctly caught a new
+wrong-citation output in the no-latency case. Focused R38 retargeted `[1]` to the
+directly supporting `[2]` through one bounded revision and re-verification.
+Full R39 (`job_322621f65e94485ca21582b995e94885`) then completed all 25
+development cases with decision, answer-case, and abstention accuracy `1.0000`,
+answer F1 `0.4459`, zero citation/claim/runtime failures, and unchanged Recall@5
+`0.7917`. These remain tuned development results, not held-out accuracy.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

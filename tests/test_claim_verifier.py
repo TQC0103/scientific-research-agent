@@ -222,6 +222,7 @@ def test_span_bound_prompts_use_one_flat_root_template_and_judgment_counts() -> 
         assert "$defs" not in value
         assert "Never return a single claim or evidence judgment as the root object" in normalized
         assert "judgment_count=" in value
+        assert "citation-bearing source span" in value
 
 
 def test_bounded_verifier_fails_after_exactly_one_invalid_output_repair(monkeypatch) -> None:
@@ -306,6 +307,28 @@ def test_span_bound_parser_rejects_unknown_or_reordered_spans() -> None:
             json.dumps(reordered),
             expected_answer=payload["answer"],
             evidence_count=4,
+        )
+
+
+def test_span_bound_parser_rejects_omitted_citation_bearing_span() -> None:
+    answer = "First supported statement [1]. Second supported statement [2]."
+    payload = {
+        "claims": [
+            {
+                "claim_text": "First supported statement",
+                "source_span_id": "span_1",
+                "requires_citation": True,
+                "evidence_judgments": [
+                    {"relationship": "entails", "reason": "Direct support."}
+                ],
+                "assessment_reason": "Direct support.",
+            }
+        ]
+    }
+
+    with pytest.raises(ValueError, match="omitted citation-bearing.*span_2"):
+        claim_verifier.parse_span_bound_claim_response(
+            json.dumps(payload), expected_answer=answer, evidence_count=2
         )
 
 
@@ -438,6 +461,65 @@ def test_bounded_verifier_records_single_span_output_normalization(monkeypatch) 
     assert run.model_calls == 1
     assert run.output_repaired is False
     assert run.output_normalized is True
+
+
+def test_bounded_verifier_recovers_collapsed_judgment_per_span_with_evidence(
+    monkeypatch,
+) -> None:
+    answer = "LoRA freezes original weights [1]. It trains low-rank matrices [2]."
+    collapsed = {"relationship": "entails", "reason": "Direct passage support."}
+    responses = iter(
+        [
+            json.dumps(collapsed),
+            json.dumps({"relationship": "entails", "reason": "Passage 1 supports it."}),
+            json.dumps({"relationship": "entails", "reason": "Passage 2 supports it."}),
+        ]
+    )
+    prompts = []
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> SimpleNamespace:
+            prompts.append(prompt)
+            return SimpleNamespace(content=next(responses))
+
+    monkeypatch.setattr(claim_verifier, "get_llm", lambda **kwargs: FakeModel())
+    evidence = _evidence()[:2]
+
+    run = claim_verifier.verify_answer_claims_bounded(answer, evidence)
+
+    assert run.model_calls == 3
+    assert run.output_repaired is True
+    assert run.output_normalized is True
+    assert [claim.source_text for claim in run.bundle.claims] == [
+        "LoRA freezes original weights [1].",
+        "It trains low-rank matrices [2].",
+    ]
+    assert all("Verifier-approved evidence" in prompt for prompt in prompts[1:])
+    assert "LoRA freezes original weights [1]." in prompts[1]
+    assert "It trains low-rank matrices [2]." not in prompts[1]
+    assert "It trains low-rank matrices [2]." in prompts[2]
+
+
+def test_collapsed_recovery_stays_bounded_for_ambiguous_span_shapes(monkeypatch) -> None:
+    answer = "First claim [1][2]. Second claim [3]."
+    responses = iter(
+        [
+            json.dumps({"relationship": "entails", "reason": "Collapsed."}),
+            json.dumps({"relationship": "entails", "reason": "Still invalid."}),
+        ]
+    )
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> SimpleNamespace:
+            return SimpleNamespace(content=next(responses))
+
+    monkeypatch.setattr(claim_verifier, "get_llm", lambda **kwargs: FakeModel())
+
+    with pytest.raises(claim_verifier.ClaimVerificationRunError) as captured:
+        claim_verifier.verify_answer_claims_bounded(answer, _evidence()[:3])
+
+    assert captured.value.model_calls == 2
+    assert "after one bounded output repair" in str(captured.value)
 
 
 def test_span_bound_parser_does_not_recover_single_judgment_for_ambiguous_answer() -> None:
@@ -686,3 +768,30 @@ def test_claim_repair_can_be_triggered_by_deterministic_completeness_issue() -> 
 
     assert "deterministic completeness check" in prompt
     assert "Fill every requested numeric field" in prompt
+
+
+def test_claim_repair_prompt_allows_text_locked_citation_retargeting() -> None:
+    answer = "LoRA merges its update into the base weights for inference [1]."
+    bundle = _supported_bundle(answer, ["LoRA merges its update into the base weights."])
+    bundle.assessments[0] = bundle.assessments[0].model_copy(
+        update={
+            "verdict": ClaimVerdict.UNSUPPORTED,
+            "cited_evidence": [
+                ClaimEvidenceLink(
+                    citation_label=1,
+                    relationship="does_not_support",
+                    reason="The first passage is only background.",
+                )
+            ],
+        }
+    )
+
+    prompt = claim_verifier.build_claim_repair_prompt(
+        "Why is there no added latency?",
+        answer,
+        _evidence()[:2],
+        bundle,
+    )
+
+    assert "retarget only its citation" in prompt
+    assert "[2]" in prompt
