@@ -1834,3 +1834,31 @@ needs review before attributing the coverage decline solely to ranking.
 
 R32 and R33 outputs remain ignored runtime artifacts. Final local verification
 passed Ruff and all 190 pytest tests.
+
+## 2026-09-16 — Bounded synthesis citation repair and focused R34
+
+R33's WMT answer failure was caused by an answer label copied from the source
+paper's numeric bibliography references rather than by missing evidence. The
+synthesis boundary now masks those internal references, explicitly enumerates
+the allowed evidence labels, and records raw output plus physical synthesis-call
+telemetry. A missing or invalid first answer may receive one citation-only model
+repair. Code accepts it only when removal of citation tokens leaves exactly the
+same normalized answer text and all repaired labels resolve against approved
+evidence; otherwise the original fail-closed grounding message remains.
+
+Focused R34 staged bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-wmt-citation-r34`,
+kernel `quccngtrng/sra-e2e-wmt-citation-r34`, and job
+`job_d2855c0aaee24410a100efce204b4673` under account
+`acct_3e7e9998dec6467f95fb3502422f7914` on exact `NvidiaTeslaT4`. It succeeded
+in 277 seconds with CUDA 12.8, torch 2.10.0+cu128, transformers 4.56.2, and no
+tool, execution, or OOM failure. The single WMT case answered with 28.4 BLEU and
+the over-two-BLEU comparison cited as `[1]`; decision accuracy, Recall@5, MRR,
+gold evidence coverage, required-paper coverage, supported-claim rate, and
+citation completeness were all `1.0000`. The claim bundle verified on its first
+attempt with no answer revision. Prevention worked before repair: the run used
+one evidence-verifier, one synthesis, and one claim-verifier call, so the live
+citation-repair count was zero. Deterministic tests cover both a successful
+label replacement, missing-label insertion across punctuation spacing, and
+rejection when repair changes answer text. R34 outputs
+remain under ignored `data/evaluations/runs/wmt_citation_r34`.

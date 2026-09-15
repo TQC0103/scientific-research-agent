@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-09-15
+Last updated: 2026-09-16
 
 ## Current baseline
 
@@ -31,6 +31,12 @@ Last updated: 2026-09-15
   span-pruning revision, with Recall@K, gold coverage, and required-paper
   coverage all `1.0000`, answer F1 `0.4386`, and no execution/tool/OOM error.
   Full R33 reproduced its successful bounded comparison repair.
+- Latest focused regression: WMT citation R34 job
+  `job_d2855c0aaee24410a100efce204b4673` on exact T4. The case returned the
+  expected answer with valid `[1]`, one supported atomic claim, no revision,
+  and no citation/claim/runtime failure. Masking internal paper references was
+  sufficient, so it used one synthesis call and did not invoke the fallback
+  citation-only repair.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -41,7 +47,7 @@ Last updated: 2026-09-15
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 190
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 194
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -506,6 +512,10 @@ aggregate is now the first ignored development regression baseline.
 - Numeric citation validation proves only that a label maps to an approved
   passage; semantic support is now checked separately and fails closed, but has
   not yet been validated on an independently reviewed end-to-end suite.
+- Synthesis now masks paper-internal numeric bibliography references and permits
+  one text-invariant citation-only repair. Focused R34 validates prevention on
+  the observed WMT failure; it did not exercise the live repair edge, whose
+  acceptance and fail-closed behavior are currently covered by unit tests.
 - The Task 7 contract proves structural traceability and verdict consistency,
   but cannot determine whether a paraphrase is truly atomic or a passage
   semantically entails it.
@@ -610,10 +620,9 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Diagnose the two remaining R33 false abstentions separately: invalid
-   synthesis citation labeling for `transformer_wmt14_en_de_result`, and two
-   malformed top-level claim-verifier outputs for
-   `lora_frozen_low_rank_mechanism`.
+1. Diagnose the remaining R33 false abstention: two malformed top-level claim-
+   verifier outputs for `lora_frozen_low_rank_mechanism`. Focused R34 closed the
+   separate WMT invalid-citation regression without weakening fail-closed checks.
 2. Analyze the four R33 answer cases with zero annotated Recall@5 but successful
    verified answers; distinguish incomplete gold evidence from retrieval drift
    before changing ranking.

@@ -343,7 +343,13 @@ def _llm_calls(state: Mapping[str, Any]) -> LlmCallCounts:
         if isinstance(attempts, Mapping)
         else int(state.get("retrieval_attempt_count", 0) or 0)
     )
-    synthesis = int(bool(state.get("evidence_sufficient")))
+    synthesis = int(
+        state.get(
+            "synthesis_model_call_count",
+            int(bool(state.get("evidence_sufficient"))),
+        )
+        or 0
+    )
     claims = int(state.get("claim_verification_attempt_count", 0) or 0)
     repairs = int(
         state.get(

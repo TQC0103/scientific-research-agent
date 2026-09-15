@@ -242,11 +242,15 @@ Implementation: `app/models/llm.py`, `app/models/claims.py`,
 
 ```mermaid
 flowchart TD
-    VERIFIED["Verifier-approved passages only"] --> PROMPT["Evidence-only answer prompt"]
+    VERIFIED["Verifier-approved passages only"] --> MASK["Mask numeric paper bibliography references"]
+    MASK --> PROMPT["Evidence-only answer prompt; enumerate allowed labels"]
     PROMPT --> QWEN["Qwen3 4B synthesis"]
     QWEN --> RAW["Concise answer with numeric citation labels"]
     RAW --> PARSE["Resolve every numeric label against supplied passages"]
-    PARSE -->|"missing or any invalid label"| CITEFAIL["Discard generated answer; explicit grounding failure"]
+    PARSE -->|"missing or any invalid label"| CITEREPAIR["One citation-only repair"]
+    CITEREPAIR --> LOCK{"Non-citation text unchanged and labels valid?"}
+    LOCK -->|"no"| CITEFAIL["Discard generated answer; explicit grounding failure"]
+    LOCK -->|"yes"| METADATA
     PARSE -->|"all labels valid"| METADATA["Resolve trusted arXiv version, title, page, section"]
     METADATA --> FINAL["Answer + deterministic Sources block"]
 
@@ -280,9 +284,14 @@ flowchart TD
 
 The model never authors bibliographic metadata. Abstract fallback citations are
 labeled `Abstract`; full-text citations use stored page and section metadata.
-Code never invents a citation when the model omits one. Missing citations and
-labels outside the verifier-approved passage list fail closed before any Sources
-block is rendered. The production graph then strips that deterministic block,
+Code masks numeric bibliography references in evidence before prompting and
+enumerates the only allowed answer labels. It never deterministically invents a
+citation when the model omits one. Missing or invalid labels may enter exactly
+one model repair that is accepted only when non-citation answer text remains
+identical and every repaired label maps to approved evidence; otherwise the
+answer fails closed before any Sources block is rendered. The graph records raw
+output, repair status/error, and the actual synthesis-call count. It then strips
+the deterministic Sources block,
 checks atomic claims against only approved passages, and permits at most one
 answer repair. Production claim extraction cannot author claim IDs, source text,
 visible labels, or verdicts: it selects a code-owned exact span and returns
@@ -570,6 +579,10 @@ focused R22 and full R23; R23 completed all 25 cases and 86 physical calls with
 zero OOM/tool/execution errors. Its remaining retrieval, answer-completeness,
 and claim-grounding failures stay in their respective graph/report layers and
 are not collapsed into the runtime-success edge.
+Focused R34 then closed the observed WMT invalid-label failure: masked paper
+references produced a valid `[1]` answer on the first synthesis call, and the
+claim verifier accepted the bound claim without revision. The repair edge was
+therefore not exercised by that live case and remains covered deterministically.
 
 ## Maintenance rule
 

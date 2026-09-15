@@ -68,11 +68,14 @@ rejects a positive verifier decision when its selected passages do not mention
 the requested metric or benchmark (for example, training time is not electrical
 energy and WMT BLEU is not ImageNet top-1 accuracy).
 
-Synthesis no longer attaches `[1]` when the model omits citations. An answer
-without a valid label, or with any label outside the verifier-approved evidence
-set, is discarded and replaced by an explicit citation-grounding failure. Valid
-labels are still resolved to trusted version, title, page, and section metadata
-by code rather than by the model.
+Synthesis no longer attaches `[1]` when the model omits citations. Numeric
+bibliography references inside retrieved paper text are masked before synthesis
+so they cannot be mistaken for answer labels. If the first answer still omits a
+label or uses a label outside the verifier-approved evidence set, one bounded
+citation-only repair may change labels but must preserve every other answer
+token; an unsafe or still-invalid repair fails closed. Valid labels are resolved
+to trusted version, title, page, and section metadata by code rather than by the
+model. The evaluator records the actual one-or-two synthesis model calls.
 
 After citation-safe synthesis, the production graph performs atomic claim
 verification against those same approved passages. Answers whose factual claims
@@ -642,6 +645,14 @@ from `0.8400` to `0.9200` and answer F1 from `0.3699` to `0.4043`; Recall@5 fell
 from `0.8333` to `0.7917`. The LoRA no-latency and LoRA/RAG comparison cases
 remained recovered, while LoRA frozen-weight still failed closed on malformed
 claim output. R33 is still development data, not a held-out or publishable score.
+
+Focused R34 (`job_d2855c0aaee24410a100efce204b4673`) then validated the WMT
+citation fix on exact T4. Masking the paper's internal references prevented the
+bad label at generation time, so the answer used valid `[1]`, passed atomic
+claim verification without revision, and required only one synthesis call. The
+single-case decision, Recall@5, gold coverage, required-paper coverage, supported-
+claim rate, and citation completeness were all `1.0000`; this is a regression
+check for one observed failure, not an aggregate score.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

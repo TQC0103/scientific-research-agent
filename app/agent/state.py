@@ -23,6 +23,10 @@ class AgentState(TypedDict, total=False):
     answer: str
     verified_evidence: list[dict]
     synthesis_citation_valid: bool
+    synthesis_raw_answer: str
+    synthesis_model_call_count: int
+    synthesis_citation_repair_count: int
+    synthesis_citation_repair_error: str | None
     claim_verification: dict
     claim_verification_status: str
     claim_verification_error: str | None

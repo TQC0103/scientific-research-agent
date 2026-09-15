@@ -14,7 +14,7 @@ from app.models.claim_verifier import (
     verify_answer_claims_bounded,
 )
 from app.models.claims import ClaimVerdict, ClaimVerificationBundle
-from app.models.llm import answer_from_evidence
+from app.models.llm import answer_from_evidence_bounded
 from app.models.verifier import verify_evidence
 from app.retrieval.vector_store import index_is_current, retrieve
 from app.tools.arxiv_search import get_arxiv_metadata, search_arxiv
@@ -179,6 +179,10 @@ def discover(state: AgentState) -> dict:
         "evidence_verifications": {},
         "verified_evidence": [],
         "synthesis_citation_valid": False,
+        "synthesis_raw_answer": "",
+        "synthesis_model_call_count": 0,
+        "synthesis_citation_repair_count": 0,
+        "synthesis_citation_repair_error": None,
         "claim_verification": {},
         "claim_verification_status": "not_run",
         "claim_verification_error": None,
@@ -432,6 +436,10 @@ def synthesize(state: AgentState) -> dict:
         state.get("retrieved_chunks", [])
     )
     verified_evidence = []
+    synthesis_raw_answer = ""
+    synthesis_model_call_count = 0
+    synthesis_citation_repair_count = 0
+    synthesis_citation_repair_error = None
     evidence_sufficient = bool(
         state.get("evidence_sufficient") and _coverage_sufficient(state, verifications)
     )
@@ -479,7 +487,14 @@ def synthesize(state: AgentState) -> dict:
                 for number in verification.get("supported_evidence", [])
                 if 1 <= number <= len(evidence)
             )
-        answer = answer_from_evidence(state["user_query"], verified_evidence, papers)
+        synthesis = answer_from_evidence_bounded(
+            state["user_query"], verified_evidence, papers
+        )
+        answer = synthesis.answer
+        synthesis_raw_answer = synthesis.raw_answer
+        synthesis_model_call_count = synthesis.model_calls
+        synthesis_citation_repair_count = synthesis.citation_repair_count
+        synthesis_citation_repair_error = synthesis.citation_repair_error
     if state.get("tool_errors"):
         answer += "\n\nRetrieval notes:\n- " + "\n- ".join(state["tool_errors"])
     citation_valid = bool(evidence_sufficient and verified_evidence and "\n\nSources:\n" in answer)
@@ -488,6 +503,10 @@ def synthesize(state: AgentState) -> dict:
         "answer": answer,
         "verified_evidence": verified_evidence,
         "synthesis_citation_valid": citation_valid,
+        "synthesis_raw_answer": synthesis_raw_answer,
+        "synthesis_model_call_count": synthesis_model_call_count,
+        "synthesis_citation_repair_count": synthesis_citation_repair_count,
+        "synthesis_citation_repair_error": synthesis_citation_repair_error,
         "claim_verification": {},
         "claim_verification_status": "not_run",
         "claim_verification_error": None,

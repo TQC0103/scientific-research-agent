@@ -61,9 +61,11 @@ Continue in this order:
    through paper-local verifier subquestions and exact pruning of a wholly
    unsupported standalone answer span. Full R33 retained two of those three
    recoveries and raised decision accuracy to `0.9200`; the frozen-weight case
-   still exposed small-model structure variance. Next isolate that malformed
-   output and the WMT invalid-citation abstention. Table-aware ResNet answer
-   recovery remains a separate utility target.
+   still exposed small-model structure variance. Focused R34 fixed and validated
+   the WMT invalid-citation abstention by masking paper bibliography references
+   before synthesis; the bounded citation-only repair remains a fail-closed
+   fallback. Next isolate the frozen-weight malformed claim output. Table-aware
+   ResNet answer recovery remains a separate utility target.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

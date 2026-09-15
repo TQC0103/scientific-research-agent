@@ -462,6 +462,15 @@ citation-safety failure `0.0400`. Compared with R23, answer decisions improved
 by two net cases while annotated retrieval coverage declined. R33 is the latest
 clean R25 development checkpoint, not the frozen R10 baseline.
 
+Focused R34 (`job_d2855c0aaee24410a100efce204b4673`) reran only
+`transformer_wmt14_en_de_result` on exact T4 after paper-internal numeric
+bibliography references were masked before synthesis. The answer used `[1]`,
+the bound claim was supported, and decision accuracy, Recall@5, gold evidence
+coverage, required-paper coverage, supported-claim rate, and citation
+completeness were all `1.0000`. It used one verifier, one synthesis, and one
+claim-verifier call; the bounded citation-only fallback was not needed. This is
+a focused regression result, not a replacement for the 25-case R33 checkpoint.
+
 ## Retrieval matching contract
 
 The internal evaluator implements the following rules:

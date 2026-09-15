@@ -2,6 +2,7 @@ import pytest
 
 from app.agent import graph
 from app.models import verifier
+from app.models.llm import AnswerSynthesisRun
 from app.models.verifier import EvidenceVerification, _extract_json
 
 
@@ -97,7 +98,7 @@ def test_synthesis_fails_closed_on_internally_inconsistent_verification(
     def fail_answer(*args, **kwargs):
         raise AssertionError("Synthesis model must not run")
 
-    monkeypatch.setattr(graph, "answer_from_evidence", fail_answer)
+    monkeypatch.setattr(graph, "answer_from_evidence_bounded", fail_answer)
     result = graph.synthesize(
         {
             "user_query": "By what factors were parameters, memory, and latency reduced?",
@@ -331,9 +332,11 @@ def test_synthesis_uses_only_passages_approved_by_verifier(monkeypatch) -> None:
 
     def fake_answer(question, evidence, papers):
         captured["evidence"] = evidence
-        return "Verified answer."
+        return AnswerSynthesisRun(
+            answer="Verified answer.", raw_answer="Verified answer.", model_calls=1
+        )
 
-    monkeypatch.setattr(graph, "answer_from_evidence", fake_answer)
+    monkeypatch.setattr(graph, "answer_from_evidence_bounded", fake_answer)
     evidence = [_chunk(0, "unsupported"), _chunk(1, "supported")]
     result = graph.synthesize(
         {
@@ -350,6 +353,9 @@ def test_synthesis_uses_only_passages_approved_by_verifier(monkeypatch) -> None:
         }
     )
     assert result["answer"] == "Verified answer."
+    assert result["synthesis_raw_answer"] == "Verified answer."
+    assert result["synthesis_model_call_count"] == 1
+    assert result["synthesis_citation_repair_count"] == 0
     assert captured["evidence"] == [evidence[1]]
 
 
@@ -357,7 +363,7 @@ def test_insufficient_evidence_stops_without_calling_synthesis_model(monkeypatch
     def fail_answer(*args, **kwargs):
         raise AssertionError("Synthesis model must not run")
 
-    monkeypatch.setattr(graph, "answer_from_evidence", fail_answer)
+    monkeypatch.setattr(graph, "answer_from_evidence_bounded", fail_answer)
     result = graph.synthesize(
         {
             "user_query": "Question",
@@ -556,9 +562,11 @@ def test_multi_paper_synthesis_keeps_approved_evidence_separate(monkeypatch) -> 
 
     def fake_answer(question, evidence, papers):
         captured["evidence"] = evidence
-        return "Comparison."
+        return AnswerSynthesisRun(
+            answer="Comparison.", raw_answer="Comparison.", model_calls=1
+        )
 
-    monkeypatch.setattr(graph, "answer_from_evidence", fake_answer)
+    monkeypatch.setattr(graph, "answer_from_evidence_bounded", fake_answer)
     result = graph.synthesize(
         {
             "user_query": "Compare A and B",

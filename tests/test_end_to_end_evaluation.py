@@ -239,6 +239,44 @@ def test_revised_success_counts_two_claim_checks_and_one_repair() -> None:
     assert report.cases[0].llm_calls.total == 5
 
 
+def test_citation_repair_is_counted_as_a_second_synthesis_call() -> None:
+    suite = _two_case_suite()
+    case = suite.cases[0]
+    suite = suite.model_copy(update={"cases": [case]})
+    reference = case.expected.reference_answer
+    body = f"{reference} [1]"
+    bundle = _supported_bundle(body)
+    evidence = case.gold_evidence[0]
+
+    def invoke(payload, config):
+        chunk = {
+            "arxiv_id": evidence.paper_id,
+            "versioned_id": evidence.versioned_id,
+            "page": evidence.page,
+            "section": evidence.section,
+            "text": evidence.quote,
+        }
+        return {
+            "answer": f"{body}\n\nSources:\n[1] trusted",
+            "evidence_sufficient": True,
+            "synthesis_citation_valid": True,
+            "synthesis_model_call_count": 2,
+            "synthesis_citation_repair_count": 1,
+            "claim_verification_status": "verified",
+            "claim_verification": bundle.model_dump(mode="json"),
+            "claim_verification_attempt_count": 1,
+            "claim_revision_count": 0,
+            "retrieval_attempt_counts": {evidence.paper_id: 1},
+            "retrieved_chunks_by_paper": {evidence.paper_id: [chunk]},
+            "tool_errors": [],
+        }
+
+    report = run_end_to_end(suite, invoke, config_name="citation-repair")
+
+    assert report.cases[0].llm_calls.synthesis == 2
+    assert report.cases[0].llm_calls.total == 4
+
+
 def test_deterministic_revision_does_not_count_as_claim_repair_model_call() -> None:
     suite = _two_case_suite()
     case = suite.cases[0]

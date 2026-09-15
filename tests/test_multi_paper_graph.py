@@ -7,6 +7,7 @@ from app.models.claims import (
     ClaimEvidenceLink,
     ClaimVerificationBundle,
 )
+from app.models.llm import AnswerSynthesisRun
 from app.models.verifier import EvidenceVerification
 
 
@@ -52,11 +53,12 @@ def test_full_graph_requires_and_synthesizes_both_explicit_papers(monkeypatch) -
 
     def fake_answer(question, evidence, papers):
         assert {item["arxiv_id"] for item in evidence} == set(paper_ids)
-        return (
+        answer = (
             "Grounded comparison [1][2].\n\nSources:\n"
             "[1] arXiv:2401.00001v1 — page 2, Method\n"
             "[2] arXiv:2401.00002v1 — page 2, Method"
         )
+        return AnswerSynthesisRun(answer=answer, raw_answer=answer, model_calls=1)
 
     def fake_claim_verification(answer, evidence, question):
         assert len(evidence) == 2
@@ -96,7 +98,7 @@ def test_full_graph_requires_and_synthesizes_both_explicit_papers(monkeypatch) -
         )
 
     monkeypatch.setattr(graph, "verify_evidence", fake_verify)
-    monkeypatch.setattr(graph, "answer_from_evidence", fake_answer)
+    monkeypatch.setattr(graph, "answer_from_evidence_bounded", fake_answer)
     monkeypatch.setattr(
         graph,
         "verify_answer_claims_bounded",
