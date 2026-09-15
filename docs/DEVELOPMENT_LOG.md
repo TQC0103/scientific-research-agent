@@ -1715,3 +1715,74 @@ answer F1 are both `0.0000` for this one positive case, with seven counted LLM
 calls. R26 therefore closes the unsafe false approval observed in R23 but does
 not solve table-value extraction or answer utility. Its ignored artifact is at
 `data/evaluations/runs/resnet_guard_r26`.
+
+## 2026-09-15 — LoRA grounding recovery and scoped comparison verification
+
+The three LoRA failures in full R23 were decomposed with focused exact-T4 runs
+instead of being treated as one prompt-quality problem. R27 used bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-lora-claim-anchor-r27`,
+kernel `tqc0103/sra-e2e-lora-claim-anchor-r27`, and job
+`job_2cff1ab381c44b4c9e1a6596caed5b40`. Claim extraction is now anchored to the
+immutable answer span: when a model emits multiple claims for one span, claims
+that import evidence-only vocabulary or numeric details fail structure
+validation and receive the existing single structure retry. R27 recovered the
+frozen-weight and no-latency cases as verified answers. The LoRA/RAG comparison
+still abstained earlier at evidence verification, proving that its remaining
+failure was not in claim extraction.
+
+R28 attempted that comparison with authoritative paper scope and the original
+question separated from the current retrieval query. Jobs
+`job_19a36730fea9476f91a60c9ee0fbd096` and
+`job_0e11a33886fd46a4a33e69c1036a8622` both failed before model execution because
+the live arXiv Atom metadata request returned HTTP 429. They produced no quality
+result. The Kaggle end-to-end adapter now derives metadata from the reviewed
+suite and pinned source manifest, validates the versioned identity, and still
+downloads and ingests the real pinned PDF. This removes an unrelated live
+metadata service from the repeatable benchmark path.
+
+R29 used bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-lora-rag-scope-r29`,
+kernel `quccngtrng/sra-e2e-lora-rag-scope-r29`, and job
+`job_a2c1ac09afaa47b2b7cb40bbadab0f56`. It succeeded in 293 seconds without the
+metadata API, but the verifier accepted only the RAG side even though retrieval
+Recall@K was `1.0000`; required-paper and gold coverage remained `0.5000`. The
+shared comparison wording was therefore still an unstable decision target for
+each paper-local verifier call.
+
+The graph now recognizes the bounded `How do A and B ... differently?` form,
+binds A/B to title tokens or leading-title acronyms, and produces one local
+`How does A ...?` question per paper. Unknown comparison forms remain unchanged
+rather than receiving a guessed rewrite. R30 used bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-lora-rag-local-r30`,
+kernel `quccngtrng/sra-e2e-lora-rag-local-r30`, and job
+`job_1160bbf005a542f7b67310c2204d58aa`. It succeeded in 381 seconds: both paper
+checks passed on their first attempt and Recall@K, gold coverage, and required-
+paper coverage were all `1.0000`. Synthesis then added an uncited standalone
+comparison summary; claim verification rejected it and the model repair repeated
+it, so the safe final result was still abstention.
+
+Multi-paper synthesis now requests one citation-complete sentence per paper and
+forbids uncited opening or closing summaries. More importantly, the bounded
+claim repair can remove a wholly unsupported standalone source span exactly in
+code when every failed claim is unsupported, no failed claim is partial or
+shares a retained span, and at least one answer span remains. Partial, mixed, and
+completeness failures still use at most one repair-model call. The graph records
+answer revisions separately from physical claim-repair model calls.
+
+R31 used account `acct_3e7e9998dec6467f95fb3502422f7914`, exact
+`NvidiaTeslaT4`, bundle
+`C:\Users\ASUS\Documents\Codex\2026-08-13\t\experiments\sra-e2e-lora-rag-ground-r31`,
+kernel `quccngtrng/sra-e2e-lora-rag-ground-r31`, and job
+`job_5a030a7481b34e5d80048c54441726b4`. It succeeded in 333 seconds. The one
+development comparison returned the expected answer decision, passed claim
+verification after one deterministic span-pruning revision, and recorded
+Recall@K, gold coverage, and required-paper coverage of `1.0000`, answer F1
+`0.4386`, and zero execution, tool, or OOM failures. The saved R31 report counted
+six LLM-node calls because the old telemetry equated every revision with a model
+repair; adapter telemetry showed five physical calls: two evidence checks, one
+synthesis, and two claim checks. New reports use the explicit repair-model-call
+counter and will count that deterministic revision as zero model calls. R31 is a
+focused regression, not a replacement for the full 25-case R23 checkpoint. All
+runtime artifacts remain ignored.
+
+Final local verification passed Ruff and all 189 pytest tests.

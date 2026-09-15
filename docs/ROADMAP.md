@@ -56,8 +56,12 @@ Continue in this order:
    paper-wide absence assertions through the existing bounded repair. Focused
    R26 validated the safe path: it blocked the false approval, attempted one
    revision, and abstained when the model repeated the incomplete answer. The
-   next quality target is the three LoRA claim-grounding/structure abstentions;
-   table-aware answer recovery remains separate utility work.
+   R27 recovered the frozen-weight and no-latency LoRA cases by rejecting
+   evidence-derived claim expansion. R30/R31 recovered the LoRA/RAG comparison
+   through paper-local verifier subquestions and exact pruning of a wholly
+   unsupported standalone answer span. Run the full 25-case suite again before
+   promoting these focused regressions; table-aware ResNet answer recovery
+   remains a separate utility target.
 4. Add production embedding-call instrumentation and structured abstention-
    reason classification only where the graph exposes reliable observations;
    do not estimate them from adapter behavior.

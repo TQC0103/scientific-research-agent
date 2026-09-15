@@ -1,5 +1,5 @@
 from app.agent import graph
-from app.models.claim_verifier import ClaimVerificationRun
+from app.models.claim_verifier import ClaimRepairRun, ClaimVerificationRun
 from app.models.claims import (
     CLAIM_VERIFICATION_CONTRACT_VERSION,
     AtomicClaim,
@@ -180,7 +180,11 @@ def test_repair_route_allows_exactly_one_revision() -> None:
 def test_revision_is_recorded_and_reverified(monkeypatch) -> None:
     bundle = _bundle("partial")
     revised = "Narrowed fact [1].\n\nSources:\n[1] trusted"
-    monkeypatch.setattr(graph, "repair_answer_claims", lambda *args: revised)
+    monkeypatch.setattr(
+        graph,
+        "repair_answer_claims_bounded",
+        lambda *args: ClaimRepairRun(answer=revised, model_calls=1),
+    )
     state = {
         "user_query": "Question?",
         "answer": "Fact 1 [1].\n\nSources:\n[1] trusted",
@@ -195,6 +199,7 @@ def test_revision_is_recorded_and_reverified(monkeypatch) -> None:
 
     assert result["answer"] == revised
     assert result["claim_revision_count"] == 1
+    assert result["claim_repair_model_call_count"] == 1
     assert result["claim_revision_history"][-1] == revised
     assert graph.route_after_revision(result) == "verify_claims"
 
@@ -205,7 +210,7 @@ def test_failed_revision_abstains_without_another_loop(monkeypatch) -> None:
     def fail(*args):
         raise ValueError("repair failed")
 
-    monkeypatch.setattr(graph, "repair_answer_claims", fail)
+    monkeypatch.setattr(graph, "repair_answer_claims_bounded", fail)
     result = graph.revise_answer(
         {
             "user_query": "Question?",

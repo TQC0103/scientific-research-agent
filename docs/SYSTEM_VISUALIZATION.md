@@ -175,8 +175,9 @@ Implementation: `app/models/verifier.py`, `app/agent/graph.py`.
 ```mermaid
 flowchart TD
     INPUT["Question + required paper set"] --> LOOP["For each required paper"]
-    LOOP --> CAP["Keep ranked prefix; default verifier cap = 6 passages"]
-    CAP --> SCOPE["Paper-scoped question + bounded passages"]
+    LOOP --> CAP["Keep ranked prefix; default verifier cap = 5 passages"]
+    CAP --> LOCAL["Split recognized A/B differently question into paper-local subquestions"]
+    LOCAL --> SCOPE["Authoritative paper scope + bounded passages"]
     SCOPE --> QWEN["Qwen3 4B verifier; temperature 0; fixed seed"]
     QWEN --> JSON["Per-paper JSON: sufficient, reason, missing, query, supported IDs"]
     JSON --> VALIDATE["Parse schema and validate passage IDs"]
@@ -205,7 +206,11 @@ a passage answers the question. Negative and exhaustive questions require
 enough scope; silence in a few passages is not accepted as proof. For a
 multi-paper question, each paper must cover every requested comparison
 dimension on its own side. Missing evidence about another paper is ignored
-during that paper's check, but missing dimensions within the paper are not.
+during that paper's check, but missing dimensions within the paper are not. For
+the recognized `How do A and B ... differently?` shape, title tokens or leading
+title acronyms bind A/B to candidates and code produces one local `How does A
+...?` question per paper. Unrecognized shapes retain the original question and
+paper scope rather than guessing a rewrite.
 The post-parse completeness invariant is deterministic: a paper is covered only
 when `sufficient=true`, at least one valid supporting passage is selected, and
 `missing_information` is empty. A false decision is never upgraded merely
@@ -222,7 +227,7 @@ it. This guard narrows a positive model decision; it never upgrades insufficient
 evidence.
 
 Retrieval state retains up to eight passages per paper across rewrites, while a
-separate default cap of six limits each verifier prompt. Because the verifier
+separate default cap of five limits each verifier prompt. Because the verifier
 receives a prefix rather than a reordered sample, its one-based supporting IDs
 remain valid against the retained per-paper list used by synthesis.
 
@@ -261,7 +266,9 @@ flowchart TD
     RECHECK -->|"no"| CLAIMFAIL
     CLAIMGUARD -->|"invalid after retry"| CLAIMFAIL["Explicit claim-grounding abstention"]
     CLAIMBUNDLE -->|"all supported"| VERIFIED_FINAL["Return answer"]
-    CLAIMBUNDLE -->|"partial or mixed; no prior revision"| REPAIR["One evidence-only revision"]
+    CLAIMBUNDLE -->|"only standalone wholly unsupported spans"| PRUNE["Delete exact spans in code; 0 repair model calls"]
+    CLAIMBUNDLE -->|"partial, mixed-span, or completeness issue; no prior revision"| REPAIR["One evidence-only model revision"]
+    PRUNE --> SOURCES
     REPAIR --> SOURCES["Restore trusted Sources block"]
     SOURCES --> CLAIMPROMPT
     CLAIMBUNDLE -->|"unsupported, invalid, or post-repair failure"| CLAIMFAIL["Explicit claim-grounding abstention"]
@@ -286,7 +293,11 @@ Separately, one malformed response may receive one compact
 structure-only retry against immutable spans; a second invalid response abstains.
 The answer-repair model cannot author source metadata; code restores
 it from trusted passage records before re-verification. Wholly unsupported
-answers and unresolved post-repair claims also abstain.
+standalone spans can instead be removed exactly without a model call, but only
+when every failed claim is unsupported and occupies a removable whole span;
+partial or mixed spans still use the bounded model repair. Revision count and
+physical claim-repair model-call count are stored separately. Wholly
+unsupported answers and unresolved post-repair claims also abstain.
 
 ## 8. Persistence module
 

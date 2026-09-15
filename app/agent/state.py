@@ -31,6 +31,7 @@ class AgentState(TypedDict, total=False):
     claim_verification_output_normalized: bool
     claim_completeness_issues: list[str]
     claim_revision_count: int
+    claim_repair_model_call_count: int
     claim_revision_history: list[str]
     iteration_count: int
     discovery_source: str

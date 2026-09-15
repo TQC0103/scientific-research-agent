@@ -451,12 +451,95 @@ def test_multi_paper_verification_retries_only_the_missing_paper(monkeypatch) ->
     assert result["papers_to_retrieve"] == [paper_b]
     assert result["evidence_verifications"][paper_a]["sufficient"] is True
     assert result["evidence_verifications"][paper_b]["sufficient"] is False
-    assert all(
-        "Ignore all missing information about other papers" in item[0] for item in scoped_questions
-    )
+    assert all(item[0] == "Compare paper A and paper B." for item in scoped_questions)
     assert all(
         "Do not require passages about the other papers" in item[1] for item in scoped_questions
     )
+
+
+def test_multi_paper_scope_is_authoritative_and_follows_original_question() -> None:
+    prompt = verifier.build_verifier_prompt(
+        "How do LoRA and RAG use a pretrained model differently?",
+        [_paper_chunk("2005.11401", 0, "RAG combines parametric and non-parametric memory.")],
+        "How do LoRA and RAG use a pretrained model differently?",
+        "Assess only the RAG paper's side; do not require LoRA evidence.",
+    )
+
+    question_position = prompt.index("Original user question:")
+    scope_position = prompt.index("Authoritative verification scope:")
+    retrieval_position = prompt.index("Current retrieval query (context only")
+    assert question_position < scope_position < retrieval_position
+    assert "does not need to mention, explain, or contrast any other paper" in prompt
+    assert "must concern only the scoped paper" in prompt
+
+
+def test_comparison_question_is_split_into_paper_local_verifier_questions(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def fake_verify(question, evidence, current_query, scope):
+        calls.append((question, current_query, evidence[0]["arxiv_id"]))
+        return EvidenceVerification(
+            sufficient=True,
+            reason="The scoped paper's side is supported.",
+            supported_evidence=[1],
+        )
+
+    monkeypatch.setattr(graph, "verify_evidence", fake_verify)
+    lora = "2106.09685"
+    rag = "2005.11401"
+    graph.check_evidence(
+        {
+            "user_query": (
+                "How do LoRA and RAG use a pretrained model differently when adapting it "
+                "to downstream knowledge-intensive tasks?"
+            ),
+            "candidate_papers": [
+                {
+                    "arxiv_id": lora,
+                    "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+                },
+                {
+                    "arxiv_id": rag,
+                    "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+                },
+            ],
+            "selected_papers": [lora, rag],
+            "required_paper_ids": [lora, rag],
+            "required_paper_count": 2,
+            "coverage_mode": "all",
+            "papers_to_retrieve": [lora, rag],
+            "retrieved_chunks_by_paper": {
+                lora: [_paper_chunk(lora, 0, "LoRA evidence")],
+                rag: [_paper_chunk(rag, 0, "RAG evidence")],
+            },
+            "retrieval_queries": {},
+            "retrieval_attempt_counts": {},
+            "tool_errors": [],
+        }
+    )
+
+    lora_question = (
+        "How does LoRA use a pretrained model when adapting it to downstream "
+        "knowledge-intensive tasks?"
+    )
+    rag_question = (
+        "How does RAG use a pretrained model when adapting it to downstream "
+        "knowledge-intensive tasks?"
+    )
+    assert calls == [
+        (
+            lora_question,
+            lora_question,
+            lora,
+        ),
+        (
+            rag_question,
+            rag_question,
+            rag,
+        ),
+    ]
 
 
 def test_multi_paper_synthesis_keeps_approved_evidence_separate(monkeypatch) -> None:

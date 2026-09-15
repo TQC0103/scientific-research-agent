@@ -345,7 +345,13 @@ def _llm_calls(state: Mapping[str, Any]) -> LlmCallCounts:
     )
     synthesis = int(bool(state.get("evidence_sufficient")))
     claims = int(state.get("claim_verification_attempt_count", 0) or 0)
-    repairs = int(state.get("claim_revision_count", 0) or 0)
+    repairs = int(
+        state.get(
+            "claim_repair_model_call_count",
+            state.get("claim_revision_count", 0),
+        )
+        or 0
+    )
     return LlmCallCounts(
         evidence_verifier=evidence_calls,
         synthesis=synthesis,

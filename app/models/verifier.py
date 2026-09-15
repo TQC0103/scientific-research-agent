@@ -149,14 +149,19 @@ First identify exactly what the question requests without strengthening it. Then
 each requested element can be stated as a faithful paraphrase of one or more passages. Mark
 sufficient=true when all requested elements are supported; do not demand extra detail.
 
-Current retrieval query:
-{current_query or question}
+Original user question:
+{question}
 
-Verification scope:
+Authoritative verification scope:
 {scope_instruction or "Assess whether the passages support the complete question."}
 
-Question:
-{question}
+For a paper-specific scope, this scope is the complete decision target. A sufficient
+paper-local result does not need to mention, explain, or contrast any other paper. Every
+missing_information item and any suggested_query must concern only the scoped paper; a
+missing fact about another paper is not a valid reason to reject this paper's evidence.
+
+Current retrieval query (context only; it does not expand the verification scope):
+{current_query or question}
 
 Evidence:
 {chr(10).join(excerpts)}

@@ -239,6 +239,43 @@ def test_revised_success_counts_two_claim_checks_and_one_repair() -> None:
     assert report.cases[0].llm_calls.total == 5
 
 
+def test_deterministic_revision_does_not_count_as_claim_repair_model_call() -> None:
+    suite = _two_case_suite()
+    case = suite.cases[0]
+    suite = suite.model_copy(update={"cases": [case]})
+    reference = case.expected.reference_answer
+    body = f"{reference} [1]"
+    bundle = _supported_bundle(body)
+    evidence = case.gold_evidence[0]
+
+    def invoke(payload, config):
+        chunk = {
+            "arxiv_id": evidence.paper_id,
+            "versioned_id": evidence.versioned_id,
+            "page": evidence.page,
+            "section": evidence.section,
+            "text": evidence.quote,
+        }
+        return {
+            "answer": f"{body}\n\nSources:\n[1] trusted",
+            "evidence_sufficient": True,
+            "synthesis_citation_valid": True,
+            "claim_verification_status": "verified",
+            "claim_verification": bundle.model_dump(mode="json"),
+            "claim_verification_attempt_count": 2,
+            "claim_revision_count": 1,
+            "claim_repair_model_call_count": 0,
+            "retrieval_attempt_counts": {evidence.paper_id: 1},
+            "retrieved_chunks_by_paper": {evidence.paper_id: [chunk]},
+            "tool_errors": [],
+        }
+
+    report = run_end_to_end(suite, invoke, config_name="prune", run_id="prune")
+
+    assert report.cases[0].llm_calls.claim_repair == 0
+    assert report.cases[0].llm_calls.total == 4
+
+
 def test_outputs_are_reloadable_and_markdown_explains_metric_boundary(tmp_path: Path) -> None:
     suite = _two_case_suite().model_copy(update={"cases": []})
     report = run_end_to_end(suite, lambda payload, config: {}, config_name="empty", run_id="empty")

@@ -124,8 +124,10 @@ Repeated `--paper-id` options activate required coverage for every supplied
 paper. Comparison-style questions without explicit IDs require the first two
 discovered papers. Retrieval queries, retry counts, verifier decisions, and
 approved passages are isolated per paper, so evidence from one source cannot
-fill a missing side of another source. Use `chat --trace` to inspect per-paper
-attempt counts and the aggregate coverage decision.
+fill a missing side of another source. The common `How do A and B ...
+differently?` form is deterministically split into paper-local verification
+questions while the aggregate still requires both papers. Use `chat --trace`
+to inspect per-paper attempt counts and the aggregate coverage decision.
 
 ## Data layout
 
@@ -424,6 +426,9 @@ Each case includes
 ordered node updates, the serializable final graph state, retrieval diagnostics,
 final decision, claim status, repair count, counted LLM-node calls, latency, and
 failure reasons. Embedding calls are explicitly `null` until instrumented.
+Claim-repair accounting distinguishes an answer revision from a physical model
+call: exact pruning of a wholly unsupported standalone span records zero repair
+model calls.
 
 Compare a later identical-suite/config run with a prior aggregate using:
 
@@ -445,6 +450,11 @@ ignored Kaggle source with:
 ```powershell
 python -m scripts.prepare_end_to_end_kaggle_job
 ```
+
+The generated benchmark derives metadata from the reviewed suite's pinned
+revision, title, and PDF URL instead of calling the live arXiv Atom API. This
+prevents an unrelated metadata rate limit from invalidating a GPU run; PDF
+download and ingestion remain real runtime operations.
 
 Select R25 and an explicit retrieval configuration without changing R10:
 
@@ -611,6 +621,17 @@ paper omitted information without an explicit cited absence statement, the
 answer receives the existing single bounded repair and is then re-verified.
 This guard is intentionally narrow; it does not claim general semantic
 completeness.
+
+Focused LoRA follow-ups separated three failures. R27 rejected claims copied
+from evidence but recovered the frozen-weight and no-latency cases. R30 showed
+that paper-local subquestions make both sides of the LoRA/RAG comparison pass
+evidence verification with complete gold and required-paper coverage. R31 then
+pruned its standalone uncited comparison summary exactly and returned a
+verified answer after one bounded deterministic revision: decision accuracy,
+Recall@K, gold evidence coverage, and required-paper coverage were all `1.0000`
+for that one development case, with answer F1 `0.4386`. These are focused
+regressions, not aggregate quality claims; full R23 remains the latest clean
+25-case checkpoint.
 
 `first_submitted_at` is the first arXiv submission and `last_revised_at` is the
 retrieved arXiv version's update time. Neither is a journal publication date.

@@ -314,7 +314,7 @@ def test_span_bound_parser_binds_judgments_to_visible_labels_by_position() -> No
     span_payload = _span_payload(payload)
     span_payload["claims"][0]["evidence_judgments"] = []
 
-    with pytest.raises(ValueError, match="one evidence judgment per visible"):
+    with pytest.raises(ValueError, match="counts must match exactly"):
         claim_verifier.parse_span_bound_claim_response(
             json.dumps(span_payload),
             expected_answer=payload["answer"],
@@ -340,6 +340,82 @@ def test_span_bound_parser_recovers_single_judgment_for_one_span_and_label() -> 
     assert bundle.claims[0].citation_labels == [1]
     assert bundle.claims[0].claim_text == answer.removesuffix(" [1].") + "."
     assert bundle.assessments[0].verdict == ClaimVerdict.SUPPORTED
+
+
+def test_span_bound_parser_rejects_claims_copied_from_evidence() -> None:
+    answer = "LoRA freezes the original weights and trains low-rank matrices [1]."
+    payload = {
+        "claims": [
+            {
+                "claim_text": "LoRA freezes the original weights",
+                "source_span_id": "span_1",
+                "requires_citation": True,
+                "evidence_judgments": [
+                    {"relationship": "entails", "reason": "Direct support."}
+                ],
+                "assessment_reason": "Direct support.",
+            },
+            {
+                "claim_text": (
+                    "LoRA reduces trainable parameters by 10,000 times and GPU memory by 3 times"
+                ),
+                "source_span_id": "span_1",
+                "requires_citation": True,
+                "evidence_judgments": [
+                    {"relationship": "entails", "reason": "Copied from the evidence."}
+                ],
+                "assessment_reason": "Copied from the evidence.",
+            }
+        ]
+    }
+
+    with pytest.raises(ValueError, match="imports content not stated"):
+        claim_verifier.parse_span_bound_claim_response(
+            json.dumps(payload), expected_answer=answer, evidence_count=1
+        )
+
+
+def test_bounded_verifier_repairs_evidence_derived_extra_claim(monkeypatch) -> None:
+    answer = "LoRA freezes the original weights and trains low-rank matrices [1]."
+    invalid = {
+        "claims": [
+            {
+                "claim_text": "LoRA freezes the original weights",
+                "source_span_id": "span_1",
+                "requires_citation": True,
+                "evidence_judgments": [
+                    {"relationship": "entails", "reason": "Direct support."}
+                ],
+                "assessment_reason": "Direct support.",
+            },
+            {
+                "claim_text": "LoRA reduces GPU memory by 3 times",
+                "source_span_id": "span_1",
+                "requires_citation": True,
+                "evidence_judgments": [
+                    {"relationship": "entails", "reason": "Evidence-only detail."}
+                ],
+                "assessment_reason": "Evidence-only detail.",
+            },
+        ]
+    }
+    repaired = {"claims": [invalid["claims"][0]]}
+    responses = iter([json.dumps(invalid), json.dumps(repaired)])
+    prompts = []
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> SimpleNamespace:
+            prompts.append(prompt)
+            return SimpleNamespace(content=next(responses))
+
+    monkeypatch.setattr(claim_verifier, "get_llm", lambda **kwargs: FakeModel())
+
+    run = claim_verifier.verify_answer_claims_bounded(answer, _evidence()[:1])
+
+    assert run.model_calls == 2
+    assert run.output_repaired is True
+    assert len(run.bundle.claims) == 1
+    assert "Remove any claim that copied facts" in prompts[1]
 
 
 def test_bounded_verifier_records_single_span_output_normalization(monkeypatch) -> None:
@@ -447,6 +523,68 @@ def test_claim_repair_without_citation_fails_citation_safety(monkeypatch) -> Non
 
     assert "citation" in answer.casefold()
     assert "\n\nSources:\n" not in answer
+
+
+def test_claim_repair_prunes_standalone_unsupported_span_without_model(monkeypatch) -> None:
+    answer = "Supported mechanism [1]. Unsupported comparison summary."
+    bundle = ClaimVerificationBundle(
+        contract_version=CLAIM_VERIFICATION_CONTRACT_VERSION,
+        answer=answer,
+        evidence_count=1,
+        claims=[
+            AtomicClaim(
+                claim_id="claim_1",
+                claim_text="Supported mechanism",
+                source_text="Supported mechanism [1].",
+                requires_citation=True,
+                citation_labels=[1],
+            ),
+            AtomicClaim(
+                claim_id="claim_2",
+                claim_text="Unsupported comparison summary",
+                source_text="Unsupported comparison summary.",
+                requires_citation=True,
+                citation_labels=[],
+            ),
+        ],
+        assessments=[
+            ClaimAssessment(
+                claim_id="claim_1",
+                verdict="supported",
+                cited_evidence=[
+                    ClaimEvidenceLink(
+                        citation_label=1,
+                        relationship="entails",
+                        reason="Direct support.",
+                    )
+                ],
+                reason="Direct support.",
+            ),
+            ClaimAssessment(
+                claim_id="claim_2",
+                verdict="unsupported",
+                cited_evidence=[],
+                reason="No citation or support.",
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        claim_verifier,
+        "get_llm",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("model must not load")),
+    )
+
+    run = claim_verifier.repair_answer_claims_bounded(
+        "Compare two methods.",
+        answer,
+        _evidence()[:1],
+        {"1706.03762": {"title": "Paper"}},
+        bundle,
+    )
+
+    assert run.model_calls == 0
+    assert run.answer.startswith("Supported mechanism [1].\n\nSources:\n")
+    assert "Unsupported comparison summary" not in run.answer
 
 
 def _supported_bundle(answer: str, claim_texts: list[str]) -> ClaimVerificationBundle:

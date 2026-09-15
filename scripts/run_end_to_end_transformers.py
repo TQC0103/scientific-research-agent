@@ -203,7 +203,7 @@ class CrossEncoderRuntime:
 def _install_adapters(
     llm: TransformersRuntime,
     embeddings: SentenceTransformerEmbeddings,
-    expected_revisions: dict[str, str],
+    pinned_sources: dict[str, dict[str, Any]],
     reranker: CrossEncoderRuntime | None = None,
 ) -> Any:
     import app.agent.graph as graph_module
@@ -211,21 +211,15 @@ def _install_adapters(
     import app.models.llm as llm_module
     import app.models.verifier as verifier_module
     import app.retrieval.vector_store as vector_module
-    from app.db.database import get_paper
+    from app.db.database import get_paper, upsert_paper
 
-    original_metadata = graph_module.get_arxiv_metadata
     metadata_cache: dict[str, dict[str, Any]] = {}
 
     def pinned_metadata(paper_id: str) -> dict[str, Any]:
         base_id = paper_id.split("v", 1)[0]
         if base_id not in metadata_cache:
-            paper = original_metadata(expected_revisions[base_id])
-            actual = paper.get("versioned_id")
-            if actual != expected_revisions[base_id]:
-                raise ValueError(
-                    f"Pinned arXiv revision mismatch for {base_id}: expected "
-                    f"{expected_revisions[base_id]}, received {actual}."
-                )
+            paper = _metadata_from_pinned_source(base_id, pinned_sources[base_id])
+            upsert_paper(paper)
             metadata_cache[base_id] = paper
         return dict(get_paper(base_id) or metadata_cache[base_id])
 
@@ -244,6 +238,34 @@ def _install_adapters(
     settings.ollama_model = f"hf:{DEFAULT_LLM_MODEL}@{DEFAULT_LLM_REVISION}"
     settings.ollama_embed_model = f"hf:{DEFAULT_EMBEDDING_MODEL}@{DEFAULT_EMBEDDING_REVISION}"
     return graph_module.research_graph
+
+
+def _metadata_from_pinned_source(
+    paper_id: str, source: dict[str, Any]
+) -> dict[str, Any]:
+    """Build benchmark metadata from the reviewed source manifest without an API call."""
+    versioned_id = str(source["versioned_id"])
+    base_id, separator, revision_text = versioned_id.rpartition("v")
+    if not separator or base_id != paper_id or not revision_text.isdigit():
+        raise ValueError(f"Invalid pinned source identity for {paper_id}: {versioned_id}")
+    return {
+        "arxiv_id": paper_id,
+        "versioned_id": versioned_id,
+        "version": int(revision_text),
+        "title": str(source["title"]),
+        "abstract": "",
+        "authors": [],
+        "categories": [],
+        "primary_category": None,
+        "published": None,
+        "updated": None,
+        "first_submitted_at": None,
+        "last_revised_at": None,
+        "doi": None,
+        "journal_ref": None,
+        "comment": "Pinned evaluation source; metadata API intentionally bypassed.",
+        "pdf_url": str(source["pdf_url"]),
+    }
 
 
 def _invoke(graph: Any, payload: dict, config: dict) -> dict:
@@ -323,7 +345,17 @@ def main() -> None:
     settings.data_dir = args.data_dir
     settings.ensure_directories()
     sources = json.loads(args.sources.read_text(encoding="utf-8"))["sources"]
-    expected = {item["versioned_id"].rsplit("v", 1)[0]: item["versioned_id"] for item in sources}
+    suite = load_suite(args.suite)
+    titles: dict[str, str] = {}
+    for case in suite.cases:
+        for paper in case.papers:
+            existing = titles.setdefault(paper.paper_id, paper.title)
+            if existing != paper.title:
+                raise ValueError(f"Conflicting pinned titles for {paper.paper_id}.")
+    pinned_sources = {}
+    for item in sources:
+        base_id = item["versioned_id"].rsplit("v", 1)[0]
+        pinned_sources[base_id] = {**item, "title": titles[base_id]}
     llm = TransformersRuntime(args.llm_model, args.llm_revision)
     embeddings = SentenceTransformerEmbeddings(
         args.embedding_model,
@@ -339,7 +371,7 @@ def main() -> None:
             batch_size=args.reranker_batch_size,
             device="cuda:1" if llm.torch.cuda.device_count() > 1 else "cpu",
         )
-    graph = _install_adapters(llm, embeddings, expected, reranker)
+    graph = _install_adapters(llm, embeddings, pinned_sources, reranker)
 
     smoke = _run_suite(
         args.suite,

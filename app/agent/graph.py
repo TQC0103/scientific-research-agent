@@ -7,9 +7,10 @@ from app.config import settings
 from app.db.database import search_local
 from app.ingestion.indexing import index_paper
 from app.models.claim_verifier import (
+    ClaimRepairRunError,
     ClaimVerificationRunError,
     claim_completeness_issues,
-    repair_answer_claims,
+    repair_answer_claims_bounded,
     verify_answer_claims_bounded,
 )
 from app.models.claims import ClaimVerdict, ClaimVerificationBundle
@@ -27,6 +28,9 @@ MULTI_PAPER_PATTERN = re.compile(
     r"|so sánh|khác nhau|giống nhau|hai (bài|paper)",
     re.IGNORECASE,
 )
+TITLE_ALIAS_STOPWORDS = frozenset(
+    {"a", "an", "and", "for", "in", "of", "on", "the", "to", "with"}
+)
 
 
 def _merge_candidates(*groups: list[dict]) -> list[dict]:
@@ -39,6 +43,57 @@ def _merge_candidates(*groups: list[dict]) -> list[dict]:
 
 def _requires_multi_paper(query: str) -> bool:
     return bool(MULTI_PAPER_PATTERN.search(query))
+
+
+def _paper_alias_in_question(question: str, title: str) -> str | None:
+    """Find a title token or leading-title acronym explicitly used by the user."""
+    title_tokens = re.findall(r"[A-Za-z0-9]+", title)
+    content_tokens = [
+        token for token in title_tokens if token.casefold() not in TITLE_ALIAS_STOPWORDS
+    ]
+    candidates = ([content_tokens[0]] if content_tokens else []) + [
+        "".join(token[0] for token in content_tokens[:length])
+        for length in range(2, min(5, len(content_tokens)) + 1)
+    ]
+    for candidate in dict.fromkeys(candidates):
+        if len(candidate) < 2:
+            continue
+        match = re.search(rf"(?<!\w){re.escape(candidate)}(?!\w)", question, re.IGNORECASE)
+        if match:
+            return match.group(0)
+    return None
+
+
+def _paper_local_verification_question(
+    question: str,
+    *,
+    target_title: str,
+    peer_titles: list[str],
+) -> str:
+    """Split the common `How do A and B ... differently?` comparison shape."""
+    target_alias = _paper_alias_in_question(question, target_title)
+    peer_aliases = [
+        alias
+        for title in peer_titles
+        if (alias := _paper_alias_in_question(question, title)) is not None
+    ]
+    if target_alias is None or not peer_aliases:
+        return question
+    for peer_alias in peer_aliases:
+        for left, right in ((target_alias, peer_alias), (peer_alias, target_alias)):
+            pattern = re.compile(
+                rf"^How\s+do\s+{re.escape(left)}\s+and\s+{re.escape(right)}\s+"
+                r"(?P<predicate>.+?)\s+differently(?P<tail>.*?)\??$",
+                re.IGNORECASE,
+            )
+            match = pattern.match(question.strip())
+            if not match:
+                continue
+            predicate = match.group("predicate").strip()
+            tail = match.group("tail").strip()
+            suffix = f" {tail}" if tail else ""
+            return f"How does {target_alias} {predicate}{suffix}?"
+    return question
 
 
 def _group_evidence(evidence: list[dict]) -> dict[str, list[dict]]:
@@ -132,6 +187,7 @@ def discover(state: AgentState) -> dict:
         "claim_verification_output_normalized": False,
         "claim_completeness_issues": [],
         "claim_revision_count": 0,
+        "claim_repair_model_call_count": 0,
         "claim_revision_history": [],
         "papers_to_retrieve": [],
         "discovery_source": source,
@@ -244,25 +300,30 @@ def check_evidence(state: AgentState) -> dict:
         verifier_failed = False
         paper = papers.get(paper_id, {})
         scope = None
+        verification_question = state["user_query"]
         if multi_paper:
+            verification_question = _paper_local_verification_question(
+                state["user_query"],
+                target_title=paper.get("title", ""),
+                peer_titles=[
+                    candidate.get("title", "")
+                    for candidate_id, candidate in papers.items()
+                    if candidate_id != paper_id
+                ],
+            )
             scope = (
                 f"Assess coverage only for arXiv:{paper_id} "
                 f"({paper.get('title', 'Unknown title')}). Decide whether this paper supplies "
                 "enough evidence for its own side of the multi-paper question. Every requested "
                 "comparison dimension about this paper must have direct passage support. Do not "
-                "require passages about the other papers."
+                "require passages about the other papers. Mark this paper sufficient when its "
+                "own requested side is directly supported, even when the passages never name "
+                "the compared papers. If a requested dimension for this paper is absent, mark "
+                "it insufficient and make the missing fact and suggested query paper-local."
             )
-            verification_question = (
-                f"For arXiv:{paper_id} only, do these passages provide this paper's own "
-                "information for every requested comparison dimension? If even one dimension "
-                "is absent, mark insufficient and target it in the new query. Ignore all missing "
-                f"information about other papers. Original comparison: {state['user_query']}"
-            )
-        else:
-            verification_question = state["user_query"]
         try:
             result = verify_evidence(
-                verification_question, verifier_evidence, current, scope
+                verification_question, verifier_evidence, verification_question, scope
             )
             verification = result.model_dump()
         except (ValueError, OSError) as exc:
@@ -434,6 +495,7 @@ def synthesize(state: AgentState) -> dict:
         "claim_verification_output_normalized": False,
         "claim_completeness_issues": [],
         "claim_revision_count": 0,
+        "claim_repair_model_call_count": 0,
         "claim_revision_history": [answer] if evidence_sufficient else [],
     }
 
@@ -511,11 +573,12 @@ def route_after_claim_verification(state: AgentState) -> str:
 
 def revise_answer(state: AgentState) -> dict:
     revisions = state.get("claim_revision_count", 0) + 1
+    repair_calls = state.get("claim_repair_model_call_count", 0)
     history = list(state.get("claim_revision_history", []))
     papers = {paper["arxiv_id"]: paper for paper in state.get("candidate_papers", [])}
     try:
         verification = ClaimVerificationBundle.model_validate(state.get("claim_verification", {}))
-        answer = repair_answer_claims(
+        repair = repair_answer_claims_bounded(
             state["user_query"],
             state["answer"],
             state.get("verified_evidence", []),
@@ -523,11 +586,14 @@ def revise_answer(state: AgentState) -> dict:
             verification,
             state.get("claim_completeness_issues", []),
         )
+        answer = repair.answer
+        repair_calls += repair.model_calls
         history.append(answer)
         return {
             "answer": answer,
             "synthesis_citation_valid": "\n\nSources:\n" in answer,
             "claim_revision_count": revisions,
+            "claim_repair_model_call_count": repair_calls,
             "claim_revision_history": history,
             "claim_verification_status": "not_run",
             "claim_verification_error": None,
@@ -536,8 +602,11 @@ def revise_answer(state: AgentState) -> dict:
             "claim_completeness_issues": [],
         }
     except (ValueError, OSError) as exc:
+        if isinstance(exc, ClaimRepairRunError):
+            repair_calls += exc.model_calls
         return {
             "claim_revision_count": revisions,
+            "claim_repair_model_call_count": repair_calls,
             "claim_revision_history": history,
             "claim_verification_status": "invalid",
             "claim_verification_error": str(exc),

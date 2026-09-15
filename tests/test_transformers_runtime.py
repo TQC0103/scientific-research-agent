@@ -5,8 +5,26 @@ import pytest
 
 from scripts.run_end_to_end_transformers import (
     TransformersRuntime,
+    _metadata_from_pinned_source,
     _smoke_failure_diagnostics,
 )
+
+
+def test_pinned_benchmark_metadata_avoids_live_arxiv_dependency() -> None:
+    metadata = _metadata_from_pinned_source(
+        "2005.11401",
+        {
+            "versioned_id": "2005.11401v4",
+            "title": "Retrieval-Augmented Generation",
+            "pdf_url": "https://arxiv.org/pdf/2005.11401v4",
+        },
+    )
+
+    assert metadata["arxiv_id"] == "2005.11401"
+    assert metadata["versioned_id"] == "2005.11401v4"
+    assert metadata["version"] == 4
+    assert metadata["pdf_url"].endswith("2005.11401v4")
+    assert metadata["abstract"] == ""
 
 
 class FakeOutOfMemoryError(RuntimeError):

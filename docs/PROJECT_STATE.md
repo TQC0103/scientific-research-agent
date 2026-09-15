@@ -24,6 +24,12 @@ Last updated: 2026-09-15
   `0.8400`, answer F1 `0.3699`, Recall@5 `0.8333`, and claim-verifier failure
   `0.0400`. It is diagnostic development data, not the frozen R10 baseline or
   held-out accuracy.
+- Latest focused quality regression: LoRA/RAG R31 job
+  `job_5a030a7481b34e5d80048c54441726b4` on exact T4. Its one development
+  comparison returned the expected verified answer after one deterministic
+  span-pruning revision, with Recall@K, gold coverage, and required-paper
+  coverage all `1.0000`, answer F1 `0.4386`, and no execution/tool/OOM error.
+  This does not replace the full R23 checkpoint.
 - Task 6 implementation commits: `174d1c3`, `6ab0811`; Task 9 commit:
   `1dc5f9d`; Task 7 commit: `0e77634`; Task 8 commits: `ea3a973`, `a4d37e7`;
   SciFact commit: `7959e07`; Task 10 commit: `70e762d`; Task 11 runner commit:
@@ -34,7 +40,7 @@ Last updated: 2026-09-15
   baseline and separate 25-case development expansion, the 22-case controlled
   verifier definition, citation fixtures, and the
   claim-verification contract, synthetic claim-verifier outputs, and Task 11
-  report schema/node-stream/baseline behavior validated; Ruff passed and all 182
+  report schema/node-stream/baseline behavior validated; Ruff passed and all 189
   pytest tests passed. Native QASPER loaded all 5,049
   questions and native SciFact loaded all 300 labeled dev claims. No local model
   benchmark was run.
@@ -61,6 +67,8 @@ Last updated: 2026-09-15
   ImageNet, and top-1 metric requests; mismatched selected passages can only be
   downgraded to insufficient evidence
 - Per-paper evidence/query/retry maps and required coverage for comparisons
+- Deterministic paper-local verification questions for recognized `How do A
+  and B ... differently?` comparisons; aggregate all-paper coverage is unchanged
 - Verified-passage-only synthesis, fail-closed numeric citation labels, and
   deterministic citation metadata; missing/invalid labels never receive an
   automatic source
@@ -124,6 +132,10 @@ Last updated: 2026-09-15
   bundle into the existing bounded repair path, records the deterministic issues
   in graph state, and requires explicit cited evidence before accepting a claim
   that a paper omitted information
+- Claim extraction rejects multi-claim evidence-derived details absent from the
+  selected answer span. Repair may delete exact wholly unsupported standalone
+  spans without an LLM, while partial/mixed spans retain the one-call repair
+  boundary; revision and repair-model-call counters are separate
 - Task 11 end-to-end evaluator and `python -m evaluation.run` command over the
   production node-update stream, with versioned schema, automatic node/final-state
   traces, exact-suite identity, registered metrics, case-level failure isolation,
@@ -136,6 +148,9 @@ Last updated: 2026-09-15
   result collection
 - Repeatable `--case-id` selection for narrow end-to-end GPU regressions; smoke
   and measured runs share the selected cases and manifests record the selection
+- Pinned benchmark metadata derived from reviewed source/suite artifacts,
+  removing the live arXiv Atom API from the Kaggle execution dependency while
+  retaining real pinned-PDF download and ingestion
 - Seven-case Task 8 synthetic development benchmark using the production
   prompt/parser, structural extraction/verdict/relationship metrics, fail-closed
   citation accounting, raw-response diagnostics, and a narrow pinned Qwen3-4B
@@ -153,7 +168,8 @@ Last updated: 2026-09-15
 2. Reuse current indexes or lazily download, validate, parse, chunk, embed, and
    index selected revisions; fall back to labeled abstract evidence on failure.
 3. Run hybrid retrieval separately per paper, retain at most eight accumulated
-   passages per paper, send at most six ranked passages to each verifier call,
+   passages per paper, send at most five ranked passages to each verifier call,
+   split recognized A/B `differently` comparisons into paper-local checks,
    apply deterministic semantic anchors, and require every
    positive verification to have valid supporting IDs with no missing elements;
    retry with at most two focused query rewrites per paper.
@@ -165,10 +181,10 @@ Last updated: 2026-09-15
 6. Split the answer into immutable citation-scoped spans and verify atomic claims
    by model-selected span ID, then derive claim IDs, exact source/label fields,
    and verdicts in code.
-   Retry malformed output
-   structure once without repeating evidence. Return when supported; revise
-   partial/mixed content once and verify again; otherwise abstain. Neither retry
-   branch can exceed its fixed bound.
+   Retry malformed output structure once without repeating evidence. Return
+   when supported; prune exact wholly unsupported standalone spans or revise
+   partial/mixed content once, then verify again; otherwise abstain. Neither
+   retry branch can exceed its fixed bound.
 
 This flow is shared by CLI and Gradio. CLI `--trace` currently prints discovery,
 paper selection, coverage, and retrieval attempts, but not the new claim bundle
@@ -569,7 +585,9 @@ aggregate is now the first ignored development regression baseline.
   answer that omitted a requested numeric value present in approved evidence
   while claim verification falsely accepted its absence assertion. Decision
   accuracy alone hides the last failure, so answer and claim traces remain
-  mandatory for evaluation.
+  mandatory for evaluation. Focused R27 and R31 now recover all three observed
+  LoRA cases, but only a new full-suite run can show whether the changes regress
+  other cases.
 - The ten internal cases are repo-authored and tuned development data. The two
   negative cases were human-adjudicated after a full-paper audit on 2026-08-27;
   the eight answer cases were independently source-audited on 2026-08-30. The
@@ -587,8 +605,8 @@ aggregate is now the first ignored development regression baseline.
 
 ## Next priorities
 
-1. Diagnose the three R23 LoRA claim-grounding/structure abstentions and prefer
-   prompt/contract fixes over adding broad parser normalizations.
+1. Run the full 25-case suite after the R27-R31 LoRA fixes and compare it with
+   R23 before treating the focused recoveries as a new checkpoint.
 2. Analyze `resnet_degradation_problem` as a retrieval/evidence miss separately
    from generation and claim verification.
 3. Improve table-aware synthesis/repair without weakening the validated R26
